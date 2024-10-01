@@ -26,6 +26,9 @@ logic sof, reset_n;                                         //Start of frame & A
 //Clock instantiation
 always #4 clk = ~clk;
 
+
+/********* Function & Task Declarations ***********/
+
 /*
  * @brief Function used to generate a packet with random values
  * @note The packet is constrained to a random size (64 - 1500 bytes)
@@ -83,8 +86,6 @@ function automatic [31:0] crc32_reference_model;
     
 endfunction : crc32_reference_model
 
-assign reset = (sof || ~reset_n);
-
 /*
  * @brief Controls the flow of data into the DUT
  * @param i_byte_stream Stream of bytes to pass into the DUT
@@ -115,12 +116,13 @@ task drive_crc32_data;
 
 endtask : drive_crc32_data
 
+assign reset = (sof || ~reset_n);
+logic [7:0] i_stream [];
+
 //Init CRC LUT
 initial begin
     $readmemb("C:/Users/klaze/Xilinx_FGPA_Projects/FPGA_Based_Network_Stack/Software/CRC_LUT.txt", crc_lut);
 end
-
-logic [7:0] i_stream [];
 
 //Testbench Logic
 initial begin
@@ -131,8 +133,8 @@ initial begin
     #50;
     reset_n = 1'b1;
       
-      
-    for(int i = 0; i < 20; i++) begin
+    //Generate 50 packets to transmit to the CRC32
+    for(int i = 0; i < 50; i++) begin
         /* Generate Random Packet to Transmit */
         generate_packet(i_stream);
         
@@ -141,13 +143,11 @@ initial begin
         
         /* Compare output to reference model */
         assert(crc_out == crc32_reference_model(i_stream)) 
-            else $display("Actual output DID NOT match the reference model");
+            else $fatal("Actual output DID NOT match the reference model");
     end
     
     $finish;
     
 end
-
-
 
 endmodule
