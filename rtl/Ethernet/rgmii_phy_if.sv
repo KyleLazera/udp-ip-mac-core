@@ -30,8 +30,8 @@ module rgmii_phy_if
     
     /* MAC Interface */
     input wire [7:0] rgmii_mac_tx_data,       //tx data to transmit to the PHY
-    input wire rgmii_mac_tx_dv,               //tx data valid signal - used for the rxctl        
-    input wire rgmii_mac_tx_er,               //tx data error - used for rxctl
+    input wire rgmii_mac_tx_dv,               //tx data valid signal - indicates to the PHY that the data is valid and it can be transmitted       
+    input wire rgmii_mac_tx_er,               //tx data error - Indicates an error in the data
     output wire rgmii_mac_tx_rdy,             //Signal to indicate new data can be driven from MAC
     output wire rgmii_mac_rx_clk,             //RX PHY clock
     output wire [7:0] rgmii_mac_rx_data,      //Data recieved from PHY
