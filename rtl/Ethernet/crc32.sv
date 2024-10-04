@@ -63,7 +63,7 @@ reg [DATA_WIDTH-1:0] table_index;                       //Holds the index into t
 
 /* Initialize the LUT in ROM */
 initial begin 
-    $readmemb("CRC_LUT.txt", crc_table);
+    $readmemb("C:/Users/klaze/Xilinx_FGPA_Projects/FPGA_Based_Network_Stack/Software/CRC_LUT.txt", crc_table);
 end
 
 /* Intermediary Logic */
