@@ -4,23 +4,37 @@
  * and improve overall latency. This algorithm leverages the linearity of CRCs, relying on the equation:
  * CRC(A ^ B) = CRC(A) ^ CRC(B). 
  *
+ * Notes on Latency:
  * The implementation utilizes a lookup table (LUT) containing precomputed CRC32 values for each byte,
  * ranging from 0 to 255. This LUT was populated using C code, which can be found in the Software directory.
- * Due to the use of the parallelized implementation instead of the serial implementation, the latency of 
- * the CRC algorithm is improved by a factor of 8. In the serial implementation, calculating the CRC32 for a byte 
- * takes 8x ns, where x is a clock cycle (bit-by-bit). However, this implementation allows a singular byte to 
- * be computed in x clock cycle(s). Therefore, to calculate the CRC for 10 bytes in the serial implementation 
- * would take: 8(10) = 80 clock cycles (each clock cycle is 8 ns, resulting in 640 ns). In contrast, the 
- * parallelized implementation takes only 10 clock cycles (80 ns).
+ * Unlike the serial implementation, which processes the CRC32 calculation bit-by-bit (resulting in a latency
+ * of 8 clock cycles per byte), this implementation is fully parallelized, enabling the CRC32 computation for
+ * a byte to be completed in a single clock cycle. Therefore, calculating the CRC for 10 bytes takes only
+ * 10 clock cycles, dramatically reducing latency.
  *
- * The algorithm is as follows:
- * 1) Invert the input byte so that the most significant bit becomes the least significant bit.
- * 2) XOR the input byte with the most significant bit (MSB) of the CRC state (initialized to 0xFFFFFFFF).
- * 3) Use this value as the index into the LUT (this will provide the precomputed CRC32 value for this byte).
- * 4) Shift the CRC state left by 8 bits (to make room for the new byte) and XOR with the output of the LUT.
- * 5) This is the new CRC state. If this was not the final byte, return to step 1.
- * 6) If this was the final byte, reverse the bits again and XOR them with 0xFFFFFFFF (invert).
- * 7) This is the output value.
+ * In the serial implementation, calculating the CRC32 for a byte takes 8x ns, where x is a clock cycle (bit-by-bit).
+ * For example, calculating the CRC32 for 10 bytes in the serial implementation would take: 8(10) = 80 clock cycles
+ * (each clock cycle is 8 ns, resulting in 640 ns). In contrast, this parallelized implementation takes only
+ * 10 clock cycles (80 ns). This means, 8 bits can be process in 8 ns (1 period), leading to 1 bit per ns. This ensures
+ * Gbit processing.
+ *
+ * Algorithm:
+ * 1. The input byte is inverted such that the most significant bit (MSB) becomes the least significant bit (LSB).
+ * 2. The inverted input byte is XORed with the most significant byte of the input CRC state (which is initialized
+ *    to `0xFFFFFFFF` for the first input).
+ * 3. The result is used as an index into the LUT, providing the precomputed CRC32 value for this byte.
+ * 4. The CRC state is shifted left by 8 bits (to make room for the new byte), and the result is XORed with the output
+ *    of the LUT.
+ * 5. This result becomes the updated CRC state. The module outputs the updated CRC32 value in the same clock cycle
+ *    the input byte is received.
+ *
+ * Important Notes:
+ * - The module processes the CRC32 calculation for a given input byte in purely combinational logic and outputs the
+ *   updated CRC state on the same clock cycle as the input data.
+ * - The CRC state must be input to the module and updated externally after each calculation to maintain correct operation
+ *   across multiple bytes.
+ * - This design enables high-speed, real-time processing, allowing the calculation of the CRC32 checksum at line rate
+ *   for Gbit Ethernet applications.
  *
  * CRC Parameters:
  * - REFIN: Set to true, indicating that the input bits are reversed in the algorithm.
@@ -44,10 +58,11 @@ module crc32
     input wire reset,
     /* Input Signals */
     input wire [DATA_WIDTH-1:0] i_byte,         //Input Byte 
+    input wire [CRC_WIDTH-1:0] i_crc_state,     //Input CRC State (this is initialized to 0xFFFFFFF or the output CRC State)
     input wire crc_en,                          //Enables the CRC indicating data has been passed in
-    input wire eof,                             //End of frame signal - causes output CRC to be inverted & reversed
     /* Ouput Signals */             
-    output wire [31:0] crc_out                  //Output CRC value
+    output wire [CRC_WIDTH-1:0] crc_out,        //Output CRC value
+    output wire [CRC_WIDTH-1:0] o_crc_state     //Outputs the current CRC State after a calculation
 );
 
 /* Local Parameters */
@@ -56,10 +71,10 @@ localparam TABLE_WIDTH = CRC_WIDTH;
 
 /* Signal Declaratios */
 reg [TABLE_WIDTH-1:0] crc_table [TABLE_DEPTH-1:0];      //Init LUT that holds precomputed CRC32 values for each byte value (0 - 255)
-reg [CRC_WIDTH-1:0] crc_state, crc_next;                //Register that holds the state of the CRC
 reg [DATA_WIDTH-1:0] i_byte_rev;                        //Used to reverse the bit order of the input byte
 reg [CRC_WIDTH-1:0] o_crc_inv, o_crc_rev;               //Used for reversing and inverting the final CRC output value
 reg [DATA_WIDTH-1:0] table_index;                       //Holds the index into the LUT
+reg [CRC_WIDTH-1:0] crc_next;                           //Holds the next CRC calculation
 
 /* Initialize the LUT in ROM */
 initial begin 
@@ -67,41 +82,32 @@ initial begin
 end
 
 /* Intermediary Logic */
-always @(*) begin
-    crc_next = crc_state;
-    
+always @(*) begin   
     if(crc_en) begin
         //Reverse the input byte
         for(int i = 0; i < 8; i++) 
             i_byte_rev[i] = i_byte[(DATA_WIDTH-1)-i];  
         
         //Calculate Table index based on i_byte
-        table_index = i_byte_rev ^ crc_state[31:24];
+        table_index = i_byte_rev ^ i_crc_state[31:24];
         //XOR output of LUT with teh current CRC state
-        crc_next = {crc_state[24:0], 8'h0} ^ crc_table[table_index];    
-    end
+        crc_next = {i_crc_state[24:0], 8'h0} ^ crc_table[table_index];          
+    end 
 end
 
 /* Invert and Reverse the CRC State - output used only when EOF is set */
 generate 
     genvar j;
     //Invert the output CRC value
-    assign o_crc_inv = ~crc_state;
+    assign o_crc_inv = ~crc_next;
     // Reverse the bit order for the output CRC
     for(j = 0; j < 32; j++) 
-        assign o_crc_rev[j] = o_crc_inv[(CRC_WIDTH-1)-j]; 
-        
+        assign o_crc_rev[j] = o_crc_inv[(CRC_WIDTH-1)-j];       
 endgenerate
 
-/* Sequential Logic to update the CRC state */
-always @(posedge clk) begin
-    if(reset) 
-        crc_state <= 32'hFFFFFFFF;
-    else 
-        crc_state <= crc_next;  
-end
 
 /* Output Logic */
-assign crc_out = (eof) ? o_crc_rev : crc_state;
+assign o_crc_state = crc_next;
+assign crc_out = o_crc_rev;
 
 endmodule

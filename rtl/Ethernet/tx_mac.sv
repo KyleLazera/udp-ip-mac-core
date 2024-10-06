@@ -65,7 +65,7 @@ typedef enum{IDLE,              //State when no transactions are occuring
 state_type state_reg, state_next;                               //Holds the current and next State 
 reg [DATA_WIDTH-1:0] tx_data_reg, tx_data_next;                 //Holds data to be transmitted to RGMII
 reg [2:0] byte_ctr, byte_ctr_next;                              //Counts the number of bytes transmitted
-reg [5:0] pckt_size, pckt_size_next;                            //Counts size of payload in bytes (Ensure they payload is between 46 - 1500 bytes) 
+reg [7:0] pckt_size, pckt_size_next;                            //Counts size of payload in bytes (Ensure they payload is between 46 - 1500 bytes) 
 reg mii_sdr, mii_sdr_next;                                      //Indicates the next data transfer needs to shift byte by 4 (for SDR in MII mode)
 reg axis_rdy_reg, axis_rdy_next;                                //Implements a FF between the outgoing s_tx_axis_rdy signal and FIFO  
 reg [3:0] ifg_ctr, ifg_ctr_next;
@@ -84,7 +84,7 @@ always @(posedge clk) begin
         state_reg <= IDLE;
         tx_data_reg <= 8'h0;
         byte_ctr <= 3'h0;
-        pckt_size <= 6'h0;
+        pckt_size <= 8'h0;
         mii_sdr <= 1'b0;
         axis_rdy_reg <= 1'b0;
         sof_reg <= 1'b1;
@@ -118,10 +118,12 @@ assign crc_data_in = crc_in_data_reg;
 always @(*) begin
     /* Default Assignments */
     state_next = state_reg;
+    tx_data_next = tx_data_reg;
     byte_ctr_next = byte_ctr;
     pckt_size_next = pckt_size;
     crc_in_data_next = crc_in_data_reg;
     ifg_ctr_next = ifg_ctr;
+    mii_sdr_next = 1'b1;
     axis_rdy_next = 1'b0;
     sof_next = 1'b0;
     eof_next = 1'b0;
@@ -154,13 +156,19 @@ always @(*) begin
                 end
             end
             PREAMBLE : begin
-                //If all 7 bytes of the Header have been sent, transmit the SFD 
-                if(byte_ctr == 3'd7) begin
+                //Set the s_axis_trdy flag high here, so we have incoming data when we enter the PACKET State
+                if(byte_ctr == 3'd6) begin
+                    axis_rdy_next = 1'b1; 
+                    tx_data_next = ETH_HDR;
+                    byte_ctr_next = byte_ctr + 1;
+                end
+                //If all 7 bytes of the Header have been sent, transmit the SFD  
+                else if(byte_ctr == 3'd7) begin
                     tx_data_next = ETH_SFD;                    
                     mii_sdr_next = 1'b1;
                     byte_ctr_next = 3'd0;
                     pckt_size_next = 6'd0;
-                    axis_rdy_next = 1'b1;       //TODO: Readjust the position of this signal - intended to set rdy so when we enter the PACKET state we recieve data
+                    axis_rdy_next = 1'b1;     
                     state_next = PACKET;
                 end else begin
                     tx_data_next = ETH_HDR;
@@ -179,22 +187,29 @@ always @(*) begin
                 //If the last beat has arrived OR there is no more valid data in the FIFO
                 //TODO: Possibly deal with error flag here for RGMII
                 if(s_tx_axis_tlast || !s_tx_axis_tvalid) begin
-                    if(pckt_size > 60) begin
+                    if(pckt_size > 59) begin
                         byte_ctr_next = 3'd4;
-                        state_next = FCS;
-                    end else
+                        eof_next = 1'b1;
+                        state_next = FCS;                        
+                    end else begin
                         state_next = PADDING;
+                    end
                 end
             end
             PADDING : begin
-                tx_data_next = ETH_PAD;
+                crc_en_next = 1'b1;
                 crc_in_data_next = ETH_PAD;
-                mii_sdr_next = 1;             
+                tx_data_next = ETH_PAD;                
+                mii_sdr_next = 1;   
+                pckt_size_next = pckt_size + 1;    
                 
-                if(pckt_size > 60)
+                if(pckt_size > 59) begin
+                    crc_en_next = 1'b0;
+                    eof_next = 1'b1;
+                    byte_ctr_next = 3'd4;
                     state_next = FCS;
-                else 
-                    pckt_size_next = pckt_size + 1;
+                end //else 
+                    //pckt_size_next = pckt_size + 1;
             end            
             FCS : begin
                 eof_next = 1'b1;
