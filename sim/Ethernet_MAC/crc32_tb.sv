@@ -16,7 +16,6 @@ localparam POLY = 32'h04C11DB7;
 
 /* Module Signal Declarations */
 logic clk;
-logic reset;
 logic crc_en;
 logic [DATA_WIDTH-1:0] i_byte;
 logic [CRC_WIDTH-1:0] crc_out, o_crc_state, i_crc_state;
@@ -30,6 +29,7 @@ logic [CRC_WIDTH-1:0] crc_state, crc_next;                  //these will be used
 logic reset_n, sof;                                         //Start of frame & Active low reset signal
 logic [DATA_WIDTH-1:0] i_stream [];                         //Stores the packet to transmit
 logic [DATA_WIDTH-1:0] i_data;                              //Stores byte from each packet to transmit
+logic reset;
 
 //Clock instantiation
 always #4 clk = ~clk;

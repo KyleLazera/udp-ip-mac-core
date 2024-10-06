@@ -49,7 +49,7 @@ module tx_mac
 localparam [7:0] ETH_HDR = 8'h55;               
 localparam [7:0] ETH_SFD = 8'hD5;  
 localparam [7:0] ETH_PAD = 8'h00;    
-localparam MIN_FRAME = 60;                                  //46 minimum Payload + 12 Address Bytes + 2 Type/Length Bytes         
+localparam MIN_FRAME_WIDTH = 59;                            //46 byte minimum Payload + 12 Address Bytes + 2 Type/Length Bytes = 60 bytes         
 
 /* FSM State Declarations */
 typedef enum{IDLE,              //State when no transactions are occuring
@@ -71,12 +71,13 @@ reg axis_rdy_reg, axis_rdy_next;                                //Implements a F
 reg [3:0] ifg_ctr, ifg_ctr_next;
 
 /* CRC32 Interface Signals */
-reg [31:0] crc_state;                                           //holds the output state of the CRC32 module
-reg [DATA_WIDTH-1:0] crc_in_data_reg, crc_in_data_next;         //Holds the input values for the CRC32 module
+reg [31:0] crc_state, crc_next;                                 //Holds the output state of the CRC32 module                                       
+reg [DATA_WIDTH-1:0] crc_in_data_reg, crc_in_data_next;         //Holds the input values for the CRC32 module                               
+reg crc_en_reg, crc_en_next;                                    //Register that holds crc_en state 
 wire [DATA_WIDTH-1:0] crc_data_in;                              //Signal that drives the CRC data into the module
-reg sof_reg, sof_next, eof_reg, eof_next;                       //Holds start/end of frame signals for CRC32
-reg crc_en_reg, crc_en_next;                                    //Register that holds crc_en state                               
-wire sof, crc_en, eof;                                          //Start of Frame Signal, CRC enable, End of Frame                 
+reg sof;                                                        //Start of frame signal                              
+wire crc_en;                                                    //CRC enable - this enables the CRC32 module to operate  
+wire [31:0] crc_data_out;    
 
 /* Sequential Logic */
 always @(posedge clk) begin
@@ -87,11 +88,10 @@ always @(posedge clk) begin
         pckt_size <= 8'h0;
         mii_sdr <= 1'b0;
         axis_rdy_reg <= 1'b0;
-        sof_reg <= 1'b1;
         crc_en_reg <= 1'b0;
-        eof_reg <= 1'b0;
         crc_in_data_reg <= 1'b0;
         ifg_ctr <= 1'b0;
+        crc_state <= 32'hFFFFFFFF;
     end else begin
         state_reg <= state_next;
         tx_data_reg <= tx_data_next;
@@ -99,18 +99,22 @@ always @(posedge clk) begin
         pckt_size <= pckt_size_next;
         mii_sdr <= mii_sdr_next;
         axis_rdy_reg <= axis_rdy_next;
-        sof_reg <= sof_next;
         crc_en_reg <= crc_en_next;
-        eof_reg <= eof_next;
         crc_in_data_reg <= crc_in_data_next;
         ifg_ctr <= ifg_ctr_next;
+        
+        /* Logic to update CRC State */
+        if(sof)
+            crc_state <= 32'hFFFFFFFF;
+        else if(crc_en)
+            crc_state <= crc_next;
+        else
+            crc_state <= crc_state;
     end
 end
 
 /* Control Signals */
 
-assign sof = sof_reg;
-assign eof = eof_reg;
 assign crc_en = crc_en_reg;
 assign crc_data_in = crc_in_data_reg;
 
@@ -125,8 +129,6 @@ always @(*) begin
     ifg_ctr_next = ifg_ctr;
     mii_sdr_next = 1'b1;
     axis_rdy_next = 1'b0;
-    sof_next = 1'b0;
-    eof_next = 1'b0;
     crc_en_next = 1'b0;
  
     //If the RGMII is NOT ready to recieve data - pause the FSM operation
@@ -152,7 +154,6 @@ always @(*) begin
                     mii_sdr_next = 1'b0;
                     pckt_size_next = 6'b0;
                     state_next = PREAMBLE;
-                    sof_next = 1'b1;
                 end
             end
             PREAMBLE : begin
@@ -187,44 +188,42 @@ always @(*) begin
                 //If the last beat has arrived OR there is no more valid data in the FIFO
                 //TODO: Possibly deal with error flag here for RGMII
                 if(s_tx_axis_tlast || !s_tx_axis_tvalid) begin
-                    if(pckt_size > 59) begin
-                        byte_ctr_next = 3'd4;
-                        eof_next = 1'b1;
+                    if(pckt_size > MIN_FRAME_WIDTH) begin
+                        byte_ctr_next = 3'd3;
                         state_next = FCS;                        
                     end else begin
                         state_next = PADDING;
                     end
                 end
             end
-            PADDING : begin
-                crc_en_next = 1'b1;
+            PADDING : begin            
                 crc_in_data_next = ETH_PAD;
-                tx_data_next = ETH_PAD;                
-                mii_sdr_next = 1;   
-                pckt_size_next = pckt_size + 1;    
+                tx_data_next = ETH_PAD;
+                pckt_size_next = pckt_size + 1;                               
+                crc_en_next = 1'b1;                                 
+                mii_sdr_next = 1'b1; 
                 
-                if(pckt_size > 59) begin
-                    crc_en_next = 1'b0;
-                    eof_next = 1'b1;
-                    byte_ctr_next = 3'd4;
+                //Once 59 bytes has been transmitted, shift to the FCS. The 60th byte will be transmitted
+                //on the clock edge that triggers the state change    
+                if(pckt_size > (MIN_FRAME_WIDTH-1)) begin                   
+                    byte_ctr_next = 3'd3;
                     state_next = FCS;
-                end //else 
-                    //pckt_size_next = pckt_size + 1;
+                end 
             end            
             FCS : begin
-                eof_next = 1'b1;
                 //Multiplex to determine which bytes to transmit
                 case (byte_ctr)
-                    3'b11 : tx_data_next = crc_state[7:0];
-                    3'b10 : tx_data_next = crc_state[15:8];
-                    3'b01 : tx_data_next = crc_state[23:16];
-                    3'b00 : tx_data_next = crc_state[31:24];
+                    3'b11 : tx_data_next = crc_data_out[7:0];
+                    3'b10 : tx_data_next = crc_data_out[15:8];
+                    3'b01 : tx_data_next = crc_data_out[23:16];
+                    3'b00 : tx_data_next = crc_data_out[31:24];
                 endcase
                 mii_sdr_next = 1;
                 
-                //Ensure all 32 bits (4 bytes) of the CR are transmitted
+                //Ensure all 32 bits (4 bytes) of the CRC are transmitted
                 if(byte_ctr == 0) begin                    
                     state_next = IFG;
+                    ifg_ctr_next = 4'd0;
                 end else
                     byte_ctr_next = byte_ctr - 1;
             end
@@ -241,11 +240,11 @@ end
 /* CRC32 Module Instantiation */
 crc32 #(.DATA_WIDTH(8)) 
 crc_module(.clk(clk),
-           .reset(sof || ~reset_n),
            .i_byte(crc_data_in),
+           .i_crc_state(crc_state),
            .crc_en(crc_en),
-           .eof(eof),
-           .crc_out(crc_state)
+           .o_crc_state(crc_next),
+           .crc_out(crc_data_out)
            );
            
 /* Output Logic */         

@@ -55,7 +55,6 @@ module crc32
 )
 (
     input wire clk,
-    input wire reset,
     /* Input Signals */
     input wire [DATA_WIDTH-1:0] i_byte,         //Input Byte 
     input wire [CRC_WIDTH-1:0] i_crc_state,     //Input CRC State (this is initialized to 0xFFFFFFF or the output CRC State)

@@ -80,7 +80,7 @@ function automatic [31:0] crc32_reference_model;
     
 endfunction : crc32_reference_model
 
-localparam PCKT_SIZE = 59;
+localparam PCKT_SIZE = 57;
 
 /* Function that simulates the FIFO interacting via AXI Stream with the TXMAC */
 task fifo_sim();
