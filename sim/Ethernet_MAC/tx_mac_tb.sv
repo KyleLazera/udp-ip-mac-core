@@ -1,12 +1,5 @@
 `timescale 1ns / 1ps
 
-/*
- * Currently doing manual testing by just driving stimulus to the module and monitoring outputs.
- * This is begin used to develop the module progressivley, rather than just developing it at once
- * and then testing and debugging the entire module.
- * This verification implementation will be improved upon to cover more functionality of teh device.
-*/
-
 module tx_mac_tb;
 
 localparam DATA_WIDTH = 8;
@@ -98,12 +91,14 @@ task fifo_sim();
             last_pckt = (PCKT_SIZE >= 60) ? 1'b1 : 1'b0;
         end
         
+        //Generate random byte values
         s_tx_axis_tdata = $urandom_range(0, 255);
         crc_state = crc32_reference_model(s_tx_axis_tdata, crc_state, last_pckt);
         $display("0x%0h", s_tx_axis_tdata);
         packet_ctr++;
     end
     
+    //If packet size is less than 60, add padding to the CRC reference model
     if(PCKT_SIZE < 60) begin
         for(int i = 0; i < (60 - PCKT_SIZE); i++) begin
             
@@ -124,7 +119,7 @@ endtask : fifo_sim
 
 /* RGMII Interface Task */
 task rgmii_sim();
-    //Simulate a 1000Mbps for now since this is teh targetted throughput. This
+    //Simulate a 1000Mbps for now since this is teh targeted throughput. This
     //means driving the tx rdy signal at all times and pulling mii select low
     mii_select = 1'b0;
     rgmii_mac_tx_rdy = 1'b1;
@@ -137,7 +132,7 @@ initial begin
     #50;
     reset_n = 1;
     
-    //Call he RGMII interface sim
+    //Call the RGMII interface sim
     rgmii_sim();
     s_tx_axis_tvalid = 1'b1;
     
@@ -145,7 +140,9 @@ initial begin
     @(posedge s_tx_axis_trdy);
     
     //Simulate FIFO functionality to transmit data
-    fifo_sim();
+    for(int i = 0; i < 10; i++) begin
+        fifo_sim(); 
+    end
     
     #10000;
     
