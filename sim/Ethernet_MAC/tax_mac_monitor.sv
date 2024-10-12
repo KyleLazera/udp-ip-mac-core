@@ -46,19 +46,21 @@ class tx_mac_monitor;
                         state = PREAMBLE;
                 end
                 PREAMBLE : begin
-                    if(byte_ctr < 8) begin
+                    if(byte_ctr < 7) begin
                         #1 rec_item.preamble[byte_ctr] = vif.rgmii_mac_tx_data;
                         byte_ctr++;
                     end else begin
+                        #1 rec_item.preamble[byte_ctr] = vif.rgmii_mac_tx_data;
                         byte_ctr = 0;
                         state = PAYLOAD;
                     end 
                                                                                        
                 end
                 PAYLOAD : begin                                    
-                    #1 rec_item.payload.push_back(vif.rgmii_mac_tx_data);
+                    #1 rec_item.payload.push_back(vif.rgmii_mac_tx_data);                    
+                    byte_ctr++;
                     
-                    if(last_byte) begin
+                    if(last_byte && byte_ctr > 59) begin
                         last_byte = 1'b0;
                         state = CRC;
                         byte_ctr = 0;
@@ -67,6 +69,8 @@ class tx_mac_monitor;
                             last_byte = 1'b1;
                         end
                     end
+                                        
+                    
                 end
                 CRC : begin
                     //Populate the CRC bytes after small delay

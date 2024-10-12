@@ -14,7 +14,7 @@ class tx_mac_env;
     tx_mac_scb      scb;
     //Init mailboxes and events
     mailbox drv_mbx, scb_mbx;
-    event drv_done;
+    event drv_done, scb_done;
     //Virtual Intf
     virtual tx_mac_if vif;
     //Tag for debugging
@@ -28,10 +28,10 @@ class tx_mac_env;
         drv_mbx = new();
         scb_mbx = new();
         //Components
-        gen = new(drv_mbx, drv_done);
+        gen = new(drv_mbx, drv_done, scb_done);
         drv = new(drv_mbx, drv_done);
         mon = new(scb_mbx);
-        scb = new(scb_mbx);
+        scb = new(scb_mbx, scb_done);
     endfunction : new
     
     task main();

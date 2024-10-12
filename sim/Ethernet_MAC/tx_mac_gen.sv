@@ -8,15 +8,16 @@
 class tx_mac_gen;
     //Mailbox to communicate with driver
     mailbox drv_mbx;
-    //Used to control flow of generator from driver
-    event drv_done;
+    //Used to control flow of generator from driver & scb
+    event drv_done, scb_done;
     //Tag for printing/debugging
     string TAG = "Generator";
     
     //Constructor    
-    function new(mailbox _drv_mbx, event _evt);
+    function new(mailbox _drv_mbx, event _evt_drv, event _evt_scb);
         drv_mbx = _drv_mbx;
-        drv_done = _evt;
+        drv_done = _evt_drv;
+        scb_done = _evt_scb;
     endfunction : new
     
     task main();
@@ -39,7 +40,7 @@ class tx_mac_gen;
             @(drv_done);
         end
         
-        #1000;
+        @(scb_done);
         
         $display("Generator Complete");
         
