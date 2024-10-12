@@ -19,8 +19,8 @@ class tx_mac_trans_item;
     //Remove the CRC as this will be generated, we only want to simulate Addresses, Type/Length & Payload 
     constraint pckt_size_const
     {
-        pckt_size >= 60; //60
-        pckt_size <= 70; //1500
+        pckt_size >= 15; 
+        pckt_size <= 1500; 
     }
   
 endclass : tx_mac_trans_item

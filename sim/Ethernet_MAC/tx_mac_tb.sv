@@ -24,53 +24,6 @@ tx_mac#(.DATA_WIDTH(DATA_WIDTH)) DUT(.clk(clk), .reset_n(reset_n), .s_tx_axis_td
 //Set clk period (8ns for 125 MHz)
 always #4 clk = ~clk;
 
-/*
-
-localparam PCKT_SIZE = 57;
-
-* Function that simulates the FIFO interacting via AXI Stream with the TXMAC *
-task fifo_sim();
-    int packet_ctr = 0;
-    bit last_pckt = 1'b0;
-    reg[31:0] crc_state = 32'hFFFFFFFF;
-  
-    //While TxMAC raises trdy flag & we have not transmitted 100 packets, generate and send
-    //random bytes of data to the TxMAC
-    while(s_tx_axis_trdy && (packet_ctr < PCKT_SIZE)) begin
-        @(posedge clk);
-        //On the last packet raise the tlast flag
-        if(packet_ctr == (PCKT_SIZE-1)) begin
-            s_tx_axis_tlast = 1'b1;
-            last_pckt = (PCKT_SIZE >= 60) ? 1'b1 : 1'b0;
-        end
-        
-        //Generate random byte values
-        s_tx_axis_tdata = $urandom_range(0, 255);
-        crc_state = crc32_reference_model(s_tx_axis_tdata, crc_state, last_pckt);
-        $display("0x%0h", s_tx_axis_tdata);
-        packet_ctr++;
-    end
-    
-    //If packet size is less than 60, add padding to the CRC reference model
-    if(PCKT_SIZE < 60) begin
-        for(int i = 0; i < (60 - PCKT_SIZE); i++) begin
-            
-            if(i == ((60 - PCKT_SIZE) - 1))
-                last_pckt = 1'b1;
-        
-            crc_state = crc32_reference_model(8'h0, crc_state, last_pckt);
-            $display("0x00");        
-        end
-    end
-    
-    @(posedge clk);
-    s_tx_axis_tlast = 1'b0;
-    
-    $display("Calculated CRC32 based on reference model: %0h", crc_state);
-    
-endtask : fifo_sim*/
-
-
 tx_mac_test test_demo;
 
 initial begin

@@ -33,11 +33,11 @@ class tx_mac_driver;
         
         forever begin        
             
+            @(posedge vif.clk);
+            
             if(vif.s_tx_axis_trdy) begin
                 //Fetch data from mailbox 
-                drv_mbx.get(rec_item);
-                
-                @(posedge vif.clk);
+                drv_mbx.get(rec_item);                                
                 
                 //Count the packet sent - used to identify last packet to raise the last flag 
                 byte_ctr++;  
@@ -47,8 +47,9 @@ class tx_mac_driver;
                     vif.s_tx_axis_tlast = 1'b1; 
                     //Send byte to interface if ready signal is high
                     vif.s_tx_axis_tdata = rec_item.data_byte;
-                    //Wait for teh next clock edge to lower the last signal
+                    //Wait for the next clock edge to lower the last signal
                     @(posedge vif.clk);
+                    byte_ctr = 0;
                     vif.s_tx_axis_tlast = 1'b0; 
                     //indicate driver has succesfully transmitted data
                     ->drv_done;                                 

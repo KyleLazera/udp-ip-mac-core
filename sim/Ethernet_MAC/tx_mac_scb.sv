@@ -7,7 +7,7 @@
  * Scoreboard Checks:
  * 1) Ensure the preamble abides by the following pattern: 7 bytes of 8'h55 followed by 1 byte of 8'hD5
  * 2) Ensure the payload size is between 46 - 1500 bytes
- * 3) use a reference model for the CRC calclation
+ * 3) Use a reference model to confirm the CRC calclation
 */
 
 class tx_mac_scb;
@@ -31,6 +31,7 @@ class tx_mac_scb;
     
     task main();
         tx_mac_trans_item mon_item;
+        int pckt_num = 0;
         $display("[%s] Starting...", TAG);
         
         //LUT Init
@@ -53,8 +54,11 @@ class tx_mac_scb;
             assert(crc32_reference_model(mon_item.payload) == {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]})
                 else $fatal(2, "CRC-32 Failed");
                 
-            ->scb_done;
-            
+            if(pckt_num == 9)
+                ->scb_done;
+            else
+                pckt_num++;
+                
         end
                 
     endtask : main

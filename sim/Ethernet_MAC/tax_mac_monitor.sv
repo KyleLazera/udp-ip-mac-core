@@ -41,6 +41,11 @@ class tx_mac_monitor;
             
             case(state)
                 IDLE : begin
+                    //Clear all current variables
+                    rec_item.preamble = '{default: 8'h00};
+                    rec_item.payload = {};
+                    rec_item.fcs = '{default: 8'h00};
+                    byte_ctr = 0;
                     //If there is valid data in the FIFO go to the preamble state
                     if(vif.s_tx_axis_tvalid)
                         state = PREAMBLE;
