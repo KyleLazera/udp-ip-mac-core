@@ -3,7 +3,7 @@
 
 `include "tx_mac_gen.sv"
 `include "tx_mac_driver.sv"
-`include "tx_mac_monitor.sv"
+`include "tax_mac_monitor.sv"
 `include "tx_mac_scb.sv"
 
 class tx_mac_env;

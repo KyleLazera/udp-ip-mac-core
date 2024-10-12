@@ -27,6 +27,8 @@ class tx_mac_gen;
         //Used to randomize teh size of the packet
         gen_item.randomize();
         
+        $display("packet size: %0d", gen_item.pckt_size);
+        
         //Generate the number of bytes based on the packet size
         for(int i = 0; i < gen_item.pckt_size; i++) begin
             //Randomize the byte value
@@ -36,6 +38,10 @@ class tx_mac_gen;
             //Wait for driver to indicate it has transmitted the byte
             @(drv_done);
         end
+        
+        #1000;
+        
+        $display("Generator Complete");
         
     endtask : main
     

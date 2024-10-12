@@ -21,8 +21,10 @@ class tx_mac_monitor;
         bit pckt_synch = 1'b0;
         $display("[%s] Starting...", TAG);
         
+        @(posedge vif.clk);
+        
         forever begin
-            //Sample teh data being transmitted to the RGMII on every clock pulse
+            //Sample the data being transmitted to the RGMII on every clock pulse
             @(posedge vif.clk);
             rec_item.data_byte = vif.rgmii_mac_tx_data;        
             //Transmit this data to the scoreboard

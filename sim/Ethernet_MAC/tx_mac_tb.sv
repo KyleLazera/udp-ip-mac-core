@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+`include "tx_mac_test.sv"
+
 module tx_mac_tb;
 
 localparam DATA_WIDTH = 8;
@@ -8,59 +10,54 @@ localparam TABLE_DEPTH = (2**DATA_WIDTH);
 
 /* Signals */
 logic clk, reset_n;
-logic [DATA_WIDTH-1:0] s_tx_axis_tdata;
-logic s_tx_axis_tvalid;                
-logic s_tx_axis_tlast;                     
-logic s_tx_axis_tkeep;          //Currently Not being used            
-logic s_tx_axis_tuser;          //Currently Not being used            
-logic s_tx_axis_trdy;                  
-logic rgmii_mac_tx_rdy;                
-logic [DATA_WIDTH-1:0] rgmii_mac_tx_data;       
-logic rgmii_mac_tx_dv;                          
-logic rgmii_mac_tx_er;                          
-logic mii_select;                                
 
-/* Module Instantiation */
-tx_mac#(.DATA_WIDTH(DATA_WIDTH)) DUT(.*);
+/* Initialize the interface */
+tx_mac_if vif(.clk(clk), .reset_n(reset_n));                        
+                      
+/* Module Instantiation & connect with the interface*/
+tx_mac#(.DATA_WIDTH(DATA_WIDTH)) DUT(.clk(clk), .reset_n(reset_n), .s_tx_axis_tdata(vif.s_tx_axis_tdata), .s_tx_axis_tvalid(vif.s_tx_axis_tvalid),
+                                    .s_tx_axis_tlast(vif.s_tx_axis_tlast), .s_tx_axis_tkeep(vif.s_tx_axis_tkeep), .s_tx_axis_tuser(vif.s_tx_axis_tuser), 
+                                    .s_tx_axis_trdy(vif.s_tx_axis_trdy),.rgmii_mac_tx_rdy(vif.rgmii_mac_tx_rdy), .rgmii_mac_tx_data(vif.rgmii_mac_tx_data),
+                                     .rgmii_mac_tx_dv(vif.rgmii_mac_tx_dv), .rgmii_mac_tx_er(vif.rgmii_mac_tx_er), .mii_select(vif.mii_select));
 
 logic [CRC_WIDTH-1:0] crc_lut [TABLE_DEPTH-1:0];            //LUT Decleration
-
-//LUT Init
-initial begin
-    $readmemb("C:/Users/klaze/Xilinx_FGPA_Projects/FPGA_Based_Network_Stack/Software/CRC_LUT.txt", crc_lut);
-end
 
 //Set clk period (8ns for 125 MHz)
 always #4 clk = ~clk;
 
-/*
+//LUT Init
+/*initial begin
+    $readmemb("C:/Users/klaze/Xilinx_FGPA_Projects/FPGA_Based_Network_Stack/Software/CRC_LUT.txt", crc_lut);
+end
+
+*
  * @Brief Reference Model that implements the CRC32 algorithm for each byte passed into it
  * @param i_byte Takes in a byte to pass into the model
  * @retval Returns the CRC32 current CRC value to append to the data message
-*/
+*
 function automatic [31:0] crc32_reference_model;
     input [7:0] i_byte;
     input [31:0] crc_state;
     input last;
     
-    /* Intermediary Signals */
+    * Intermediary Signals *
     reg [31:0] crc_state_rev;
     reg [7:0] i_byte_rev, table_index;
     integer i;
     
-    /* Reverse the bit order of the byte in question */
+    * Reverse the bit order of the byte in question *
     i_byte_rev = 0;
     for(int j = 0; j < 8; j++)
        i_byte_rev[j] = i_byte[(DATA_WIDTH-1)-j];
        
-    /* XOR this value with the MSB of the current CRC State */
+    * XOR this value with the MSB of the current CRC State *
     table_index = i_byte_rev ^ crc_state[31:24];
     
-    /* Index into the LUT and XOR the output with the shifted CRC */
+    * Index into the LUT and XOR the output with the shifted CRC *
     crc_state = {crc_state[24:0], 8'h0} ^ crc_lut[table_index];
     
     if(last == 1) begin
-        /* Reverse & Invert the final CRC State after all bytes have been iterated through */
+        * Reverse & Invert the final CRC State after all bytes have been iterated through *
         crc_state_rev = 32'h0;
         for(int k = 0; k < 32; k++) 
             crc_state_rev[k] = crc_state[(CRC_WIDTH-1)-k];
@@ -68,14 +65,14 @@ function automatic [31:0] crc32_reference_model;
         crc_state = ~crc_state_rev;            
     end
     
-    /* Output The new CRC32 State */
+    * Output The new CRC32 State *
     crc32_reference_model = crc_state;
     
 endfunction : crc32_reference_model
 
 localparam PCKT_SIZE = 57;
 
-/* Function that simulates the FIFO interacting via AXI Stream with the TXMAC */
+* Function that simulates the FIFO interacting via AXI Stream with the TXMAC *
 task fifo_sim();
     int packet_ctr = 0;
     bit last_pckt = 1'b0;
@@ -117,13 +114,15 @@ task fifo_sim();
     
 endtask : fifo_sim
 
-/* RGMII Interface Task */
+* RGMII Interface Task *
 task rgmii_sim();
     //Simulate a 1000Mbps for now since this is teh targeted throughput. This
     //means driving the tx rdy signal at all times and pulling mii select low
     mii_select = 1'b0;
     rgmii_mac_tx_rdy = 1'b1;
-endtask : rgmii_sim
+endtask : rgmii_sim*/
+
+tx_mac_test test_demo;
 
 initial begin
     //Init Reset and clock vals
@@ -131,20 +130,12 @@ initial begin
     reset_n = 0;
     #50;
     reset_n = 1;
+    #20;
     
-    //Call the RGMII interface sim
-    rgmii_sim();
-    s_tx_axis_tvalid = 1'b1;
+    test_demo = new(vif);
+    test_demo.main();
     
-    //Wait for the ready flag to go high, this indicates the preamble was sent
-    @(posedge s_tx_axis_trdy);
-    
-    //Simulate FIFO functionality to transmit data
-    for(int i = 0; i < 10; i++) begin
-        fifo_sim(); 
-    end
-    
-    #10000;
+    #100;
     
     $finish;
       

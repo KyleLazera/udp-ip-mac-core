@@ -29,22 +29,37 @@ class tx_mac_driver;
         sim_rgmii();   
         sim_fifo();
         
+        @(posedge vif.s_tx_axis_trdy);
+        
         forever begin        
-            //Fetch data from mailbox 
-            drv_mbx.get(rec_item);
             
-            //Check to see if this is last byte in packet
-            if(byte_ctr == rec_item.pckt_size)
-                vif.s_tx_axis_tlast = 1'b1;
-            else
-                vif.s_tx_axis_tlast = 1'b0;
-            
-            //Send byte to interface
-            vif.s_tx_axis_tdata = rec_item.data_byte;
-            //indicate driver has succesfully transmitted data
-            ->drv_done;
-            //Count the packet sent - used to identify last packet to raise the last flag 
-            byte_ctr++;
+            if(vif.s_tx_axis_trdy) begin
+                //Fetch data from mailbox 
+                drv_mbx.get(rec_item);
+                
+                @(posedge vif.clk);
+                
+                //Count the packet sent - used to identify last packet to raise the last flag 
+                byte_ctr++;  
+                
+                //Check to see if this is last byte in packet
+                if(byte_ctr == (rec_item.pckt_size)) begin
+                    vif.s_tx_axis_tlast = 1'b1; 
+                    //Send byte to interface if ready signal is high
+                    vif.s_tx_axis_tdata = rec_item.data_byte;
+                    //Wait for teh next clock edge to lower the last signal
+                    @(posedge vif.clk);
+                    vif.s_tx_axis_tlast = 1'b0; 
+                    //indicate driver has succesfully transmitted data
+                    ->drv_done;                                 
+                end else begin
+                    vif.s_tx_axis_tlast = 1'b0;
+                    //Send byte to interface if ready signal is high
+                    vif.s_tx_axis_tdata = rec_item.data_byte;
+                    //indicate driver has succesfully transmitted data
+                    ->drv_done;                              
+                end
+            end
         end
                    
     endtask : main
