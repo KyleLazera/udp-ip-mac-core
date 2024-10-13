@@ -44,7 +44,8 @@ class tx_mac_scb;
             /* Check Preamble Pattern */
             assert( {mon_item.preamble[0], mon_item.preamble[1], mon_item.preamble[2], mon_item.preamble[3], 
                     mon_item.preamble[4], mon_item.preamble[5], mon_item.preamble[6], mon_item.preamble[7]} 
-                    == {{7{8'h55}}, 8'hD5} ) else $fatal(2, "Preamble mismatch");
+                    == {{7{8'h55}}, 8'hD5} ) else $fatal(2, "Preamble mismatch: %0h", {mon_item.preamble[0], mon_item.preamble[1], mon_item.preamble[2], mon_item.preamble[3], 
+                    mon_item.preamble[4], mon_item.preamble[5], mon_item.preamble[6], mon_item.preamble[7]});
             
             /* Check Payload Size is between 46 bytes and 1500 bytes*/
             assert(mon_item.payload.size() >= 46 && mon_item.payload.size() <= 1500) 

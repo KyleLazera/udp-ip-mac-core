@@ -7,6 +7,7 @@ class tx_mac_test;
     //instantiate environemnt
     tx_mac_env  env;
     string TAG = "Test";
+    bit mii_sel;
     
     //Constructor
     function new(virtual tx_mac_if _vif);

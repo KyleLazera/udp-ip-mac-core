@@ -29,7 +29,7 @@ class tx_mac_gen;
         for(int j = 0; j < 10; j++) begin
             //Used to randomize teh size of the packet
             gen_item.pckt_size = $urandom_range(30, 1500);        
-                
+          
             //Generate the number of bytes based on the packet size
             for(int i = 0; i < gen_item.pckt_size; i++) begin
                 //Randomize the byte value

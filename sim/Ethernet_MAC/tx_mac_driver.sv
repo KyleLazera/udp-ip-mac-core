@@ -37,8 +37,7 @@ class tx_mac_driver;
             
             if(vif.s_tx_axis_trdy) begin
                 //Fetch data from mailbox 
-                drv_mbx.get(rec_item);                                
-                
+                drv_mbx.get(rec_item);                                                
                 //Count the packet sent - used to identify last packet to raise the last flag 
                 byte_ctr++;  
                 
@@ -48,9 +47,9 @@ class tx_mac_driver;
                     //Send byte to interface if ready signal is high
                     vif.s_tx_axis_tdata = rec_item.data_byte;
                     //Wait for the next clock edge to lower the last signal
-                    @(posedge vif.clk);
+                    //@(posedge vif.clk);
                     byte_ctr = 0;
-                    vif.s_tx_axis_tlast = 1'b0; 
+                    //vif.s_tx_axis_tlast = 1'b0; 
                     //indicate driver has succesfully transmitted data
                     ->drv_done;                                 
                 end else begin
@@ -65,7 +64,7 @@ class tx_mac_driver;
                    
     endtask : main
     
-    //This function simulates the signals from the RGMII module
+    //This function sets the signals from the RGMII module to inital value
     function sim_rgmii();
         //Simulate a 1000Mbps for now since this is teh targeted throughput. This
         //means driving the tx rdy signal at all times and pulling mii select low
@@ -73,7 +72,7 @@ class tx_mac_driver;
         vif.rgmii_mac_tx_rdy = 1'b1;        
     endfunction : sim_rgmii    
     
-    //This function simulates the signals from the FIFO module
+    //This function simulates the initial signals from the FIFO module
     function sim_fifo();
          //For now indicate there is always valid data in the FIFO (Never empty)
          vif.s_tx_axis_tvalid = 1'b1;

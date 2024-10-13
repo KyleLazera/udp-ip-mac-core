@@ -28,10 +28,7 @@ class tx_mac_monitor;
         state_type state = IDLE;
         int byte_ctr = 0;
         bit last_byte = 1'b0;
-        
-        logic [7:0] ethernet_pckt[$];
-        //Queue to hold the preamble/SFD
-        logic [7:0] preamble [$];         
+                
         
         $display("[%s] Starting...", TAG);
         
@@ -52,18 +49,30 @@ class tx_mac_monitor;
                 end
                 PREAMBLE : begin
                     if(byte_ctr < 7) begin
-                        #1 rec_item.preamble[byte_ctr] = vif.rgmii_mac_tx_data;
+                        #1 rec_item.preamble[byte_ctr] = vif.rgmii_mac_tx_data;                        
+                        
+                        //If MII mode is selected, delay by 1 clock cycle
+                        if(vif.mii_select)
+                            @(posedge vif.clk);
+                            
                         byte_ctr++;
                     end else begin
                         #1 rec_item.preamble[byte_ctr] = vif.rgmii_mac_tx_data;
+                        
+                        if(vif.mii_select)
+                            @(posedge vif.clk);                        
+                        
                         byte_ctr = 0;
                         state = PAYLOAD;
                     end 
                                                                                        
                 end
                 PAYLOAD : begin                                    
-                    #1 rec_item.payload.push_back(vif.rgmii_mac_tx_data);                    
+                    #1 rec_item.payload.push_back(vif.rgmii_mac_tx_data);                   
                     byte_ctr++;
+                    
+                    if(vif.mii_select)
+                        @(posedge vif.clk);
                     
                     if(last_byte && byte_ctr > 59) begin
                         last_byte = 1'b0;
@@ -86,6 +95,9 @@ class tx_mac_monitor;
                         2 : rec_item.fcs[2] = vif.rgmii_mac_tx_data;
                         3 : rec_item.fcs[3] = vif.rgmii_mac_tx_data;
                     endcase
+                    
+                    if(vif.mii_select)
+                        @(posedge vif.clk);                    
                    
                     if(byte_ctr == 3) begin
                         state = IFG;
@@ -95,6 +107,10 @@ class tx_mac_monitor;
                    
                 end
                 IFG : begin
+                
+                if(vif.mii_select)
+                    @(posedge vif.clk);                
+                
                 //Wait for the IFG and send transaction item to scoreboard
                 if(byte_ctr > 4'd12) begin 
                     state = IDLE;

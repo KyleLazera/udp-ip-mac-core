@@ -19,7 +19,8 @@
 
 module tx_mac
 #(
-    parameter DATA_WIDTH = 8
+    parameter DATA_WIDTH = 8,
+    parameter IFG_SIZE = 12
 ) 
 (
     input wire clk, 
@@ -163,13 +164,13 @@ always @(*) begin
     else if(mii_select && mii_sdr) begin
         tx_data_next = {4'b0, tx_data_reg[7:4]};
         mii_sdr_next = 1'b0;
-        axis_rdy_next = 1'b1;
     end
     //If neither of the above options are met, proceed with the FSM
     else begin
         /* FSM Next State Logic */
         case(state_reg) 
             IDLE : begin
+                mii_sdr_next = 1'b0;
                 //If there is data in the FIFO, prepare to begin transaction
                 if(s_tx_axis_tvalid) begin
                     sof = 1'b1;
@@ -184,7 +185,9 @@ always @(*) begin
                 rgmii_dv_next = 1'b1;
                 //Set the s_axis_trdy flag high here, so we have incoming data when we enter the PACKET State
                 if(byte_ctr == 3'd6) begin
-                    axis_rdy_next = 1'b1; 
+                    if(~mii_select)
+                        axis_rdy_next = 1'b1; 
+                    
                     tx_data_next = ETH_HDR;
                     byte_ctr_next = byte_ctr + 1;
                 end
@@ -263,7 +266,9 @@ always @(*) begin
             //According to IEEE, the required IFG bewteen packets is 96 bit-times
             //For 1Gbit this is 96ns, for 100Mbps this is 0.96us and 10Mbps is 9.6us
             IFG : begin
-                if(ifg_ctr > 4'd12) 
+                mii_sdr_next = 1;
+            
+                if(ifg_ctr > IFG_SIZE ) 
                     state_next = IDLE;
                 else
                     ifg_ctr_next = ifg_ctr + 1;

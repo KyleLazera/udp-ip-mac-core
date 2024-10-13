@@ -24,7 +24,8 @@ tx_mac#(.DATA_WIDTH(DATA_WIDTH)) DUT(.clk(clk), .reset_n(reset_n), .s_tx_axis_td
 //Set clk period (8ns for 125 MHz)
 always #4 clk = ~clk;
 
-tx_mac_test test_demo;
+//2 tests, 1 for gigabit and one for megabit ethernet
+tx_mac_test test_dut;
 
 initial begin
     //Init Reset and clock vals
@@ -34,8 +35,9 @@ initial begin
     reset_n = 1;
     #20;
     
-    test_demo = new(vif);
-    test_demo.main();
+    test_dut = new(vif);
+    test_dut.main();
+    
     
     #100;
     
