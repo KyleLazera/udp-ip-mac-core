@@ -2,16 +2,19 @@
 `define _TX_MAC_TEST
 
 `include "tx_mac_env.sv"
+`include "tx_mac_cfg.sv"
 
 class tx_mac_test;
     //instantiate environemnt
     tx_mac_env  env;
+    tx_mac_cfg  cfg;
+    
     string TAG = "Test";
-    bit mii_sel;
     
     //Constructor
     function new(virtual tx_mac_if _vif);
-        env = new(_vif);
+        cfg = new;  
+        env = new(_vif, cfg);          
     endfunction : new
     
     task main();
@@ -22,7 +25,13 @@ class tx_mac_test;
         join_any
         
         #100;
+        
+        display_final();
     endtask : main    
+    
+    function display_final();
+        env.scb.display_score();
+    endfunction : display_final
     
 endclass : tx_mac_test
 

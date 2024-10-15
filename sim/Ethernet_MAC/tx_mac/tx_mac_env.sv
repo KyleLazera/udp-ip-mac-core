@@ -5,12 +5,14 @@
 `include "tx_mac_driver.sv"
 `include "tx_mac_monitor.sv"
 `include "tx_mac_scb.sv"
+`include "tx_mac_cfg.sv"
 
 class tx_mac_env;
     //Instantiate each of the classes
     tx_mac_gen      gen;
     tx_mac_driver   drv;
     tx_mac_monitor  mon;
+    tx_mac_cfg      cfg;
     tx_mac_scb      scb;
     //Init mailboxes and events
     mailbox drv_mbx, scb_mbx;
@@ -21,7 +23,7 @@ class tx_mac_env;
     string TAG = "Environment";
     
     //Constructor - Init all individual components
-    function new(virtual tx_mac_if _vif);
+    function new(virtual tx_mac_if _vif, tx_mac_cfg _cfg);
         //Pass through virtual interface
         vif = _vif;
         //Init the mailboxes and events for the modules
@@ -32,6 +34,10 @@ class tx_mac_env;
         drv = new(drv_mbx, drv_done);
         mon = new(scb_mbx);
         scb = new(scb_mbx, scb_done);
+        //Set the tx_mac config for this test
+        gen.cfg = _cfg;
+        drv.cfg = _cfg;    
+        scb.cfg = _cfg;    
     endfunction : new
     
     task main();

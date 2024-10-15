@@ -3,8 +3,10 @@
 
 `include "tx_mac_gen.sv"
 `include "tx_mac_if.sv"
+`include "tx_mac_cfg.sv"
 
 class tx_mac_driver;
+    tx_mac_cfg cfg;
     //Mailbox for communication
     mailbox drv_mbx;
     //Events for signaling
@@ -47,9 +49,7 @@ class tx_mac_driver;
                     //Send byte to interface if ready signal is high
                     vif.s_tx_axis_tdata = rec_item.data_byte;
                     //Wait for the next clock edge to lower the last signal
-                    //@(posedge vif.clk);
                     byte_ctr = 0;
-                    //vif.s_tx_axis_tlast = 1'b0; 
                     //indicate driver has succesfully transmitted data
                     ->drv_done;                                 
                 end else begin
@@ -68,7 +68,9 @@ class tx_mac_driver;
     function sim_rgmii();
         //Simulate a 1000Mbps for now since this is teh targeted throughput. This
         //means driving the tx rdy signal at all times and pulling mii select low
-        vif.mii_select = 1'b0;
+        vif.mii_select = cfg.mii_sel;
+        $display("[%s] MII Select Value: %0b", TAG, cfg.mii_sel);
+        
         vif.rgmii_mac_tx_rdy = 1'b1;        
     endfunction : sim_rgmii    
     

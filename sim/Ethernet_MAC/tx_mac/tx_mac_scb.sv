@@ -2,6 +2,7 @@
 `define _TX_MAC_SCB
 
 `include "tx_mac_trans_item.sv"
+`include "tx_mac_cfg.sv"
 
 /* 
  * Scoreboard Checks:
@@ -15,6 +16,7 @@ class tx_mac_scb;
     localparam CRC_WIDTH = 32;
     localparam TABLE_DEPTH = (2**DATA_WIDTH);
     
+    tx_mac_cfg cfg;
     //Mailbox from monitor
     mailbox scb_mbx;
     event scb_done;
@@ -22,6 +24,9 @@ class tx_mac_scb;
     logic [CRC_WIDTH-1:0] crc_lut [TABLE_DEPTH-1:0];            
     //Tag for debugging/printing
     string TAG = "Scoreboard";
+    //Variables for final scoreboard
+    int header_fail = 0, payload_fail = 0, crc_fail = 0;
+    int header_succ = 0, payload_succ = 0, crc_succ = 0;
     
     //Constructor
     function new(mailbox _mbx, event _evt);
@@ -31,6 +36,7 @@ class tx_mac_scb;
     
     task main();
         tx_mac_trans_item mon_item;
+        //Variables
         int pckt_num = 0;
         $display("[%s] Starting...", TAG);
         
@@ -44,20 +50,38 @@ class tx_mac_scb;
             /* Check Preamble Pattern */
             assert( {mon_item.preamble[0], mon_item.preamble[1], mon_item.preamble[2], mon_item.preamble[3], 
                     mon_item.preamble[4], mon_item.preamble[5], mon_item.preamble[6], mon_item.preamble[7]} 
-                    == {{7{8'h55}}, 8'hD5} ) else $fatal(2, "Preamble mismatch: %0h", {mon_item.preamble[0], mon_item.preamble[1], mon_item.preamble[2], mon_item.preamble[3], 
-                    mon_item.preamble[4], mon_item.preamble[5], mon_item.preamble[6], mon_item.preamble[7]});
+                    == {{7{8'h55}}, 8'hD5} ) 
+                    else begin
+                        //Print the value that was picked up from the monitor 
+                        $fatal(2, "[%s] Preamble mismatch: %0h", TAG,  {mon_item.preamble[0], mon_item.preamble[1], mon_item.preamble[2], mon_item.preamble[3], 
+                        mon_item.preamble[4], mon_item.preamble[5], mon_item.preamble[6], mon_item.preamble[7]});
+                        
+                        //Increment the failed pckt
+                        header_fail++;
+                    end
             
             /* Check Payload Size is between 46 bytes and 1500 bytes*/
             assert(mon_item.payload.size() >= 46 && mon_item.payload.size() <= 1500) 
-                else $fatal(2, "Payload Size does not fall within range.");
+                else begin
+                    $fatal(2, "[%s] Payload Size does not fall within range.", TAG);
+                    //Increment payload fail
+                    payload_fail++;
+                end
                 
             /* Check CRC Calculation */         
             assert(crc32_reference_model(mon_item.payload) == {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]})
-                else $fatal(2, "CRC-32 Failed");
+                else begin
+                    $fatal(2, "[%s] CRC-32 Failed", TAG);
+                    //increment crc fail
+                    crc_fail++;
+                end
                 
-            if(pckt_num == 9)
+            if(pckt_num == (cfg.num_pckt - 1)) begin
+                header_succ = (cfg.num_pckt - header_fail);
+                payload_succ = (cfg.num_pckt - payload_succ);
+                crc_succ = (cfg.num_pckt - crc_succ);
                 ->scb_done;
-            else
+            end else
                 pckt_num++;
                 
         end
@@ -101,6 +125,15 @@ class tx_mac_scb;
         crc32_reference_model = ~crc_state_rev;
         
     endfunction : crc32_reference_model   
+    
+    function void display_score();
+        $display("****************************************");
+        $display("Final Score Board: ");
+        $display("Total Packets Transmitted: %0d", cfg.num_pckt);
+        $display("Number of Succesfull Headers: %0d Number of Failed Headers: %0d", header_succ, header_fail);
+        $display("Number of Succesfull Payloads: %0d Number of Failed Payloads: %0d", payload_succ, payload_fail);
+        $display("Number of Succesfull CRC's: %0d Number of Failed CRC's: %0d", crc_succ, crc_fail);        
+    endfunction
 
 endclass : tx_mac_scb
 

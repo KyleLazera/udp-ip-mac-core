@@ -46,7 +46,7 @@ module rgmii_phy_if
 
 wire rgmii_rx_dv, rgmii_rx_er;
 
-//Input buffers for the PHy signals through IDDR
+//Input buffers for the PHY signals through IDDR
 input_buffers #(.DATA_WIDTH(5)) 
 i_buff(.clk(rgmii_phy_rxc),
        .d_in({rgmii_phy_rxd, rgmii_phy_rxctl}),         //Input signals from PHY

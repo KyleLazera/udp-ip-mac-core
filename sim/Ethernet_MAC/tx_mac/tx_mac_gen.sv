@@ -4,8 +4,11 @@
 
 //Include transaction Item class
 `include "tx_mac_trans_item.sv"
+`include "tx_mac_cfg.sv"
 
 class tx_mac_gen;
+    //Configuration for test
+    tx_mac_cfg cfg;
     //Mailbox to communicate with driver
     mailbox drv_mbx;
     //Used to control flow of generator from driver & scb
@@ -24,9 +27,9 @@ class tx_mac_gen;
         //Create an instance of teh transaction item that will be sent to teh driver
         tx_mac_trans_item gen_item = new(); 
         $display("[%s] Starting...", TAG);   
-        
+        $display("[%s] Number of Packets to transmit: %0d", TAG, cfg.num_pckt);
         //Generate 10 packets to transmit (adjust this to more)
-        for(int j = 0; j < 10; j++) begin
+        for(int j = 0; j < cfg.num_pckt; j++) begin
             //Used to randomize teh size of the packet
             gen_item.pckt_size = $urandom_range(30, 1500);        
           
