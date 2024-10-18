@@ -36,11 +36,22 @@ logic  rgmii_mac_rx_dv;              //RX data valid signal - driven on the pose
 logic  rgmii_mac_rx_er;              //RX error signal - falling edge of rxc drives error XOR data_valid
 logic [1:0] link_speed;          
 
+//variables
+int rxc_prd;
+
 //Module Instantiation
 rgmii_phy_if rgmii_if(.*);
 
 //Initialize clocks - both have 125MHz freq (8ns period)
 always #4 clk_125 = ~clk_125;
+always #(rxc_prd/2) rgmii_phy_rxc = ~rgmii_phy_rxc;
+
+//Drive signals on the data line to the rgmii at DDR
+always @(posedge rgmii_phy_rxc)
+    rgmii_phy_rxd = $urandom_range(0, 16);
+
+always @(negedge rgmii_phy_rxc)
+    rgmii_phy_rxd = $urandom_range(0, 16);
 
 //Property to ensure that the ctrl signal drives teh dv signal on rising edge of tx clock
 property tx_ctl_dv;
@@ -54,6 +65,18 @@ property tx_data_rdy;
     disable iff(!reset_n)                       //Disable assertion is reset is low 
     (rgmii_mac_tx_rdy == 1'b1);                 //After data transmission tx_rdy shoudl always be low
 endproperty
+
+//Used to select the rgmii clk freqneyc based on bandwidth
+always @(link_speed) begin
+    case(link_speed) 
+        //10Mbps has 2.5 MHz (400ns)
+        LINK_10 : rxc_prd = 400;
+        //100Mbps has 25MHz (40ns)
+        LINK_100 : rxc_prd = 40;
+        //1Gbit has 125MHz (8ns)
+        LINK_1000 : rxc_prd = 8;
+    endcase
+end 
 
 //Task used to simulate data transmission & use immedaite assertions to ensure correct clock period
 task transmit_data(input logic [1:0] _link_speed);
@@ -141,12 +164,15 @@ assert property(tx_data_rdy)
     
 //Implement 90 degree phase shift for clk90
 initial begin
+    rxc_prd = 8;
     clk_125 = 1'b0;
-    #2 clk90 = 0;
+    rgmii_phy_rxc = 1'b0;
+    #2 clk90 = 1'b0;
     forever #4 clk90 = ~clk90;
 end
 
 initial begin
+    
     //Init/Reset signals
     reset_n = 0; #40; 
     reset_n = 1; #10;
