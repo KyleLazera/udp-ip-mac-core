@@ -21,7 +21,7 @@ module rx_mac
     input wire reset_n,
     
     /* AXI Stream Output - FIFO */
-    output wire [DATA_WIDTH-1:0] s_rx_axis_tdata,               //Data to transmit to asynch FIFO
+    output wire [DATA_WIDTH-1:0] m_rx_axis_tdata,               //Data to transmit to asynch FIFO
     output wire m_rx_axis_tvalid,                               //Signal indicating module has data to transmit
     output wire m_rx_axis_tlast,                                //Indicates last byte within a packet
     
@@ -46,25 +46,64 @@ typedef enum {IDLE,                                             //State that wai
 state_type state_reg, state_next;
 
 //5 Shift registers to store incoming data from rgmii
-reg [7:0] rgmii_rdx_0, rgmii_rdx_0_next;
-reg [7:0] rgmii_rdx_1, rgmii_rdx_1_next;
-reg [7:0] rgmii_rdx_2, rgmii_rdx_2_next;
-reg [7:0] rgmii_rdx_3, rgmii_rdx_3_next;
-reg [7:0] rgmii_rdx_4, rgmii_rdx_4_next;
+reg [DATA_WIDTH-1:0] rgmii_rdx_0;
+reg [DATA_WIDTH-1:0] rgmii_rdx_1;
+reg [DATA_WIDTH-1:0] rgmii_rdx_2;
+reg [DATA_WIDTH-1:0] rgmii_rdx_3;
+reg [DATA_WIDTH-1:0] rgmii_rdx_4;
+//Shift regiters to store data valid and error signals from rgmii
+reg [DATA_WIDTH-1:0] rgmii_dv_0, rgmii_er_0;
+reg [DATA_WIDTH-1:0] rgmii_dv_1, rgmii_er_1;
+reg [DATA_WIDTH-1:0] rgmii_dv_2, rgmii_er_2;
+reg [DATA_WIDTH-1:0] rgmii_dv_3, rgmii_er_3;
+reg [DATA_WIDTH-1:0] rgmii_dv_4, rgmii_er_4;
 
-/* Logic for shifting data into the registers from RGMII */
+/* Logic for shifting data & signals into the registers from RGMII */
 always @(posedge clk) begin
     //Synchronous active low reset
     if(~reset_n) begin
+        /* Reset Logic for data shift registers */
         rgmii_rdx_0 <= 8'b0;
         rgmii_rdx_1 <= 8'b0;
         rgmii_rdx_2 <= 8'b0;
         rgmii_rdx_3 <= 8'b0;
+        rgmii_rdx_4 <= 8'b0;
+        
+        /* Reset Logic for data valid flag shift registers */
+        rgmii_dv_0 <= 8'b0;;
+        rgmii_dv_1 <= 8'b0;;
+        rgmii_dv_2 <= 8'b0;;
+        rgmii_dv_3 <= 8'b0;;
+        rgmii_dv_4 <= 8'b0;; 
+        
+        /* Reset Logic for data error shift registers */
+        rgmii_er_0 <= 8'b0;;
+        rgmii_er_1 <= 8'b0;;
+        rgmii_er_2 <= 8'b0;;
+        rgmii_er_3 <= 8'b0;;
+        rgmii_er_4 <= 8'b0;;           
+        
     end else begin
-        rgmii_rdx_0 <= rgmii_rdx_0_next;
-        rgmii_rdx_1 <= rgmii_rdx_1_next;
-        rgmii_rdx_2 <= rgmii_rdx_2_next;
-        rgmii_rdx_3 <= rgmii_rdx_3_next;        
+        /* Shifting Data bytes in */
+        rgmii_rdx_0 <= rgmii_mac_rx_data;
+        rgmii_rdx_1 <= rgmii_rdx_0;
+        rgmii_rdx_2 <= rgmii_rdx_1;
+        rgmii_rdx_3 <= rgmii_rdx_2;
+        rgmii_rdx_4 <= rgmii_rdx_3; 
+        
+        /* Shifting Data Valid Signals */
+        rgmii_dv_0 <= rgmii_mac_rx_dv;
+        rgmii_dv_1 <= rgmii_dv_0;
+        rgmii_dv_2 <= rgmii_dv_1;
+        rgmii_dv_3 <= rgmii_dv_2;
+        rgmii_dv_4 <= rgmii_dv_3; 
+        
+        /* Shifting Error Signals in */
+        rgmii_er_0 <= rgmii_mac_rx_er;
+        rgmii_er_1 <= rgmii_er_0;
+        rgmii_er_2 <= rgmii_er_1;
+        rgmii_er_3 <= rgmii_er_2;
+        rgmii_er_4 <= rgmii_er_3;                       
     end 
 end
 

@@ -71,12 +71,16 @@ class tx_mac_scb;
             /* Check CRC Calculation */         
             assert(crc32_reference_model(mon_item.payload) == {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]})
                 else begin
-                    $fatal(2, "[%s] CRC-32 Failed", TAG);
+                    $fatal(2, "[%s] CRC-32 Failed. Reference model: %0h, DUT: %0h", TAG, crc32_reference_model(mon_item.payload), 
+                            {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]});
+                    foreach(mon_item.payload[i])
+                        $display("0x%0h", mon_item.payload[i]);  
+                    $fatal(2, "Faulty payload printed");                          
                     //increment crc fail
                     crc_fail++;
                 end
                 
-            if(pckt_num == (cfg.num_pckt - 1)) begin
+            if(pckt_num == (cfg.num_pckt - 1)) begin               
                 header_succ = (cfg.num_pckt - header_fail);
                 payload_succ = (cfg.num_pckt - payload_succ);
                 crc_succ = (cfg.num_pckt - crc_succ);
@@ -129,6 +133,7 @@ class tx_mac_scb;
     function void display_score();
         $display("****************************************");
         $display("Final Score Board: ");
+        $display("MII Select Value: %0d (1 indicates 10/100 mbps, 0 indicates 1 gbit)", cfg.mii_sel);
         $display("Total Packets Transmitted: %0d", cfg.num_pckt);
         $display("Number of Succesfull Headers: %0d Number of Failed Headers: %0d", header_succ, header_fail);
         $display("Number of Succesfull Payloads: %0d Number of Failed Payloads: %0d", payload_succ, payload_fail);

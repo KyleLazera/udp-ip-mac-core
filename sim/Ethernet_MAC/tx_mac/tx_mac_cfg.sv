@@ -17,8 +17,8 @@ class tx_mac_cfg;
     }
     
     constraint pckt_size_const{
-        num_pckt > 5;
-        num_pckt <= 50;
+        num_pckt > 10;
+        num_pckt <= 500;
     }
 
 endclass : tx_mac_cfg

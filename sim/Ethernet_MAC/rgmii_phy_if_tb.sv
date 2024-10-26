@@ -46,12 +46,14 @@ rgmii_phy_if rgmii_if(.*);
 always #4 clk_125 = ~clk_125;
 always #(rxc_prd/2) rgmii_phy_rxc = ~rgmii_phy_rxc;
 
-//Drive signals on the data line to the rgmii at DDR
+//Drive signals on the data line to the rgmii at DDR/SDR
 always @(posedge rgmii_phy_rxc)
     rgmii_phy_rxd = $urandom_range(0, 16);
 
+//Only drive on falling edge if we are in Gbit mode
 always @(negedge rgmii_phy_rxc)
-    rgmii_phy_rxd = $urandom_range(0, 16);
+    if(rxc_prd ==  8)
+        rgmii_phy_rxd = $urandom_range(0, 16);
 
 //Property to ensure that the ctrl signal drives teh dv signal on rising edge of tx clock
 property tx_ctl_dv;

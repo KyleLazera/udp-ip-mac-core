@@ -68,7 +68,7 @@ class tx_mac_monitor;
                                                                                        
                 end
                 PAYLOAD : begin                                    
-                    #1 rec_item.payload.push_back(vif.rgmii_mac_tx_data);                   
+                    #1 rec_item.payload.push_back(vif.rgmii_mac_tx_data);              
                     byte_ctr++;
                     
                     if(vif.mii_select)
@@ -80,11 +80,14 @@ class tx_mac_monitor;
                         byte_ctr = 0;
                     end else begin                                                
                         if(vif.s_tx_axis_tlast) begin
-                            last_byte = 1'b1;
+                            if(vif.mii_select &&  byte_ctr > 59) begin
+                                state = CRC;
+                                byte_ctr = 0;
+                            end else                        
+                                last_byte = 1'b1;
                         end
                     end
-                                        
-                    
+     
                 end
                 CRC : begin
                     //Populate the CRC bytes after small delay

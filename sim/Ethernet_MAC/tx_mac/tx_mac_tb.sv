@@ -27,16 +27,22 @@ always #4 clk = ~clk;
 tx_mac_test test_dut;
 
 initial begin
-    //Init Reset and clock vals
+    //Init Clock Vals
     clk = 0;
-    reset_n = 0;
-    #50;
-    reset_n = 1;
-    #20;
     
-    test_dut = new(vif);
-    test_dut.main();
+    // Iterate over multiple tests - with a reset between each test
+    //Multiple tests wil rnaomdize the configiuration for mbit or gbit
+    for(int i = 0; i < 10; i++) begin
+        reset_n = 0;
+        #50;
+        reset_n = 1;
+        #20;
         
+        test_dut = new(vif);
+        test_dut.main();    
+    
+    end       
+            
     #100;
     
     $finish;

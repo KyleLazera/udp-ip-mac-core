@@ -215,14 +215,13 @@ always @(*) begin
                 
                 //Only increment the packet counter if it is less than 60. Once min frame size has been surpassed
                 //packet counter is no longer needed
-                //TODO: Better way to implement this?? Maybe ussing a continous assignment to set a flag in this case
                 if(pckt_size < (MIN_FRAME_WIDTH + 1))
                     pckt_size_next = pckt_size + 1;
                 
                 //If the last beat has arrived OR there is no more valid data in the FIFO
                 //TODO: Possibly deal with error flag here for RGMII
                 if(s_tx_axis_tlast || !s_tx_axis_tvalid) begin
-                    if(pckt_size > MIN_FRAME_WIDTH) begin
+                    if(pckt_size > (MIN_FRAME_WIDTH - 1)) begin
                         byte_ctr_next = 3'd3;
                         state_next = FCS;                        
                     end else begin
