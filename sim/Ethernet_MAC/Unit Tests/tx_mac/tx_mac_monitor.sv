@@ -36,6 +36,7 @@ class tx_mac_monitor;
             //Sample the data being transmitted to the RGMII on every clock pulse
             @(posedge vif.clk);  
             
+            //State Machine to Control flow of data & how it is read
             case(state)
                 IDLE : begin
                     //Clear all current variables

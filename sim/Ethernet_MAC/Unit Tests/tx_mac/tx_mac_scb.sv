@@ -72,10 +72,7 @@ class tx_mac_scb;
             assert(crc32_reference_model(mon_item.payload) == {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]})
                 else begin
                     $fatal(2, "[%s] CRC-32 Failed. Reference model: %0h, DUT: %0h", TAG, crc32_reference_model(mon_item.payload), 
-                            {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]});
-                    foreach(mon_item.payload[i])
-                        $display("0x%0h", mon_item.payload[i]);  
-                    $fatal(2, "Faulty payload printed");                          
+                            {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]});                          
                     //increment crc fail
                     crc_fail++;
                 end
@@ -130,6 +127,7 @@ class tx_mac_scb;
         
     endfunction : crc32_reference_model   
     
+    //Display the final score after a test
     function void display_score();
         $display("****************************************");
         $display("Final Score Board: ");

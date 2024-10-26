@@ -5,8 +5,6 @@
 `include "tx_mac_if.sv"
 `include "tx_mac_cfg.sv"
 
-/* Todo: Improve this driver to better simulate a FIFO queue */
-
 class tx_mac_driver;
     tx_mac_cfg cfg;
     //Mailbox for communication
@@ -30,7 +28,6 @@ class tx_mac_driver;
         
         //Init the RGMII & fifo Signals
         sim_rgmii();   
-        sim_fifo();
         
         forever begin                             
                                   
@@ -76,12 +73,6 @@ class tx_mac_driver;
         
         vif.rgmii_mac_tx_rdy = 1'b1;        
     endfunction : sim_rgmii    
-    
-    //This function simulates the initial signals from the FIFO module
-    function sim_fifo();
-         //For now indicate there is always valid data in the FIFO (Never empty)
-         vif.s_tx_axis_tvalid = 1'b1;
-    endfunction : sim_fifo
 
 endclass : tx_mac_driver
 

@@ -9,16 +9,18 @@ class tx_mac_test;
     tx_mac_env  env;
     tx_mac_cfg  cfg;
     
+    int test_num;
     string TAG = "Test";
     
     //Constructor
-    function new(virtual tx_mac_if _vif);
+    function new(virtual tx_mac_if _vif, int _test);
         cfg = new;  
-        env = new(_vif, cfg);          
+        env = new(_vif, cfg);       
+        test_num = _test;   
     endfunction : new
     
     task main();
-        $display("[%s] Stating...", TAG);
+        $display("[%s] Test %0d Stating...", TAG, test_num);
         
         fork
             env.main();

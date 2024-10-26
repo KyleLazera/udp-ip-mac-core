@@ -7,6 +7,7 @@ module tx_mac_tb;
 localparam DATA_WIDTH = 8;
 localparam CRC_WIDTH = 32;
 localparam TABLE_DEPTH = (2**DATA_WIDTH);
+localparam MAX_TESTS = 10;
 
 /* Signals */
 logic clk, reset_n;
@@ -24,21 +25,28 @@ tx_mac#(.DATA_WIDTH(DATA_WIDTH)) DUT(.clk(clk), .reset_n(reset_n), .s_tx_axis_td
 //Set clk period (8ns for 125 MHz)
 always #4 clk = ~clk;
 
+/* Test Declaration */
 tx_mac_test test_dut;
+
+//Vars
+int num_tests;
 
 initial begin
     //Init Clock Vals
     clk = 0;
-    
+   
+   /* Randomize total number of test runs */    
+    num_tests = $urandom_range(4, MAX_TESTS);
+        
     // Iterate over multiple tests - with a reset between each test
     //Multiple tests wil rnaomdize the configiuration for mbit or gbit
-    for(int i = 0; i < 10; i++) begin
+    for(int i = 0; i < num_tests; i++) begin
         reset_n = 0;
         #50;
         reset_n = 1;
         #20;
         
-        test_dut = new(vif);
+        test_dut = new(vif, i);
         test_dut.main();    
     
     end       

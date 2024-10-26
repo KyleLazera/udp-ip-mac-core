@@ -70,18 +70,18 @@ always @(posedge clk) begin
         rgmii_rdx_4 <= 8'b0;
         
         /* Reset Logic for data valid flag shift registers */
-        rgmii_dv_0 <= 8'b0;;
-        rgmii_dv_1 <= 8'b0;;
-        rgmii_dv_2 <= 8'b0;;
-        rgmii_dv_3 <= 8'b0;;
-        rgmii_dv_4 <= 8'b0;; 
+        rgmii_dv_0 <= 8'b0;
+        rgmii_dv_1 <= 8'b0;
+        rgmii_dv_2 <= 8'b0;
+        rgmii_dv_3 <= 8'b0;
+        rgmii_dv_4 <= 8'b0; 
         
         /* Reset Logic for data error shift registers */
-        rgmii_er_0 <= 8'b0;;
-        rgmii_er_1 <= 8'b0;;
-        rgmii_er_2 <= 8'b0;;
-        rgmii_er_3 <= 8'b0;;
-        rgmii_er_4 <= 8'b0;;           
+        rgmii_er_0 <= 8'b0;
+        rgmii_er_1 <= 8'b0;
+        rgmii_er_2 <= 8'b0;
+        rgmii_er_3 <= 8'b0;
+        rgmii_er_4 <= 8'b0;           
         
     end else begin
         /* Shifting Data bytes in */
