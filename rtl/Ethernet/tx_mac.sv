@@ -133,7 +133,6 @@ always @(posedge clk) begin
 end
 
 /* Control Signals */
-
 assign crc_en = crc_en_reg;
 assign crc_data_in = crc_in_data_reg;
 assign crc_reset = (~reset_n || sof);
