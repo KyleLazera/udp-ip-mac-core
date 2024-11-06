@@ -23,8 +23,9 @@
 */
 
 /* TODO:
- * Address the FIFO Rdy signal - mkaing sure data is only sent when the signal is ready
+ * Address the FIFO Rdy signal - making sure data is only sent when the signal is ready
  * Driving the rx clk signal from the RGMII may require a BUFG vs a BUFR (Currently have BUFR)
+ * Add support to the error and data valid signals 
  */
 
 module rx_mac
@@ -60,7 +61,7 @@ localparam TICK_SIZE = $clog2(50);
 /* FSM Declarations */
 typedef enum {IDLE,                                             //State that waits to detect a SFD
               PAYLOAD,                                          //State that is reading and transmitting the payload
-              CRC                                               //Final state used to check the CRC 
+              CRC                                              //Final state used to check the CRC 
               } state_type;
               
 /* CRC32 Module Instantiation */
@@ -90,9 +91,8 @@ wire [DATA_WIDTH-1:0] crc_data_in;                              //Signal that dr
 reg sof;                                                        //Start of frame signal                              
 wire crc_en, crc_reset;                                         //CRC enable & reset   
 wire [31:0] crc_data_out;                                       //Ouput from the CRC32 module
-reg [31:0] payload_crc, payload_crc_next;                       //Holds the CRC from the payload recieved
 
-//5 Shift registers to store incoming data from rgmii
+//Shift registers to store incoming data from rgmii
 reg [DATA_WIDTH-1:0] rgmii_rdx_0;
 reg [DATA_WIDTH-1:0] rgmii_rdx_1;
 reg [DATA_WIDTH-1:0] rgmii_rdx_2;
@@ -106,7 +106,7 @@ reg [DATA_WIDTH-1:0] rgmii_dv_3, rgmii_er_3;
 reg [DATA_WIDTH-1:0] rgmii_dv_4, rgmii_er_4;
 
 
-/* Logic for shifting data & signals into the registers from RGMII */
+/* Logic for shifting data & signals into shift registers from RGMII */
 always @(posedge clk) begin
     //Synchronous active low reset
     if(~reset_n) begin       
@@ -164,15 +164,13 @@ always @(posedge clk) begin
         axis_last_reg <= 1'b0;
         axis_user_reg <= 1'b0;
         crc_en_reg <= 1'b0;
-        crc_in_data_reg <= 1'b0;  
-        payload_crc <= 32'b0;      
+        crc_in_data_reg <= 1'b0;        
     end else begin
         state_reg <= state_next;
         axis_valid_reg <= axis_valid_next;
         axis_data_reg <= axis_data_next;
         axis_last_reg <= axis_last_next;
         axis_user_reg <= axis_user_next; 
-        payload_crc <= payload_crc_next;
         
         /* CRC Data Updates */
         crc_en_reg <= crc_en_next;
@@ -200,7 +198,6 @@ always @(*) begin
     axis_valid_next = 1'b0;
     axis_data_next = axis_data_reg;
     crc_in_data_next = crc_in_data_reg;
-    payload_crc_next = payload_crc;
     axis_last_next = 1'b0;
     crc_en_next = 1'b0;
     axis_user_next = 1'b0;
@@ -212,29 +209,26 @@ always @(*) begin
             if(rgmii_rdx_4 == ETH_SFD) begin
                 sof = 1'b1;               
                 state_next = PAYLOAD;
-                //crc_en_next = 1'b1;
             end
         end
         PAYLOAD : begin
+            axis_valid_next = 1'b1;
+            crc_en_next = 1'b1;
+            
+            //Transmit the data from shift reg 4 to FIFO
+            axis_data_next = rgmii_rdx_4;            
+            crc_in_data_next = rgmii_rdx_4;
             
             //If we do not have valid data from RGMII - transmission complete
-            if(rgmii_dv_0 == 1'b0) begin
-                //axis_valid_next = 1'b0;
-                axis_last_next = 1'b1;
-                payload_crc_next = {rgmii_rdx_1, rgmii_rdx_2, rgmii_rdx_3, rgmii_rdx_4};                  
+            if(rgmii_mac_rx_dv == 1'b0) begin
+                axis_last_next = 1'b1;    
+                   
                 state_next = CRC;                                   
-            end else begin
-                axis_valid_next = 1'b1;
-                crc_en_next = 1'b1;
-                
-                //Transmit the data from shift reg 4 to FIFO
-                axis_data_next = rgmii_rdx_4;            
-                crc_in_data_next = rgmii_rdx_4;            
             end
         end
         CRC : begin
         
-            if(crc_data_out != payload_crc)
+            if(crc_data_out != {rgmii_rdx_1, rgmii_rdx_2, rgmii_rdx_3, rgmii_rdx_4})
                    axis_user_next = 1'b1;
             
             state_next = IDLE;
