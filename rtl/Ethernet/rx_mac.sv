@@ -67,7 +67,7 @@ typedef enum {IDLE,                                             //State that wai
 /* CRC32 Module Instantiation */
 crc32 #(.DATA_WIDTH(8)) 
 crc_module(.clk(clk),
-           .i_byte(crc_data_in),
+           .i_byte(rgmii_rdx_4),
            .i_crc_state(crc_state),
            .crc_en(crc_en),
            .o_crc_state(crc_next),
@@ -84,10 +84,8 @@ reg axis_last_reg, axis_last_next;                              //Holds the valu
 reg [DATA_WIDTH-1:0] axis_data_reg, axis_data_next;             //Holds the data to be transmitted out to the FIFO
 
 //CRC Registers
-reg [31:0] crc_state, crc_next;                                 //Holds the output state of the CRC32 module                                       
-reg [DATA_WIDTH-1:0] crc_in_data_reg, crc_in_data_next;         //Holds the input values for the CRC32 module                               
+reg [31:0] crc_state, crc_next;                                 //Holds the output state of the CRC32 module                                                                     
 reg crc_en_reg, crc_en_next;                                    //Register that holds crc_en state 
-wire [DATA_WIDTH-1:0] crc_data_in;                              //Signal that drives the CRC data into the module
 reg sof;                                                        //Start of frame signal                              
 wire crc_en, crc_reset;                                         //CRC enable & reset   
 wire [31:0] crc_data_out;                                       //Ouput from the CRC32 module
@@ -163,8 +161,7 @@ always @(posedge clk) begin
         axis_data_reg <= 1'b0;
         axis_last_reg <= 1'b0;
         axis_user_reg <= 1'b0;
-        crc_en_reg <= 1'b0;
-        crc_in_data_reg <= 1'b0;        
+        crc_en_reg <= 1'b0;       
     end else begin
         state_reg <= state_next;
         axis_valid_reg <= axis_valid_next;
@@ -173,8 +170,7 @@ always @(posedge clk) begin
         axis_user_reg <= axis_user_next; 
         
         /* CRC Data Updates */
-        crc_en_reg <= crc_en_next;
-        crc_in_data_reg <= crc_in_data_next;        
+        crc_en_reg <= crc_en_next;       
         
         /* Logic to update CRC State */
         if(crc_reset)
@@ -188,7 +184,6 @@ end
 
 /* Control Signals */
 assign crc_en = crc_en_reg;
-assign crc_data_in = crc_in_data_reg;
 assign crc_reset = (~reset_n || sof);
 
 /* Next State Logic */
@@ -197,7 +192,6 @@ always @(*) begin
     state_next = state_reg;
     axis_valid_next = 1'b0;
     axis_data_next = axis_data_reg;
-    crc_in_data_next = crc_in_data_reg;
     axis_last_next = 1'b0;
     crc_en_next = 1'b0;
     axis_user_next = 1'b0;
@@ -207,31 +201,28 @@ always @(*) begin
         IDLE : begin
             
             if(rgmii_rdx_4 == ETH_SFD) begin
-                sof = 1'b1;               
+                sof = 1'b1;      
+                crc_en_next = 1'b1;         
                 state_next = PAYLOAD;
             end
         end
-        PAYLOAD : begin
-            axis_valid_next = 1'b1;
-            crc_en_next = 1'b1;
-            
-            //Transmit the data from shift reg 4 to FIFO
-            axis_data_next = rgmii_rdx_4;            
-            crc_in_data_next = rgmii_rdx_4;
-            
-            //If we do not have valid data from RGMII - transmission complete
-            if(rgmii_mac_rx_dv == 1'b0) begin
-                axis_last_next = 1'b1;    
-                   
-                state_next = CRC;                                   
-            end
-        end
-        CRC : begin
-        
-            if(crc_data_out != {rgmii_rdx_1, rgmii_rdx_2, rgmii_rdx_3, rgmii_rdx_4})
-                   axis_user_next = 1'b1;
-            
-            state_next = IDLE;
+        PAYLOAD : begin  
+           //If there is data to transmit, calculate crc and raise valid flag
+           axis_valid_next = 1'b1;
+           crc_en_next = 1'b1;
+           
+           //Transmit the data from shift reg 4 to FIFO & CRC checker
+           axis_data_next = rgmii_rdx_4;            
+           
+           //If we do not have valid data from RGMII - transmission complete
+           if(rgmii_mac_rx_dv == 1'b0) begin
+               axis_last_next = 1'b1;  
+           
+               if(crc_data_out != {rgmii_rdx_0, rgmii_rdx_1, rgmii_rdx_2, rgmii_rdx_3})
+                   axis_user_next = 1'b1;                    
+                  
+               state_next = IDLE;                                                    
+           end
         end
     endcase
     
