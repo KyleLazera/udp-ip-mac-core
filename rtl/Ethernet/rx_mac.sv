@@ -39,7 +39,7 @@ module rx_mac
     /* AXI Stream Output - FIFO */
     output wire [DATA_WIDTH-1:0] m_rx_axis_tdata,               //Data to transmit to asynch FIFO
     output wire m_rx_axis_tvalid,                               //Signal indicating module has data to transmit
-    output wire m_rx_axis_tuser,                                //Would be used mainly to indicate a bit error
+    output wire m_rx_axis_tuser,                                //Used to indicate an error to the FIFO
     output wire m_rx_axis_tlast,                                //Indicates last byte within a packet
     
     /* FIFO Input/Control Signals */
@@ -56,12 +56,11 @@ module rx_mac
 
 /* Local variables */
 localparam [7:0] ETH_SFD = 8'hD5; 
-localparam TICK_SIZE = $clog2(50);
 
 /* FSM Declarations */
 typedef enum {IDLE,                                             //State that waits to detect a SFD
               PAYLOAD,                                          //State that is reading and transmitting the payload
-              CRC                                              //Final state used to check the CRC 
+              BAD_PCKT                                          //This state waits for teh reaminder of teh packet if there is an error
               } state_type;
               
 /* CRC32 Module Instantiation */
@@ -199,8 +198,8 @@ always @(*) begin
     
     case(state_reg) 
         IDLE : begin
-            
-            if(rgmii_rdx_4 == ETH_SFD) begin
+            //If data valid and SFD is found, reset CRC and enter payload state
+            if(rgmii_rdx_4 == ETH_SFD && rgmii_dv_4) begin
                 sof = 1'b1;      
                 crc_en_next = 1'b1;         
                 state_next = PAYLOAD;
@@ -212,17 +211,28 @@ always @(*) begin
            crc_en_next = 1'b1;
            
            //Transmit the data from shift reg 4 to FIFO & CRC checker
-           axis_data_next = rgmii_rdx_4;            
+           axis_data_next = rgmii_rdx_4; 
            
+           //If we have valid data, but there is an error, raise tuser & do not sample remaining packet
+           if(rgmii_dv_4 && rgmii_er_4) begin
+              axis_user_next = 1'b1; 
+              state_next = BAD_PCKT;
+           end                      
            //If we do not have valid data from RGMII - transmission complete
-           if(rgmii_mac_rx_dv == 1'b0) begin
+           else if(rgmii_mac_rx_dv == 1'b0) begin
                axis_last_next = 1'b1;  
            
+               //If CRC is incorrect, raise tuser flag to indicate this error
                if(crc_data_out != {rgmii_rdx_0, rgmii_rdx_1, rgmii_rdx_2, rgmii_rdx_3})
                    axis_user_next = 1'b1;                    
                   
                state_next = IDLE;                                                    
            end
+        end
+        BAD_PCKT : begin
+            //Wait for the data valid signal to go low
+            if(rgmii_mac_rx_dv == 1'b0)
+                state_next = IDLE;
         end
     endcase
     
