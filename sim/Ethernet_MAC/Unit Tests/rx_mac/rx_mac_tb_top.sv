@@ -40,14 +40,14 @@ module rx_mac_tb_top;
         #50 reset_n = 1'b1;
         #10;
            
-        /*foreach(in_data.pckt[i]) begin           
-            rgmii_mac_rx_data <= in_data.pckt[i].data;
-            rgmii_mac_rx_dv <= in_data.pckt[i].dv;
-            rgmii_mac_rx_er <= in_data.pckt[i].er;
+        foreach(in_data.packet[i]) begin           
+            rgmii_mac_rx_data <= in_data.packet[i].data;
+            rgmii_mac_rx_dv <= in_data.packet[i].dv;
+            rgmii_mac_rx_er <= in_data.packet[i].er;
             @(posedge clk);           
-        end     */               
+        end                    
                     
-        //#1000;
+        #1000;
         $finish;
     end
     

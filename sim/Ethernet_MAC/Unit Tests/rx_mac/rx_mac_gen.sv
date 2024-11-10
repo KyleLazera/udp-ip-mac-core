@@ -3,13 +3,38 @@
 
 /*
  * This file contains the classes that are used to generate a packet that will be sent to the rx_mac DUT.
- * The following goals guide the functionality of the class:
+ * The classes within this file include:
+ *      1) Transaction Item Class
+ *      2) CRC32 Class
+ *      3) Packet generation Class
+ *
+ * The following goals guide the functionality of the file:
  * 1) Payload data has a randomized size (ranging from 46 to 1500) & randomized values.
  * 2) Each data valid (dv) transmission is randomized with probability distr: 1 = 99%, 0 = 1%
  * 3) Each data error (er) transmission is randomized with probability distr: 1 = 1%, 0 = 99%
  * 4) CRC for randomized data is calculated and appended to end of payload with randomized dv and er values
  * 5) Header + SFD is prepended to payload with associated dv and er values
 */
+
+/**********************************************
+ * Transaction Item Class
+***********************************************/
+
+class rgmii_data;
+    /* Variables */
+    rand bit [7:0] data;                                        
+    rand bit dv;
+    rand bit er;      
+    
+    /* Constraints */   
+    constraint rgmii_dv {dv dist {1 := 100, 0 := 0};}      //Distribution constraint for each dv
+    constraint rgmii_er {er dist {1 := 0, 0 := 100};}      //Distribution constraint for each er                              
+    
+endclass : rgmii_data
+
+/**********************************************
+ * CRC32 Class
+***********************************************/
 
 class crc32_checksum;
     /* Localparams */
@@ -63,19 +88,11 @@ class crc32_checksum;
     endfunction : crc32_reference_model        
 endclass : crc32_checksum
 
-class rgmii_data;
-    /* Variables */
-    rand bit [7:0] data;                                        
-    rand bit dv;
-    rand bit er;      
-    
-    /* Constraints */   
-    constraint rgmii_dv {dv dist {1 := 99, 0 := 1};}      //Distribution constraint for each dv
-    constraint rgmii_er {er dist {1 := 1, 0 := 99};}      //Distribution constraint for each er                              
-    
-endclass : rgmii_data
+/**********************************************
+ * Packet Generation Class
+***********************************************/
 
-class rx_packet extends rgmii_data;
+class rx_packet;
 
     /* Localparams */
     localparam ETH_HDR = 8'h55;
@@ -103,7 +120,7 @@ class rx_packet extends rgmii_data;
     /*
      * @brief This function generates data, dv and er values and places them into a singular packet that can be
      *          transmitted to the DUT.
-     * @note The values are randomized accroding to specific constraints and depdning on the portion of the packet they belong to.
+     * @note The values are randomized according to specific constraints and depdning on the portion of the packet they belong to.
     */
     function gen_packet();
         logic [7:0] temp_payload []; 
@@ -113,8 +130,8 @@ class rx_packet extends rgmii_data;
         crc32_checksum crc = new;
         //Init a temporary packet for CRC calculation
         temp_payload = new[pckt_size];
-        //Init new instance of a packet with the specified size + header bytes (8) + CRC Bytes (4)
-        packet = new[pckt_size + 8 + 4]; 
+        //Init new instance of a packet with the specified size + header bytes (8) + CRC Bytes (4) + 1 final value to return dv to 0
+        packet = new[pckt_size + 8 + 4 + 1]; 
         
         /* Ethernet Header + SFD */
         for(int i = 0; i < 8; i++) begin
@@ -151,6 +168,12 @@ class rx_packet extends rgmii_data;
             assert(packet[8 + pckt_size + k].randomize() with {packet[8 + pckt_size + k].data == crc_bytes[(k*8) +: 8];}) 
                 else $fatal(2, "Randomization failed for packet[%0d]", (8 + pckt_size + k));             
         end   
+        
+        /* Idle Packet - This is used to return the dv to 0. The er value and data do not matter */
+        packet[8 + 4 + pckt_size] = new();
+        assert(packet[8 + 4 + pckt_size].randomize with {packet[8 + 4 + pckt_size].dv == 1'b0;}) else 
+            $fatal(2, "Failed idle data");
+        
     endfunction : gen_packet
 
 endclass : rx_packet
