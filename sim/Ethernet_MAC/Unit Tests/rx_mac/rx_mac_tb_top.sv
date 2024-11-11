@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+
 `include "rx_mac_gen.sv"
 
 module rx_mac_tb_top;
@@ -21,6 +22,21 @@ module rx_mac_tb_top;
     
     // Design Under Test Instantiation 
     rx_mac #(.DATA_WIDTH(DATA_WIDTH)) DUT (.*);  
+    
+    //Bind the system verilog assertions module to the DUT
+    bind rx_mac rx_mac_sva assertions_inst (
+        .clk(clk),
+        .reset_n(reset_n),
+        .m_rx_axis_tdata(m_rx_axis_tdata),
+        .m_rx_axis_tvalid(m_rx_axis_tvalid),
+        .m_rx_axis_tuser(m_rx_axis_tuser),
+        .m_rx_axis_tlast(m_rx_axis_tlast),
+        .s_rx_axis_trdy(s_rx_axis_trdy),
+        .rgmii_mac_rx_data(rgmii_mac_rx_data),
+        .rgmii_mac_rx_dv(rgmii_mac_rx_dv),
+        .rgmii_mac_rx_er(rgmii_mac_rx_er),
+        .mii_select(mii_select)
+    );
     
     rx_packet in_data;   
     
