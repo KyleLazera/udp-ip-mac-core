@@ -48,10 +48,7 @@ module rx_mac
     /* RGMII Interface */
     input wire [DATA_WIDTH-1:0] rgmii_mac_rx_data,              //Input data from the RGMII PHY interface
     input wire rgmii_mac_rx_dv,                                 //Indicates data from PHY is valid
-    input wire rgmii_mac_rx_er,                                 //Indicates an error in the data from the PHY
-    
-    /* Control Signals */
-    input wire mii_select                                       //Indicates whether the data is coming in at SDR or DDR 
+    input wire rgmii_mac_rx_er                                  //Indicates an error in the data from the PHY
 );
 
 /* Local variables */
@@ -198,8 +195,8 @@ always @(*) begin
     
     case(state_reg) 
         IDLE : begin
-            //If data valid and SFD is found, reset CRC and enter payload state
-            if(rgmii_rdx_4 == ETH_SFD && rgmii_dv_4) begin
+            //If data valid is high, SFD is found & FIFO is ready for data  
+            if(rgmii_rdx_4 == ETH_SFD && rgmii_dv_4 /*&& s_rx_axis_trdy*/) begin
                 sof = 1'b1;      
                 crc_en_next = 1'b1;         
                 state_next = PAYLOAD;

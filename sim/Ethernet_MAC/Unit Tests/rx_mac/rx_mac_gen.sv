@@ -104,7 +104,7 @@ class rx_packet;
     rand int clk_prd;                       //Clock period for rgmii rxc
     
     /* Constraints */         
-    constraint pckt_size_const {pckt_size inside {[10:15]};}               
+    constraint pckt_size_const {pckt_size inside {[49:1500]};}               
     constraint clk_const {clk_prd dist {400 := 30, 40 := 35, 8 := 35};}  
     
     /* Constructor */
@@ -171,8 +171,9 @@ class rx_packet;
         
         /* Idle Packet - This is used to return the dv to 0. The er value and data do not matter */
         packet[8 + 4 + pckt_size] = new();
-        assert(packet[8 + 4 + pckt_size].randomize with {packet[8 + 4 + pckt_size].dv == 1'b0;}) else 
+        assert(packet[8 + 4 + pckt_size].randomize())else 
             $fatal(2, "Failed idle data");
+        packet[8 +4 + pckt_size].dv = 1'b0;
         
     endfunction : gen_packet
 

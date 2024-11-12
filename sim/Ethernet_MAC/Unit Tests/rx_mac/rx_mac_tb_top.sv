@@ -14,8 +14,7 @@ module rx_mac_tb_top;
     logic s_rx_axis_trdy;                               
     logic [DATA_WIDTH-1:0] rgmii_mac_rx_data;           
     logic rgmii_mac_rx_dv;                              
-    logic rgmii_mac_rx_er;                              
-    logic mii_select;                                       
+    logic rgmii_mac_rx_er;                                                                   
     
     // Variables                                                     //Holds clock period ofor teh rgmii rx clk
     int clk_prd;
@@ -34,8 +33,7 @@ module rx_mac_tb_top;
         .s_rx_axis_trdy(s_rx_axis_trdy),
         .rgmii_mac_rx_data(rgmii_mac_rx_data),
         .rgmii_mac_rx_dv(rgmii_mac_rx_dv),
-        .rgmii_mac_rx_er(rgmii_mac_rx_er),
-        .mii_select(mii_select)
+        .rgmii_mac_rx_er(rgmii_mac_rx_er)
     );
     
     rx_packet in_data;   
@@ -54,7 +52,10 @@ module rx_mac_tb_top;
         //Reset
         reset_n = 1'b0;
         #50 reset_n = 1'b1;
-        #10;
+        #50;
+        
+        //Temporarily assume the FIFO is always ready to recieve data
+        s_rx_axis_trdy = 1'b1;
            
         foreach(in_data.packet[i]) begin           
             rgmii_mac_rx_data <= in_data.packet[i].data;
