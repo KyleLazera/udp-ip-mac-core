@@ -4,6 +4,10 @@
 `include "uvm_macros.svh"  // Import UVM macros
 import uvm_pkg::*;         // Import all UVM classes
 
+/*
+ * This is the transaction item that is used to create the ethernet packet that will be recieved
+ * by the RGMII PHY (this contains the byte of data, data valid signal and data error signal driven to DUT).
+*/
 class rx_mac_rgmii_item extends uvm_sequence_item;
     /* Utility macros - used to register class with factory & enable constructor definition*/
     `uvm_object_utils(rx_mac_rgmii_item)
