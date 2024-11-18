@@ -25,8 +25,7 @@ class rx_mac_seq extends uvm_sequence;
     virtual task body();
 
      //Loop to generate the specified number of packets
-        for(int i = 0; i < num_pckts; i++) begin
-            
+        for(int i = 0; i < num_pckts; i++) begin            
             //Create an instance of the packet generation class
             rx_eth_packet ethernet_packet = rx_eth_packet::create($sformatf("eth packet %0d", i));           
             

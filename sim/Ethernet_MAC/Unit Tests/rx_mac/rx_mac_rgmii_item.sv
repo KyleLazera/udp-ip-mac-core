@@ -12,10 +12,16 @@ class rx_mac_rgmii_item extends uvm_sequence_item;
     /* Utility macros - used to register class with factory & enable constructor definition*/
     `uvm_object_utils(rx_mac_rgmii_item)
     
-    /* Variables */
+    /* Variables to be randomly Generated */
     rand bit [7:0] data;                                        
     rand bit dv;
     rand bit er;      
+    
+    /* Values to store info for the monitor (FIFO end of data)*/
+    bit [7:0] fifo_data;
+    bit fifo_valid;
+    bit fifo_error;
+    bit fifo_last;
      
     /* Constraints */   
     constraint rgmii_dv {dv dist {1 := 100, 0 := 0};}      //Distribution constraint for each dv
