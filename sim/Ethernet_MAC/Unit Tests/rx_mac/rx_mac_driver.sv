@@ -1,10 +1,6 @@
 `ifndef _RX_MAC_DRIVER
 `define _RX_MAC_DRIVER
 
-`include "rx_mac_if.sv"
-`include "uvm_macros.svh"  // Import UVM macros
-import uvm_pkg::*;         // Import all UVM classes
-
 class rx_mac_driver extends uvm_driver#(rx_mac_rgmii_item);
     /* Utility Macros */
     `uvm_component_utils(rx_mac_driver)
