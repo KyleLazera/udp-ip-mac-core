@@ -21,8 +21,10 @@ class rx_mac_scb extends uvm_scoreboard;
         analysis_port = new("analysis_imp", this);        
     endfunction : build_phase
     
-    
-    /* Implement functional verification here */
+    /* Add functional verification here */
+    virtual function write(rx_mac_rgmii_item item);
+        `uvm_info("SCB", "Item Recieved", UVM_HIGH);
+    endfunction : write    
     
 endclass : rx_mac_scb
 

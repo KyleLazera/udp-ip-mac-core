@@ -1,7 +1,7 @@
 `ifndef _RX_MAC_SEQ
 `define _RX_MAC_SEQ
 
-`include "rx_mac_gen.sv"
+//`include "rx_mac_gen.sv"
 `include "rx_mac_packet.sv"
 
 class rx_mac_seq extends uvm_sequence;
@@ -27,7 +27,7 @@ class rx_mac_seq extends uvm_sequence;
      //Loop to generate the specified number of packets
         for(int i = 0; i < num_pckts; i++) begin            
             //Create an instance of the packet generation class
-            rx_eth_packet ethernet_packet = rx_eth_packet::create($sformatf("eth packet %0d", i));           
+            rx_eth_packet ethernet_packet = rx_eth_packet::type_id::create($sformatf("eth packet %0d", i));          
             
             //Generate the packet to transmit (important for correct formatting)
             ethernet_packet.generate_packet();

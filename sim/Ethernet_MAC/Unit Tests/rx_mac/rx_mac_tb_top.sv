@@ -1,26 +1,26 @@
 `timescale 1ns / 1ps
 
-`include "rx_mac_gen.sv"
+//UVM Includes
+`include "uvm_macros.svh"  // Import UVM macros
+import uvm_pkg::*;         // Import all UVM classes
+
+`include "rx_mac_test.sv"
+`include "rx_mac_if.sv"
+//`include "rx_mac_gen.sv"
 
 module rx_mac_tb_top;
-
-    localparam DATA_WIDTH = 8;
+    logic clk;                                                              
     
-    logic clk, reset_n;
-    logic [DATA_WIDTH-1:0] m_rx_axis_tdata;             
-    logic m_rx_axis_tvalid;                             
-    logic m_rx_axis_tuser;                              
-    logic m_rx_axis_tlast;                             
-    logic s_rx_axis_trdy;                               
-    logic [DATA_WIDTH-1:0] rgmii_mac_rx_data;           
-    logic rgmii_mac_rx_dv;                              
-    logic rgmii_mac_rx_er;                                                                   
+    //Init Interface
+    always #8 clk = ~clk;       //Todo: this needs to be variable to smiulate different clock periods (different tests)
+    rx_mac_if _if(clk);
     
-    // Variables                                                     //Holds clock period ofor teh rgmii rx clk
-    int clk_prd;
-    
-    // Design Under Test Instantiation 
-    rx_mac #(.DATA_WIDTH(DATA_WIDTH)) DUT (.*);  
+    // Design Under Test Instantiation - Connect with the interface 
+    rx_mac #(.DATA_WIDTH(8)) DUT (.clk(clk), .reset_n(_if.reset_n), .m_rx_axis_tdata(_if.m_rx_axis_tdata),
+                                          .m_rx_axis_tvalid(_if.m_rx_axis_tvalid), .m_rx_axis_tuser(_if.m_rx_axis_tuser),
+                                          .m_rx_axis_tlast(_if.m_rx_axis_tlast), .s_rx_axis_trdy(_if.s_rx_axis_trdy), 
+                                          .rgmii_mac_rx_data(_if.rgmii_mac_rx_data), .rgmii_mac_rx_dv(_if.rgmii_mac_rx_dv), 
+                                          .rgmii_mac_rx_er(_if.rgmii_mac_rx_er));  
     
     //Bind the system verilog assertions module to the DUT
     bind rx_mac rx_mac_sva assertions_inst (
@@ -34,39 +34,16 @@ module rx_mac_tb_top;
         .rgmii_mac_rx_data(rgmii_mac_rx_data),
         .rgmii_mac_rx_dv(rgmii_mac_rx_dv),
         .rgmii_mac_rx_er(rgmii_mac_rx_er)
-    );
-    
-    rx_packet in_data;   
-    
-    //Clocks
-    always #(clk_prd/2) clk = ~clk;
+    );  
     
     initial begin
         //Init Signals
         clk = 1'b0;
     
-        //Initializew class
-        in_data = new();
-        clk_prd = in_data.clk_prd;
-        
-        //Reset
-        reset_n = 1'b0;
-        #50 reset_n = 1'b1;
-        #50;
-        
-        //Temporarily assume the FIFO is always ready to recieve data
-        s_rx_axis_trdy = 1'b1;
-           
-        foreach(in_data.packet[i]) begin           
-            rgmii_mac_rx_data <= in_data.packet[i].data;
-            rgmii_mac_rx_dv <= in_data.packet[i].dv;
-            rgmii_mac_rx_er <= in_data.packet[i].er;
-            @(posedge clk);           
-        end                    
-                    
-        #1000;
-        $finish;
+        //Register the interface with the config db
+        uvm_config_db#(virtual rx_mac_if)::set(null, "uvm_test_top", "rx_mac_vif", _if);
+        //Run the default test instance
+        run_test("rx_mac_test");
     end
-    
-    
+       
 endmodule

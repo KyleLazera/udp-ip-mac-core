@@ -1,6 +1,10 @@
 `ifndef _RX_MAC_ENV
 `define _RX_MAC_ENV
 
+`include "rx_mac_rgmii_item.sv"
+`include "rx_mac_scb.sv"
+`include "rx_mac_agent.sv"
+
 class rx_mac_env extends uvm_env;
     `uvm_component_utils(rx_mac_env)
     

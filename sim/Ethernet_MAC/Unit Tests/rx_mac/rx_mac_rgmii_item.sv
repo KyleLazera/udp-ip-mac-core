@@ -1,8 +1,8 @@
 `ifndef _RX_MAC_RGMII_ITEM
 `define _RX_MAC_RGMII_ITEM
 
-//`include "uvm_macros.svh"  // Import UVM macros
-//import uvm_pkg::*;         // Import all UVM classes
+`include "uvm_macros.svh"  // Import UVM macros
+import uvm_pkg::*;         // Import all UVM classes
 
 /*
  * This is the transaction item that is used to create the ethernet packet that will be recieved

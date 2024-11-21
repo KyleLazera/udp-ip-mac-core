@@ -1,15 +1,8 @@
 `ifndef _RX_MAC_AGENT
 `define _RX_MAC_AGENT
 
-//UVM Includes
-`include "uvm_macros.svh"  // Import UVM macros
-import uvm_pkg::*;         // Import all UVM classes
-
-`include "rx_mac_seq.sv"
 `include "rx_mac_driver.sv"
 `include "rx_mac_monitor.sv"
-`include "rx_mac_rgmii_item.sv"
-`include "rx_mac_if.sv"
 
 class rx_mac_agent extends uvm_agent;
     /* Utility Macros */

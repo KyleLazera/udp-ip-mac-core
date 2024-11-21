@@ -5,6 +5,8 @@
 `include "uvm_macros.svh"  // Import UVM macros
 import uvm_pkg::*;         // Import all UVM classes
 
+`include "rx_mac_rgmii_item.sv"
+
 class rx_eth_packet extends uvm_object;
     /* Utility Macros */
     `uvm_object_utils(rx_eth_packet)
@@ -45,9 +47,9 @@ class rx_eth_packet extends uvm_object;
             
             //8th byte should be the SFD
             if(i < 7)                 
-                packet[i].randomize() with {packet_item.data == ETH_HDR;};
+                packet[i].randomize() with {packet[i].data == ETH_HDR;};
             else
-                packet[i].randomize() with {packet_item.data == ETH_SFD;};      
+                packet[i].randomize() with {packet[i].data == ETH_SFD;};      
         end
         
         //Generate & Append payload
