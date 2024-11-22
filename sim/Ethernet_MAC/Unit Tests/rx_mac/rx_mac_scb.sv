@@ -22,7 +22,7 @@ class rx_mac_scb extends uvm_scoreboard;
     endfunction : build_phase
     
     /* Add functional verification here */
-    virtual function write(rx_mac_rgmii_item item);
+    virtual function void write(rx_mac_rgmii_item item);
         `uvm_info("SCB", "Item Recieved", UVM_HIGH);
     endfunction : write    
     

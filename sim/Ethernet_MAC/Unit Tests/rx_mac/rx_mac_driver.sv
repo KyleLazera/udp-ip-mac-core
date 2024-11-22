@@ -28,7 +28,7 @@ class rx_mac_driver extends uvm_driver#(rx_mac_rgmii_item);
         forever begin
             //Instance of transaction item to hold object recieved from sequencer
             rx_mac_rgmii_item rgmii_item;
-            `uvm_info("DRV", $sformatf("Wait for item from sequencer"), UVM_HIGH)
+
             //Fetch the item from the sequencer
             seq_item_port.get_next_item(rgmii_item);
             

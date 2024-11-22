@@ -1,10 +1,6 @@
 `ifndef _RX_MAC_MONITOR
 `define _RX_MAC_MONITOR
 
-//`include "rx_mac_if.sv"
-//`include "uvm_macros.svh"  // Import UVM macros
-//import uvm_pkg::*;         // Import all UVM classes
-
 class rx_mac_monitor extends uvm_monitor;
     /* Utility Macros to register with factory */
     `uvm_component_utils(rx_mac_monitor)

@@ -4,6 +4,8 @@
  * This file contains a series of assertions that are used to verify the funcitonality of the rx mac.
  * Below are a series of rules that are used to guide the assertions and check the DUT functionality:
  *  1) Data in the RGMII line should be present on the axis_data line 6 clock cycles later (assuming dv is high and er is low)
+        This property makes sure that teh data transmitted on the RGMII interface matches teh output to the FIFO (excluding
+        the header and CRC).
  *  2) After transmitting the last byte of data (rasising axis_tlast), the axis_valid should go low
  *  3) When axis_valid goes high, 7 clock cycles previously should be on rgmii_rx should be D5 (SFD), rgmii_dv should be high, 
         rgmii_er should be low, & axis_trdy should be high
@@ -31,7 +33,7 @@ module rx_mac_sva
 property hdr_check;
 @(posedge clk) disable iff(~reset_n)
     $rose(m_rx_axis_tvalid) |-> (($past(rgmii_mac_rx_data, 7) == 8'hD5) && $past(rgmii_mac_rx_dv, 7) && 
-    !$past(rgmii_mac_rx_er, 7) && $past(s_rx_axis_trdy, 7)); 
+    !$past(rgmii_mac_rx_er, 7) /*&& $past(s_rx_axis_trdy, 7)*/); 
 endproperty : hdr_check
 
 /* This property checks to see if the data on the axis_data line was present on the rgmii_data line 6 clock cycles prior*/

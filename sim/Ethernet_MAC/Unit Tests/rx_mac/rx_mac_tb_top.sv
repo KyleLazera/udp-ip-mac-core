@@ -6,7 +6,6 @@ import uvm_pkg::*;         // Import all UVM classes
 
 `include "rx_mac_test.sv"
 `include "rx_mac_if.sv"
-//`include "rx_mac_gen.sv"
 
 module rx_mac_tb_top;
     logic clk;                                                              

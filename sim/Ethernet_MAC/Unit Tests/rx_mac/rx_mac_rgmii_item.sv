@@ -24,7 +24,7 @@ class rx_mac_rgmii_item extends uvm_sequence_item;
     bit fifo_last;
      
     /* Constraints */   
-    constraint rgmii_dv {dv dist {1 := 100, 0 := 0};}      //Distribution constraint for each dv
+    constraint rgmii_dv {soft dv dist {1 := 100, 0 := 0};}      //Distribution constraint for each dv
     constraint rgmii_er {er dist {1 := 0, 0 := 100};}      //Distribution constraint for each er   
     
     /* Constructor */

@@ -14,6 +14,7 @@ class rx_eth_packet extends uvm_object;
     /* Local Parameters */
     localparam HEADER_BYTES = 8;
     localparam CRC_BYTES = 4;
+    localparam IFG = 12;            //IFG is measured as time to transmit 96 bits (12 bytes)
     localparam ETH_HDR = 8'h55;
     localparam ETH_SFD = 8'hD5; 
     
@@ -22,7 +23,7 @@ class rx_eth_packet extends uvm_object;
     rand int unsigned packet_size;
     
     /* Constraints */
-    constraint packet_size_constraint {packet_size inside {[49:1500]};};
+    constraint packet_size_constraint {packet_size inside {[49:1500]};}; 
     
     /* Constructor */
     function new(string name = "Ethernet_Packet");
@@ -39,7 +40,7 @@ class rx_eth_packet extends uvm_object;
         rx_mac_rgmii_item packet_item;
         logic [31:0] crc_out;
         logic [7:0] data_payload [] = new[packet_size];
-        packet = new[packet_size + HEADER_BYTES + CRC_BYTES];
+        packet = new[packet_size + HEADER_BYTES + CRC_BYTES + IFG];
         
         // Generate & add header 
         for(int i = 0; i < HEADER_BYTES; i++) begin
@@ -66,6 +67,14 @@ class rx_eth_packet extends uvm_object;
         for(int i = 0; i < CRC_BYTES; i++) begin
             packet[HEADER_BYTES + packet_size + i] = rx_mac_rgmii_item::type_id::create($sformatf("CRC %0d", i));
             packet[HEADER_BYTES + packet_size + i].randomize() with {packet[HEADER_BYTES + packet_size + i].data == crc_out[(i*8) +: 8];};
+        end
+        
+        //Append 12 bytes (have value of 0) to simulate an IFG
+        for(int i = 0; i < IFG; i++) begin
+            packet[HEADER_BYTES + packet_size + CRC_BYTES + i] = rx_mac_rgmii_item::type_id::create($sformatf("IFG Byte %0d", i));
+            packet[HEADER_BYTES + packet_size + CRC_BYTES + i].randomize() with 
+            {packet[HEADER_BYTES + packet_size + CRC_BYTES + i].dv == 1'b0;
+             packet[HEADER_BYTES + packet_size + CRC_BYTES + i].data == 8'b0;};
         end
         
     endfunction : generate_packet
