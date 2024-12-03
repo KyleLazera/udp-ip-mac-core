@@ -42,6 +42,7 @@ class rx_mac_driver extends uvm_driver#(rx_mac_rgmii_item);
     
     /* Task that drives the generated signals to the DUT Interface */
     virtual task drive_item(rx_mac_rgmii_item rgmii_item);
+        vif.s_rx_axis_trdy <= rgmii_item.fifo_rdy;
         vif.rgmii_mac_rx_data <= rgmii_item.data;
         vif.rgmii_mac_rx_dv <= rgmii_item.dv;
         vif.rgmii_mac_rx_er <= rgmii_item.er;

@@ -15,7 +15,8 @@ class rx_mac_rgmii_item extends uvm_sequence_item;
     /* Variables to be randomly Generated */
     rand bit [7:0] data;                                        
     rand bit dv;
-    rand bit er;      
+    rand bit er;     
+    rand bit fifo_rdy;      //This is an input signal from the FIFO indicating transaction can occur 
     
     /* Values to store info for the monitor (FIFO end of data)*/
     bit [7:0] fifo_data;
@@ -24,8 +25,9 @@ class rx_mac_rgmii_item extends uvm_sequence_item;
     bit fifo_last;
      
     /* Constraints */   
-    constraint rgmii_dv {soft dv dist {1 := 100, 0 := 0};}      //Distribution constraint for each dv
-    constraint rgmii_er {er dist {1 := 0, 0 := 100};}      //Distribution constraint for each er   
+    constraint rgmii_dv {soft dv dist {1 := 100, 0 := 0};}              //Distribution constraint for each dv
+    constraint rgmii_er {soft er dist {1 := 0, 0 := 100};}              //Distribution constraint for each er  
+    constraint fifo_rdy_const {soft fifo_rdy dist {1 := 100, 0 := 0};}  //Distribution for the fifo ready signal
     
     /* Constructor */
     function new(string name = "Item");

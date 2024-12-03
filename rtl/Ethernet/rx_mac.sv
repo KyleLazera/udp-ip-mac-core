@@ -23,7 +23,6 @@
 */
 
 /* TODO:
- * Address the FIFO Rdy signal - making sure data is only sent when the signal is ready
  * Driving the rx clk signal from the RGMII may require a BUFG vs a BUFR (Currently have BUFR)
  * Add support to the error and data valid signals 
  */
@@ -196,7 +195,7 @@ always @(*) begin
     case(state_reg) 
         IDLE : begin
             //If data valid is high, SFD is found & FIFO is ready for data  
-            if(rgmii_rdx_4 == ETH_SFD && rgmii_dv_4 /*&& s_rx_axis_trdy*/) begin
+            if(rgmii_rdx_4 == ETH_SFD && rgmii_dv_4 && s_rx_axis_trdy) begin
                 sof = 1'b1;      
                 crc_en_next = 1'b1;         
                 state_next = PAYLOAD;
@@ -210,8 +209,9 @@ always @(*) begin
            //Transmit the data from shift reg 4 to FIFO & CRC checker
            axis_data_next = rgmii_rdx_4; 
            
-           //If we have valid data, but there is an error, raise tuser & do not sample remaining packet
-           if(rgmii_dv_4 && rgmii_er_4) begin
+           //If we have valid data, but there is an error, or if teh FIFO indicates it is not ready mid-transaction
+           // raise tuser & do not sample remaining packet
+           if(rgmii_dv_4 && rgmii_er_4 || (s_rx_axis_trdy == 1'b0)) begin
               axis_user_next = 1'b1; 
               state_next = BAD_PCKT;
            end                      
@@ -225,9 +225,10 @@ always @(*) begin
                   
                state_next = IDLE;                                                    
            end
+         
         end
         BAD_PCKT : begin
-            //Wait for the data valid signal to go low
+            //Wait for the data valid signal to go low indicating transaction from RGMII is complete
             if(rgmii_mac_rx_dv == 1'b0)
                 state_next = IDLE;
         end

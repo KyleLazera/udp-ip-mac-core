@@ -12,6 +12,11 @@
  *  4) When the axis_tuser signal is raised, this indicates an error, and teh axis_tvalid signal should go low 1 clock cycle later        
 */
 
+/* Todo:
+ * 1) Ensure functionality is correct if teh fifo_rdy signal goes low during transaction -> the tuser (error) signal should
+ *      be raised, and the data should no longer be sampled
+*/
+
 module rx_mac_sva
 #(parameter DATA_WIDTH = 8)
 (
@@ -33,7 +38,7 @@ module rx_mac_sva
 property hdr_check;
 @(posedge clk) disable iff(~reset_n)
     $rose(m_rx_axis_tvalid) |-> (($past(rgmii_mac_rx_data, 7) == 8'hD5) && $past(rgmii_mac_rx_dv, 7) && 
-    !$past(rgmii_mac_rx_er, 7) /*&& $past(s_rx_axis_trdy, 7)*/); 
+    !$past(rgmii_mac_rx_er, 7) && $past(s_rx_axis_trdy, 7)); 
 endproperty : hdr_check
 
 /* This property checks to see if the data on the axis_data line was present on the rgmii_data line 6 clock cycles prior*/

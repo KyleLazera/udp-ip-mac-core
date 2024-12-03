@@ -1,6 +1,11 @@
 `ifndef _RX_MAC_SCB
 `define _RX_MAC_SCB
 
+/* Todo: RX Mac may not need scoreboard, and systemverilog assertions could be used since 
+ *          the module just simply de-encapsulates a package and passes it on to the FIFO, 
+ *          which is checked using the systemverilog assertions file 
+ */
+
 class rx_mac_scb extends uvm_scoreboard;
     /* Utility macros - Register with factory */
     `uvm_component_utils(rx_mac_scb)
