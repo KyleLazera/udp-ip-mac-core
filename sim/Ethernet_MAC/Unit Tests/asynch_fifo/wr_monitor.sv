@@ -1,7 +1,7 @@
 `ifndef _WR_MONITOR
 `define _WR_MONITOR
 
-`include "async_fifo_pkg.svh"
+//`include "async_fifo_pkg.svh"
 //`include "fifo_if.sv"
 
 class wr_monitor extends uvm_monitor;
@@ -26,9 +26,31 @@ class wr_monitor extends uvm_monitor;
         //Get virtual interface from config db
         if(!uvm_config_db#(virtual wr_if)::get(this, "", "wr_if", wr_if))
             `uvm_fatal(TAG, "Failed to get virtual interface");
+        //Init the analysis port
+        a_port = new("a_port", this);
     endfunction : build_phase
     
     /* Run Phase */
+    virtual task run_phase(uvm_phase phase);
+        /* Instance of write transaction item */
+        wr_item wr_transaction;
+        
+        super.run_phase(phase);
+        
+        forever begin
+            @(posedge wr_if.clk_wr);
+            wr_transaction = new("transaction");
+            
+            //If wr enable is high & the FIFO is not full... sample data being written in 
+            //and write to analysis port
+            if(wr_if.wr_en && !wr_if.full) begin
+                wr_transaction.wr_data = wr_if.data_in;
+                a_port.write(wr_transaction);
+            end
+            
+        end
+        
+    endtask : run_phase    
     
 endclass : wr_monitor
 

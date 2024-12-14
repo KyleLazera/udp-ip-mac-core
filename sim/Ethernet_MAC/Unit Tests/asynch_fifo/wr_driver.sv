@@ -1,9 +1,9 @@
 `ifndef _WR_DRIVER
 `define _WR_DRIVER
 
-`include "async_fifo_pkg.svh"
+//`include "async_fifo_pkg.svh"
 
-class wr_driver extends uvm_driver;
+class wr_driver extends uvm_driver#(wr_item);
     /* Register with factory */
     `uvm_component_utils(wr_driver)
     
@@ -26,7 +26,23 @@ class wr_driver extends uvm_driver;
     
     /* Run phase */
     virtual task run_phase(uvm_phase phase);
-        super.run_phase(phase);
+        super.run_phase(phase);       
+        
+        forever begin
+            //Instantiate instance of transaction item
+            wr_item packet;
+        
+            //Fetch transaction item from sequencer analysis port
+            seq_item_port.get_next_item(packet);
+            
+            `uvm_info("WR_DRIVER", $sformatf("Data randomized: %0h", packet.wr_data), UVM_MEDIUM);
+            
+            //Transmit data to the DUT
+            wr_if.push(packet.wr_data);
+            
+            //Indicate driver is ready for more data
+            seq_item_port.item_done();
+        end
     endtask : run_phase
     
 endclass : wr_driver

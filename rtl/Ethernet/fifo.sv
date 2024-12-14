@@ -8,7 +8,7 @@
 module fifo
 #(
     parameter DATA_WIDTH = 8,
-    parameter FIFO_DEPTH
+    parameter FIFO_DEPTH = 255
 )
 (
     input wire clk_wr, clk_rd,
@@ -20,7 +20,7 @@ module fifo
     
     /* Signals to Read Data from FIFO */
     output wire [DATA_WIDTH-1:0] data_out,
-    output wire read_en,
+    input wire read_en,
     
     /* Status Signals of FIFO */
     output wire empty,

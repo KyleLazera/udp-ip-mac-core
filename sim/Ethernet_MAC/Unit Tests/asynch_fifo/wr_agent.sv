@@ -2,11 +2,6 @@
 `define _WR_AGENT
 
 `include "async_fifo_pkg.svh"
-//`include "wr_item.sv"
-//`include "wr_sequence.sv"
-//`include "wr_sequencer.sv"
-//`include "wr_driver.sv"
-//`include "wr_monitor.sv"
 
 class wr_agent extends uvm_agent;
     /* Register with factory */
@@ -36,8 +31,9 @@ class wr_agent extends uvm_agent;
     
     virtual function void connect_phase(uvm_phase phase);
         super.connect_phase(phase);
-        //Connect the analysis ports of teh driver and seqr
+        //Connect seq export of driver and sequencer
         drv.seq_item_port.connect(seqr.seq_item_export);
+        //assign mon analysis port
         a_port = mon.a_port;
     endfunction : connect_phase
     
