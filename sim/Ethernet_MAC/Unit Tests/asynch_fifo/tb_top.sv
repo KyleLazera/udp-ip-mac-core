@@ -42,10 +42,11 @@ module tb_top;
     
     /* Initialize virtual interfaces with uvm_config & run default test*/
     initial begin
+        //reset_n = 1'b1;
         uvm_config_db#(virtual wr_if)::set(null, "uvm_test_top.fifo_env.wr_fifo.drv", "wr_if", wr_if);
         uvm_config_db#(virtual wr_if)::set(null, "uvm_test_top.fifo_env.wr_fifo.mon", "wr_if", wr_if);
-        uvm_config_db#(virtual rd_if)::set(null, "uvm_test_top.fifo_env.rd_fifo.rd_drv", "rd_if", rd_if);
-        uvm_config_db#(virtual rd_if)::set(null, "uvm_test_top.fifo_env.rd_fifo.rd_mon", "rd_if", rd_if);
+        uvm_config_db#(virtual rd_if)::set(null, "uvm_test_top.fifo_env.rd_fifo.drv", "rd_if", rd_if);
+        uvm_config_db#(virtual rd_if)::set(null, "uvm_test_top.fifo_env.rd_fifo.mon", "rd_if", rd_if);
         
         run_test("fifo_case0");
     end

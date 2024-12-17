@@ -1,8 +1,6 @@
 `ifndef _WR_DRIVER
 `define _WR_DRIVER
 
-//`include "async_fifo_pkg.svh"
-
 class wr_driver extends uvm_driver#(wr_item);
     /* Register with factory */
     `uvm_component_utils(wr_driver)
@@ -25,12 +23,14 @@ class wr_driver extends uvm_driver#(wr_item);
     endfunction : build_phase
     
     /* Run phase */
-    virtual task run_phase(uvm_phase phase);
-        super.run_phase(phase);       
-        
+    virtual task main_phase(uvm_phase phase);
+
         forever begin
             //Instantiate instance of transaction item
             wr_item packet;
+            
+            while(!wr_if.reset_n)
+                @(posedge wr_if.clk_wr);            
         
             //Fetch transaction item from sequencer analysis port
             seq_item_port.get_next_item(packet);
@@ -43,7 +43,7 @@ class wr_driver extends uvm_driver#(wr_item);
             //Indicate driver is ready for more data
             seq_item_port.item_done();
         end
-    endtask : run_phase
+    endtask : main_phase
     
 endclass : wr_driver
 

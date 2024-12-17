@@ -18,15 +18,20 @@ class rd_driver extends uvm_driver#(rd_item);
             `uvm_fatal(TAG, "Failed to fetch virtual interface");
     endfunction : build_phase
     
-    virtual task run_phase(uvm_phase phase);
-        super.run_phase(phase);
-        
+    virtual task main_phase(uvm_phase phase);
+           
         forever begin
             //Init instance of transaction item
             rd_item read;
             
-            //Get the data from the analysis port and pass into read
+            //Block while we are reseting
+            while(!rd_if.reset_n)
+                @(posedge rd_if.clk_rd);            
+            
+            //Get the data from the analysis port and pass to DUT
             seq_item_port.get_next_item(read);
+            
+            `uvm_info("RD_DRV", $sformatf("Read Enable %0d", read.read_en), UVM_MEDIUM);
             
             //Drive data to DUT         
             rd_if.pop(read.read_en);
@@ -34,7 +39,7 @@ class rd_driver extends uvm_driver#(rd_item);
             //Indicate to sequencer it can send more data
             seq_item_port.item_done();
         end 
-    endtask : run_phase
+    endtask : main_phase
     
 endclass : rd_driver
 

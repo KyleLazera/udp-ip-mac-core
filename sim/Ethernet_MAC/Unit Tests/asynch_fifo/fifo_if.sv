@@ -8,17 +8,11 @@ interface wr_if(input clk_wr, input reset_n);
     bit full;
     
     /* Tasks that define the Bus Interface */
-    task push(logic [7:0] data);
-        //If the FIFO is full...wait until it is not
-        while(full) begin
-            wr_en = 1'b0;
-            data_in = {(8){1'b0}};
-            @(posedge clk_wr);
-        end
-        
-        //If FIFO is not full, raise enable and send data
-        wr_en = 1'b1;
-        data_in = data;   
+    task push(logic [7:0] data);      
+        wr_en <= 1'b1;
+        data_in <= data;        
+        @(posedge clk_wr);        
+        wr_en <= 1'b0; 
     endtask : push
     
 endinterface : wr_if
@@ -30,21 +24,21 @@ interface rd_if(input clk_rd, input reset_n);
     bit rd_en;
     bit empty;
     
-    /* Task that removes/reads data from FIFO */
+    /* Task that pop data from FIFO */
     task pop(bit read);
+        @(posedge clk_rd);
         
-        if(read) begin
-            //If the FIFO is empty... wait until it is not
-            while(empty) begin
-                rd_en = 1'b0;
-                @(posedge clk_rd);
-            end
-        
-            //If FIFO is not empty, read data from the FIFO
-            rd_en = 1'b1;        
-        end
-
+        if(read) 
+            rd_en <= 1'b1;        
+        else
+            rd_en <= 1'b0;
     endtask : pop 
+    
+    /* Task used to read the output data from the FIFO */
+    task read_data(output [7:0] data);
+        
+        data = data_out;        
+    endtask : read_data
       
 endinterface : rd_if
 

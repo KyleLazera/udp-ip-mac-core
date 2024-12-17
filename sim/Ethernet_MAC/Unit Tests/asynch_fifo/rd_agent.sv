@@ -21,9 +21,9 @@ class rd_agent extends uvm_agent;
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
         //Instantiate each component
-        seqr = rd_sequencer::type_id::create("rd_seqr", this);
-        drv = rd_driver::type_id::create("rd_drv", this);
-        mon = rd_monitor::type_id::create("rd_mon", this);
+        seqr = rd_sequencer::type_id::create("seqr", this);
+        drv = rd_driver::type_id::create("drv", this);
+        mon = rd_monitor::type_id::create("mon", this);
     endfunction : build_phase
     
     virtual function void connect_phase(uvm_phase phase);

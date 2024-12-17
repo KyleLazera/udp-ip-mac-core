@@ -31,6 +31,6 @@ always @(posedge clk) begin
 end
 
 /* Output Logic */
-assign o_rd_ptr = wr_ptr_1;
+assign o_wr_ptr = wr_ptr_1;
 
 endmodule

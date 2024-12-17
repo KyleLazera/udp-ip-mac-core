@@ -57,4 +57,8 @@ sync_w2r #(.ADDR_WIDTH(ADDR_WIDTH)) w2r_sync (.clk(clk_rd), .reset_n(reset_n), .
 //Synchronize read clock domain data into write clock domain
 sync_r2w #(.ADDR_WIDTH(ADDR_WIDTH)) r2w_sync (.clk(clk_wr), .reset_n(reset_n), .i_rd_ptr(rd_ptr_bin), .o_rd_ptr(rd_ptr_grey));
 
+/* Output signals */
+assign full = fifo_full;
+assign empty = fifo_empty;
+
 endmodule

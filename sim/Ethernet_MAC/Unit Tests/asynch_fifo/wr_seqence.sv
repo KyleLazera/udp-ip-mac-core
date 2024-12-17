@@ -15,7 +15,8 @@ class wr_sequence extends uvm_sequence#(wr_item);
     
     virtual task body();
         wr_item data;
-        `uvm_do(data)
+        `uvm_do(data)     
+        
     endtask : body
     
 endclass : wr_sequence

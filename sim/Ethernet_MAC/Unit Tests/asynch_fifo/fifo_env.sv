@@ -36,6 +36,8 @@ class fifo_env extends uvm_env;
     
     virtual function void connect_phase(uvm_phase phase);
         super.connect_phase(phase);
+        `uvm_info("FIFO_ENV", "Connect_phase initiated", UVM_MEDIUM);
+        
         /* Connect wr_agent with reference model */
         wr_fifo.a_port.connect(agent_model_fifo.analysis_export);
         model.port.connect(agent_model_fifo.blocking_get_export);

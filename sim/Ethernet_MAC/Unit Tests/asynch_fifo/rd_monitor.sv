@@ -26,23 +26,22 @@ class rd_monitor extends uvm_monitor;
         a_port = new("a_port", this);  
     endfunction : build_phase
     
-    virtual task run_phase(uvm_phase phase);
+    virtual task main_phase(uvm_phase phase);
         //Instantiate write transaction item to hold data
         wr_item data;
-        
-        super.run_phase(phase);
         
         forever begin
             @(posedge rd_if.clk_rd);
             //If we are reading data and FIFO is not empty, fetch data and send to scb
             if(rd_if.rd_en && !rd_if.empty) begin
                 data = new("data_out");
-                data.wr_data = rd_if.data_out;
+                rd_if.read_data(data.wr_data);
+                `uvm_info(TAG, $sformatf("Data Out %0h", data.wr_data), UVM_MEDIUM)
                 a_port.write(data);
             end
         end
         
-    endtask : run_phase
+    endtask : main_phase
     
 endclass : rd_monitor
 

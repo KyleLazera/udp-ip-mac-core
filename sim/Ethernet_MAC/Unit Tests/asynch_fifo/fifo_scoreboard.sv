@@ -22,25 +22,26 @@ class fifo_scoreboard extends uvm_scoreboard;
         actual_data = new("act_data", this); 
     endfunction : build_phase
     
-    virtual task run_phase(uvm_phase phase);
+    virtual task main_phase(uvm_phase phase);
         wr_item act_data, exp_data;
-        super.run_phase(phase);
+        super.main_phase(phase);
         
         fork
             fifo_write();
             compare_data();
         join
         
-    endtask : run_phase
+    endtask : main_phase
     
     //Task that writes to the reference FIFO
     task fifo_write();
         forever begin
             wr_item exp_data;
-            //Fetch expected data from port
+            //Fetch expected data from port, block if there is no data
             expected_data.get(exp_data);
             //Push data into reference FIFO
             expected_fifo.push_back(exp_data);
+            `uvm_info("SCB", $sformatf("data written into reference: %h", exp_data.wr_data), UVM_MEDIUM)
         end
     endtask : fifo_write
     
@@ -49,7 +50,7 @@ class fifo_scoreboard extends uvm_scoreboard;
         wr_item act_data;
         bit result;
         forever begin
-            //Fecth data from read agent
+            //Fecth output data from read agent
             actual_data.get(act_data);
             //Check if data is in the expected queue
             if(expected_fifo.size() > 0) begin
@@ -57,7 +58,7 @@ class fifo_scoreboard extends uvm_scoreboard;
                 result = act_data.compare(expected_fifo.pop_front);
                 //Check if result matched - if not print failed result
                 if(!result) 
-                    `uvm_error("SCB", "Mismatch in expected result with actual result");
+                    `uvm_error("SCB", "Mismatch in expected result with actual result.");
             end        
         end
     endtask : compare_data

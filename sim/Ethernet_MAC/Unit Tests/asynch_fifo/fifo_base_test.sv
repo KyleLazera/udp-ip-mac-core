@@ -13,8 +13,7 @@ class fifo_base_test extends uvm_test;
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
         //Init instance of the environment 
-        env = fifo_env::type_id::create("fifo_env", this);
-        
+        env = fifo_env::type_id::create("fifo_env", this);   
     endfunction : build_phase
     
     virtual function void report_phase(uvm_phase phase);

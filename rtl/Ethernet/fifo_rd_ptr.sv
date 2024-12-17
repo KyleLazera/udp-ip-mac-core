@@ -25,7 +25,7 @@ reg empty_next;
 /* Combinational Logic */
 assign bnext = bin + (read & !empty);               //Calculate the next read pointer
 assign gnext = (bnext >> 1) ^ bnext;                //Convert the read pointer to grey code
-assign empty_next = (gnext == w_ptr);
+assign empty_next = (gnext == w_ptr);               //Compare the recieved write pointer with the grey code read pointer
 
 /* Synchronous Logic */
 always @(posedge clk) begin

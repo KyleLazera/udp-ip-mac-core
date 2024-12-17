@@ -36,10 +36,7 @@ always@(posedge i_wr_clk) begin
         dual_port_ram[i_wr_addr] <= i_wr_data;
 end
 
-/* Synchronous logic to read from Block RAM */
-always@(posedge i_wr_clk) begin
-    if(i_rd_en) 
-        o_rd_data <= dual_port_ram[i_rd_addr];
-end 
+//First work Fall through read of RAM
+assign o_rd_data = dual_port_ram[i_rd_addr];
 
 endmodule

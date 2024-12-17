@@ -20,10 +20,10 @@ class fifo_reference_model extends uvm_component;
         port = new("wr_blocking_port", this);
     endfunction : build_phase
     
-    virtual task run_phase(uvm_phase phase);
+    virtual task main_phase(uvm_phase phase);
         /* Transaction item to hold the recieved data */
         wr_item rec_item, copy_item;
-        super.run_phase(phase);
+        super.main_phase(phase);
         
         forever begin
             //Get data from wr_agent - block if there is no data available
@@ -35,7 +35,7 @@ class fifo_reference_model extends uvm_component;
             wr_ap.write(copy_item);
         end
         
-    endtask : run_phase
+    endtask : main_phase
     
 endclass : fifo_reference_model
 

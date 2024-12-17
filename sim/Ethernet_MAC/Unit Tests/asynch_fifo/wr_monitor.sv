@@ -30,12 +30,10 @@ class wr_monitor extends uvm_monitor;
         a_port = new("a_port", this);
     endfunction : build_phase
     
-    /* Run Phase */
-    virtual task run_phase(uvm_phase phase);
+    /* Main Phase */
+    virtual task main_phase(uvm_phase phase);
         /* Instance of write transaction item */
         wr_item wr_transaction;
-        
-        super.run_phase(phase);
         
         forever begin
             @(posedge wr_if.clk_wr);
@@ -44,13 +42,13 @@ class wr_monitor extends uvm_monitor;
             //If wr enable is high & the FIFO is not full... sample data being written in 
             //and write to analysis port
             if(wr_if.wr_en && !wr_if.full) begin
+                `uvm_info(TAG, $sformatf("Data Sent %0h", wr_if.data_in), UVM_MEDIUM)
                 wr_transaction.wr_data = wr_if.data_in;
                 a_port.write(wr_transaction);
-            end
-            
+            end   
         end
         
-    endtask : run_phase    
+    endtask : main_phase    
     
 endclass : wr_monitor
 
