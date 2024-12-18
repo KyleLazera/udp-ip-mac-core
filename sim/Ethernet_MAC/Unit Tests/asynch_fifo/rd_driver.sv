@@ -31,8 +31,6 @@ class rd_driver extends uvm_driver#(rd_item);
             //Get the data from the analysis port and pass to DUT
             seq_item_port.get_next_item(read);
             
-            `uvm_info("RD_DRV", $sformatf("Read Enable %0d", read.read_en), UVM_MEDIUM);
-            
             //Drive data to DUT         
             rd_if.pop(read.read_en);
             

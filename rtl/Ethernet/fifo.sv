@@ -8,7 +8,7 @@
 module fifo
 #(
     parameter DATA_WIDTH = 8,
-    parameter FIFO_DEPTH = 255
+    parameter FIFO_DEPTH = 256
 )
 (
     input wire clk_wr, clk_rd,
@@ -24,7 +24,9 @@ module fifo
     
     /* Status Signals of FIFO */
     output wire empty,
-    output wire full
+    output wire almost_empty,
+    output wire full,
+    output wire almost_full
 );
 
 /* Local Params */
@@ -44,12 +46,12 @@ fifo_mem #(.DATA_WIDTH(DATA_WIDTH), .MEM_DEPTH(FIFO_DEPTH)) fifo_bram
          .i_full(fifo_full), .i_wr_data(data_in), .o_rd_data(data_out), .i_wr_addr(wr_addr), .i_rd_addr(rd_addr));
          
 //FIFO Write Pointer Comparator Instantiation
-fifo_wr_ptr #(.ADDR_WIDTH(ADDR_WIDTH)) wr_ptr (.clk(clk_wr), .reset_n(reset_n), .write(write_en),
-             .full(fifo_full), .rd_ptr(rd_ptr_grey), .w_addr(wr_addr), .w_ptr(wr_ptr_bin));
+fifo_wr_ptr #(.ADDR_WIDTH(ADDR_WIDTH), .ALMOST_FULL_DIFF(4)) wr_ptr (.clk(clk_wr), .reset_n(reset_n), .write(write_en),
+             .full(fifo_full), .rd_ptr(rd_ptr_grey), .w_addr(wr_addr), .w_ptr(wr_ptr_bin), .almost_full(almost_full));
 
 //FIFO Read Pointer Comparator Instantiation          
-fifo_rd_ptr #(.ADDR_WIDTH(ADDR_WIDTH)) rd_ptr (.clk(clk_rd), .reset_n(reset_n), .read(read_en), .empty(fifo_empty), 
-              .w_ptr(wr_ptr_grey), .rd_addr(rd_addr), .rd_ptr(rd_ptr_bin));
+fifo_rd_ptr #(.ADDR_WIDTH(ADDR_WIDTH), .ALMOST_EMPTY_DIFF(4)) rd_ptr (.clk(clk_rd), .reset_n(reset_n), .read(read_en), .empty(fifo_empty), 
+              .w_ptr(wr_ptr_grey), .rd_addr(rd_addr), .rd_ptr(rd_ptr_bin), .almost_empty(almost_empty));
               
 //Sychronize write clock domain data into read clock domain 
 sync_w2r #(.ADDR_WIDTH(ADDR_WIDTH)) w2r_sync (.clk(clk_rd), .reset_n(reset_n), .i_wr_ptr(wr_ptr_bin), .o_wr_ptr(wr_ptr_grey));

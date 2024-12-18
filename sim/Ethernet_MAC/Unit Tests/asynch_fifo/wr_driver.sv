@@ -35,10 +35,8 @@ class wr_driver extends uvm_driver#(wr_item);
             //Fetch transaction item from sequencer analysis port
             seq_item_port.get_next_item(packet);
             
-            `uvm_info("WR_DRIVER", $sformatf("Data randomized: %0h", packet.wr_data), UVM_MEDIUM);
-            
             //Transmit data to the DUT
-            wr_if.push(packet.wr_data);
+            wr_if.push(packet.wr_data, packet.wr_en);
             
             //Indicate driver is ready for more data
             seq_item_port.item_done();

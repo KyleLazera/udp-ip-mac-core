@@ -13,6 +13,9 @@ class rd_item extends uvm_sequence_item;
         `uvm_field_int(read_en, UVM_ALL_ON) //Enable copy, print etc...
     `uvm_object_utils_end
     
+    /* Constraints */
+    constraint rd_constraint{read_en dist{1 := 70, 0 := 30};}
+    
     /* Constructor */
     function new(string name = "rd_item");
         super.new(name);

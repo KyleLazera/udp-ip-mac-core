@@ -36,7 +36,6 @@ class rd_monitor extends uvm_monitor;
             if(rd_if.rd_en && !rd_if.empty) begin
                 data = new("data_out");
                 rd_if.read_data(data.wr_data);
-                `uvm_info(TAG, $sformatf("Data Out %0h", data.wr_data), UVM_MEDIUM)
                 a_port.write(data);
             end
         end

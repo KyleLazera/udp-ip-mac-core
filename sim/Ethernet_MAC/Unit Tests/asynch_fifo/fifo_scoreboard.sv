@@ -41,30 +41,28 @@ class fifo_scoreboard extends uvm_scoreboard;
             expected_data.get(exp_data);
             //Push data into reference FIFO
             expected_fifo.push_back(exp_data);
-            `uvm_info("SCB", $sformatf("data written into reference: %h", exp_data.wr_data), UVM_MEDIUM)
         end
     endtask : fifo_write
     
     //Compares the expected data in expected_fifo to the actual data recieved from DUT
     task compare_data();
-        wr_item act_data;
+        wr_item act_data, exp_data;
         bit result;
         forever begin
             //Fecth output data from read agent
             actual_data.get(act_data);
             //Check if data is in the expected queue
             if(expected_fifo.size() > 0) begin
+                exp_data = expected_fifo.pop_front;
                 //Compare the actual data, to the data in the expected fifo
-                result = act_data.compare(expected_fifo.pop_front);
+                result = act_data.compare(exp_data);
                 //Check if result matched - if not print failed result
                 if(!result) 
-                    `uvm_error("SCB", "Mismatch in expected result with actual result.");
-            end        
+                    `uvm_error("SCB", $sformatf("Mismatch of expected and actual result. Expected: %0h, Actual: %0h", exp_data, act_data));
+            end    
         end
     endtask : compare_data
     
 endclass : fifo_scoreboard
-
-
 
 `endif //_FIFO_SCB

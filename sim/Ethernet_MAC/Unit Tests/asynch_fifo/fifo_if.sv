@@ -5,14 +5,20 @@
 interface wr_if(input clk_wr, input reset_n);
     bit [7:0] data_in;
     bit wr_en;
+    bit almost_full;
     bit full;
     
     /* Tasks that define the Bus Interface */
-    task push(logic [7:0] data);      
-        wr_en <= 1'b1;
-        data_in <= data;        
+    task push(logic [7:0] data, bit write);      
+        
+        if(write) begin
+            wr_en <= 1'b1;
+            data_in <= data;
+        end         
+        
         @(posedge clk_wr);        
         wr_en <= 1'b0; 
+        
     endtask : push
     
 endinterface : wr_if
@@ -22,6 +28,7 @@ endinterface : wr_if
 interface rd_if(input clk_rd, input reset_n);
     bit [7:0] data_out;
     bit rd_en;
+    bit almost_empty;
     bit empty;
     
     /* Task that pop data from FIFO */

@@ -3,6 +3,8 @@
 
 `include "fifo_base_test.sv"
 
+/* This module holds case0, which is used to read and write to the FIFO simultaneously */
+
 /* Case0 Sequence that is set as default sequence to run for case0 test */
 class case0_sequence extends uvm_sequence;
     `uvm_object_utils(case0_sequence)
@@ -17,7 +19,6 @@ class case0_sequence extends uvm_sequence;
        
     virtual task pre_body();        
         start_phase = this.get_starting_phase();
-        `uvm_info("CASE0_SEQ", $sformatf("pre_body called - starting phase: %s", start_phase.get_name()), UVM_MEDIUM);
         
         if(start_phase != null) begin
             start_phase.raise_objection(this);
@@ -27,8 +28,9 @@ class case0_sequence extends uvm_sequence;
     
     virtual task body();
         wr_sequence     wr_seq;
-        rd_sequence     rd_seq;      
-        repeat(20) begin
+        rd_sequence     rd_seq;   
+           
+        repeat(10000) begin
             `uvm_do_on(wr_seq, p_sequencer.v_wr_seqr)
             `uvm_do_on(rd_seq, p_sequencer.v_rd_seqr)
         end
@@ -37,7 +39,6 @@ class case0_sequence extends uvm_sequence;
     endtask : body
     
     virtual task post_body();
-        `uvm_info("CASE0_SEQ", "post_body called", UVM_MEDIUM);
         if(start_phase != null) begin 
             `uvm_info("my_case0", "dropping objection", UVM_MEDIUM)
             start_phase.drop_objection(this);
@@ -55,14 +56,11 @@ class fifo_case0 extends fifo_base_test;
     endfunction : new
     
     virtual function void build_phase(uvm_phase phase);
-        // Variable to hold the retrieved sequence type
-        uvm_object_wrapper seq_type;
         super.build_phase(phase);
        
         //Set case0_sequence as the default sequence to run 
         uvm_config_db#(uvm_object_wrapper)::set(this, "fifo_env.v_seqr.main_phase", "default_sequence", 
-                                                case0_sequence::type_id::get());                                             
-                 
+                                                case0_sequence::type_id::get());                                                              
     endfunction : build_phase
     
     task main_phase(uvm_phase phase);
