@@ -4,6 +4,7 @@
 import uvm_pkg::*;         // Import all UVM classes
 
 //`include "fifo_if.sv"
+`include "fifo_sva.sv"
 `include "fifo_case0.sv"
 `include "fifo_case1.sv"
 `include "fifo_case2.sv"
@@ -23,6 +24,20 @@ module tb_top;
                                                     .write_en(wr_if.wr_en), .data_out(rd_if.data_out), .read_en(rd_if.rd_en), 
                                                     .empty(rd_if.empty), .full(wr_if.full), .almost_full(wr_if.almost_full), 
                                                     .almost_empty(rd_if.almost_empty));
+
+    /* Bind SVA file */    
+    bind fifo fifo_sva assertions_inst(
+        .clk_wr(clk_wr), .clk_rd(clk_rd), 
+        .reset_n(reset_n), 
+        .data_in(data_in),
+        .write_en(write_en), 
+        .data_out(data_out), 
+        .read_en(read_en), 
+        .empty(empty), 
+        .full(full),
+        .almost_full(almost_full), 
+        .almost_empty(almost_empty)  
+    );
                                                     
    /* Write Clock Initialization */
    initial begin

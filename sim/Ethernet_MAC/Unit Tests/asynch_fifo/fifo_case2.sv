@@ -26,13 +26,17 @@ class case2_sequence extends uvm_sequence;
         rd_sequence     rd_seq;
         
         //Write Until FIFO is full
-        repeat(500) begin
+        repeat(550) begin
             `uvm_do_on(wr_seq, p_sequencer.v_wr_seqr)
         end
         
         //Read until FIFO is empty
-        repeat(500) 
+        repeat(550) 
             `uvm_do_on(rd_seq, p_sequencer.v_rd_seqr)
+            
+        repeat(500) begin
+            `uvm_do_on(wr_seq, p_sequencer.v_wr_seqr)
+        end            
             
     endtask : body
 

@@ -32,13 +32,13 @@ interface rd_if(input clk_rd, input reset_n);
     bit empty;
     
     /* Task that pop data from FIFO */
-    task pop(bit read);
-        @(posedge clk_rd);
+    task pop(bit read);        
         
         if(read) 
             rd_en <= 1'b1;        
-        else
-            rd_en <= 1'b0;
+        
+        @(posedge clk_rd);
+        rd_en <= 1'b0;
     endtask : pop 
     
     /* Task used to read the output data from the FIFO */

@@ -42,7 +42,10 @@ assign rd_ptr_grey = (rd_ptr_bin_next >> 1) ^ rd_ptr_bin_next;                  
 assign rd_ptr_almost_empty = rd_ptr_bin_next + ALMOST_EMPTY_DIFF;               //Caluclate the almost empty value
 
 assign empty_next = (rd_ptr_grey == w_ptr);                                     //Compare the recieved write pointer with the grey code read pointer
-assign almost_empty_next = (rd_ptr_almost_empty >= wr_ptr_bin);                 //Check to see if the FIFO is almost empty
+
+/* Logic to check if FIFO is almost empty */
+assign almost_empty_next = (wr_ptr_bin >= rd_ptr_bin_next) ? (wr_ptr_bin - rd_ptr_bin_next < ALMOST_EMPTY_DIFF)
+                : (rd_ptr_almost_empty >= wr_ptr_bin);                 
 
 /* Synchronous Logic */
 always @(posedge clk) begin
