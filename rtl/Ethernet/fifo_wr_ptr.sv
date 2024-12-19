@@ -30,21 +30,27 @@ reg full_next, almost_full_next;
 
 /* Combinational Logic */
 
+//Conversion grey code to binary
 always @(*) begin
     rd_ptr_bin[ADDR_WIDTH] = rd_ptr[ADDR_WIDTH];
     
-    for(int i = ADDR_WIDTH - 1; i >= 0; i--)                                        //Convert the rd_ptr from grey code to binary
+    for(int i = ADDR_WIDTH - 1; i >= 0; i--)                      
         rd_ptr_bin[i] = rd_ptr_bin[i+1] ^ rd_ptr[i];
 end
 
-assign wr_ptr_bin_next = wr_ptr_bin + (write & !full);                              //Calculate teh next binary value for write address
-assign wr_ptr_grey = (wr_ptr_bin_next >> 1) ^ wr_ptr_bin_next;                      //Convert binary value to grey code to synchronize into read domain
+//Caluclate next wr_ptr and convert to grey code
+assign wr_ptr_bin_next = wr_ptr_bin + (write & !full);                              
+assign wr_ptr_grey = (wr_ptr_bin_next >> 1) ^ wr_ptr_bin_next;                      
 
-assign wr_ptr_almost_full = wr_ptr_bin_next + 4;                                    //Caluclate binary value that would indicate FIFO is almost full
+//Caluclate binary value that would indicate FIFO is almost full
+assign wr_ptr_almost_full = wr_ptr_bin_next + ALMOST_FULL_DIFF;                                    
 
-assign full_next = (wr_ptr_grey == {~rd_ptr[ADDR_WIDTH:ADDR_WIDTH-1], rd_ptr[ADDR_WIDTH-2:0]});           
-assign almost_full_next = (~wr_ptr_almost_full[ADDR_WIDTH:ADDR_WIDTH-1] == rd_ptr[ADDR_WIDTH:ADDR_WIDTH-1] &&
-                            rd_ptr[ADDR_WIDTH-2:0] - wr_ptr_almost_full[ADDR_WIDTH-2:0] < ALMOST_FULL_DIFF);
+//Full Flag Logic
+assign full_next = (wr_ptr_grey == {~rd_ptr[ADDR_WIDTH:ADDR_WIDTH-1], rd_ptr[ADDR_WIDTH-2:0]}); 
+
+//Almost Full Flag Logic          
+assign almost_full_next = (~wr_ptr_almost_full[ADDR_WIDTH] == rd_ptr_bin[ADDR_WIDTH] &&
+                           wr_ptr_almost_full[ADDR_WIDTH-1:0] >= rd_ptr_bin[ADDR_WIDTH-1:0]);
 
 /* Synchronous logic */
 always @(posedge clk) begin

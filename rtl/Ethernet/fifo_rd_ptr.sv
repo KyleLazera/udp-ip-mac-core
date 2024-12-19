@@ -39,10 +39,10 @@ end
 
 assign rd_ptr_bin_next = rd_ptr_bin + (read & !empty);                          //Calculate the next read pointer
 assign rd_ptr_grey = (rd_ptr_bin_next >> 1) ^ rd_ptr_bin_next;                  //Convert the read pointer to grey code
-assign rd_ptr_almost_empty = rd_ptr_bin_next + 4;                               //Caluclate the almost empty value
+assign rd_ptr_almost_empty = rd_ptr_bin_next + ALMOST_EMPTY_DIFF;               //Caluclate the almost empty value
 
 assign empty_next = (rd_ptr_grey == w_ptr);                                     //Compare the recieved write pointer with the grey code read pointer
-assign almost_empty_next = (wr_ptr_bin - rd_ptr_almost_empty < ALMOST_EMPTY_DIFF);     //Check to see if the FIFO is almost empty
+assign almost_empty_next = (rd_ptr_almost_empty >= wr_ptr_bin);                 //Check to see if the FIFO is almost empty
 
 /* Synchronous Logic */
 always @(posedge clk) begin
