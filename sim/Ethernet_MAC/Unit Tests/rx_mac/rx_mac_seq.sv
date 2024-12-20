@@ -14,7 +14,6 @@ class rx_mac_seq extends uvm_sequence;
     
     /* Constraints */         
     constraint num_pckts_const {num_pckts inside{[5:10]};}             
-    //constraint clk_const {clk_prd dist {400 := 30, 40 := 35, 8 := 35};} 
     
     /* Constructor */
     function new(string name = "Gen_Item_Seq");

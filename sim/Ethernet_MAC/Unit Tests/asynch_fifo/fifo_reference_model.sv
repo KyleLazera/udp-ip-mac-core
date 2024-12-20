@@ -35,7 +35,7 @@ class fifo_reference_model extends uvm_component;
             wr_ap.write(copy_item);
         end
         
-    endtask : main_phase
+    endtask : main_phase    
     
 endclass : fifo_reference_model
 

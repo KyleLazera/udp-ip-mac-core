@@ -4,12 +4,54 @@
 `include "tx_mac_trans_item.sv"
 `include "tx_mac_cfg.sv"
 
+class tx_mac_scb extends uvm_scoreboard;
+    `uvm_component_utils(tx_mac_scb)
+    
+    /* Port that recieves data from the reference model */
+    uvm_blocking_get_port#(tx_mac_trans_item) expected_data;
+    /* Port that recieves data from the monitor - actual data from DUT */
+    uvm_blocking_get_port#(tx_mac_trans_item) actual_data;
+    
+    bit result;
+    
+    function new(string name = "tx_mac_scb", uvm_component parent);
+        super.new(name, parent);
+    endfunction : new
+    
+    virtual function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        //Init analysis ports
+        expected_data = new("expected_data", this);
+        actual_data = new("actual_data", this);
+    endfunction : build_phase
+    
+    virtual task run_phase(uvm_phase phase);
+        tx_mac_trans_item   actual_item, exp_item;
+        super.run_phase(phase);
+        
+        forever begin
+            //Get the actual output data
+            actual_data.get(actual_item);
+            
+            //get data from the reference model
+            expected_data.get(exp_item);
+            
+            result = actual_item.compare(exp_item);
+            
+            if(!result)
+                `uvm_error("TX_MAC_SCB", "Mismatch of the packets")
+            
+        end
+    endtask : run_phase
+    
+endclass : tx_mac_scb
+
 /* 
  * Scoreboard Checks:
  * 1) Ensure the preamble abides by the following pattern: 7 bytes of 8'h55 followed by 1 byte of 8'hD5
  * 2) Ensure the payload size is between 46 - 1500 bytes
  * 3) Use a reference model to confirm the CRC calclation
-*/
+*
 
 class tx_mac_scb;
     localparam DATA_WIDTH = 8;
@@ -47,7 +89,7 @@ class tx_mac_scb;
             //Fetch data from queue
             scb_mbx.get(mon_item);        
             
-            /* Check Preamble Pattern */
+            // Check Preamble Pattern 
             assert( {mon_item.preamble[0], mon_item.preamble[1], mon_item.preamble[2], mon_item.preamble[3], 
                     mon_item.preamble[4], mon_item.preamble[5], mon_item.preamble[6], mon_item.preamble[7]} 
                     == {{7{8'h55}}, 8'hD5} ) 
@@ -60,7 +102,7 @@ class tx_mac_scb;
                         header_fail++;
                     end
             
-            /* Check Payload Size is between 46 bytes and 1500 bytes*/
+            // Check Payload Size is between 46 bytes and 1500 bytes
             assert(mon_item.payload.size() >= 46 && mon_item.payload.size() <= 1500) 
                 else begin
                     $fatal(2, "[%s] Payload Size does not fall within range.", TAG);
@@ -68,7 +110,7 @@ class tx_mac_scb;
                     payload_fail++;
                 end
                 
-            /* Check CRC Calculation */         
+            // Check CRC Calculation        
             assert(crc32_reference_model(mon_item.payload) == {mon_item.fcs[3], mon_item.fcs[2], mon_item.fcs[1], mon_item.fcs[0]})
                 else begin
                     $fatal(2, "[%s] CRC-32 Failed. Reference model: %0h, DUT: %0h", TAG, crc32_reference_model(mon_item.payload), 
@@ -90,15 +132,15 @@ class tx_mac_scb;
     endtask : main
     
     
-     /*
+     
      * @Brief Reference Model that implements the CRC32 algorithm for each byte passed into it
      * @param i_byte Takes in a byte to pass into the model
      * @retval Returns the CRC32 current CRC value to append to the data message
-    */
+    *
     function automatic [31:0] crc32_reference_model;
         input [7:0] i_byte_stream[];
         
-        /* Intermediary Signals */
+        // Intermediary Signals 
         reg [31:0] crc_state = 32'hFFFFFFFF;
         reg [31:0] crc_state_rev;
         reg [7:0] i_byte_rev, table_index;
@@ -106,19 +148,19 @@ class tx_mac_scb;
         
         //Iterate through each byte in the stream
         foreach(i_byte_stream[i]) begin
-             /* Reverse the bit order of the byte in question */
+             // Reverse the bit order of the byte in question 
              i_byte_rev = 0;
              for(int j = 0; j < 8; j++)
                 i_byte_rev[j] = i_byte_stream[i][(DATA_WIDTH-1)-j];
                 
-             /* XOR this value with the MSB of teh current CRC State */
+             // XOR this value with the MSB of teh current CRC State 
              table_index = i_byte_rev ^ crc_state[31:24];
              
-             /* Index into the LUT and XOR the output with the shifted CRC */
+             // Index into the LUT and XOR the output with the shifted CRC 
              crc_state = {crc_state[24:0], 8'h0} ^ crc_lut[table_index];
         end
         
-        /* Reverse & Invert the final CRC State after all bytes have been iterated through */
+        // Reverse & Invert the final CRC State after all bytes have been iterated through 
         crc_state_rev = 32'h0;
         for(int k = 0; k < 32; k++) 
             crc_state_rev[k] = crc_state[(CRC_WIDTH-1)-k];
@@ -138,6 +180,6 @@ class tx_mac_scb;
         $display("Number of Succesfull CRC's: %0d Number of Failed CRC's: %0d", crc_succ, crc_fail);        
     endfunction
 
-endclass : tx_mac_scb
+endclass : tx_mac_scb*/
 
 `endif

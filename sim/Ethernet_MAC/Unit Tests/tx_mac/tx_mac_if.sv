@@ -1,9 +1,11 @@
 `ifndef _TX_MAC_IF
 `define _TX_MAC_IF
 
+`include "tx_mac_trans_item.sv"
+
 interface tx_mac_if(input logic clk, input logic reset_n);
     /* AXI Stream Input - FIFO */
-    logic [7:0] s_tx_axis_tdata;            //Incoming bytes of data from the FIFO    
+    logic [7:0] s_tx_axis_tdata;                        //Incoming bytes of data from the FIFO    
     logic s_tx_axis_tvalid;                            //Indicates FIFO has valid data (is not empty)
     logic s_tx_axis_tlast;                             //Indicates last beat of transaction (final byte in packet)
     logic s_tx_axis_tkeep;                             //TODO: Determine if will be used
@@ -21,6 +23,42 @@ interface tx_mac_if(input logic clk, input logic reset_n);
     /* Configurations */
     logic mii_select;                                  //Configures data rate (Double Data Rate (DDR) or Singale Data Rate (SDR))      
     
+    /* Tasks to write data to the Signals */
+    
+    task drive_data(tx_mac_trans_item item);
+        // Raise the tvalid flag indicating there is data to transmit /
+        if(item.payload.size() > 0)                                 
+            vif.s_tx_axis_tvalid <= 1'b1;                              
+        
+        // Only transmit data when the tx MAC asserts rdy flag 
+        @(posedge s_tx_axis_trdy);            
+                          
+        // Drive a packet to the txmac (simulates FIFO driving data) 
+        foreach(item.payload[i]) begin
+            @(posedge clk);                  
+            s_tx_axis_tdata <= item.payload[i];
+            s_tx_axis_tlast <= item.last_byte[i];                   
+            
+            //If we are in MII mode, wait for the trdy flag to be raised again
+            //if(cfg.mii_sel)
+                //@(posedge s_tx_axis_trdy);               
+        end
+        
+        // Lower the last byte flag after a clock period    
+        s_tx_axis_tlast = @(posedge clk) 1'b0; 
+        
+        // Clear the valid flag after last byte was sent 
+        s_tx_axis_tvalid <= 1'b0;     
+           
+    endtask : drive_data
+    
+    task monitor_output_data(tx_mac_trans_item item);
+        @(posedge clk);
+        
+        if(rgmii_mac_tx_dv)
+            item.payload.push_back(rgmii_mac_tx_data);
+       
+    endtask : monitor_output_data
 
 endinterface : tx_mac_if
 

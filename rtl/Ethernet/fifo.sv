@@ -1,9 +1,18 @@
 `timescale 1ns / 1ps
 
 /*
- * Acts as the FIFO Wrapper, that encapsulates all the FIFO components into a singular module that interacts with
- * the rx and tx mac via AXI Stream.
-*/
+ * This module serves as the FIFO Wrapper, encapsulating all FIFO components into a single module that interfaces 
+ * with the RX and TX MAC via AXI Stream.
+ *
+ * Note: This FIFO uses "pessimistic" full and empty flags. While the flags are asserted at the correct time, 
+ * they experience a 2-clock-cycle delay in deassertion. This delay is caused by the need to synchronize the pointer 
+ * from the opposite clock domain into the current clock domain using two synchronizer flip-flops.
+ * 
+ * Note: Due to clock synchronization delays, during sequential read and write operations, a full or empty flag 
+ * might be erroneously raised if the flag comparison occurs before the data from the other clock domain is updated. 
+ * To address this, almost full and almost empty flags are incorporated for more accurate status signaling.
+ */
+
 
 module fifo
 #(

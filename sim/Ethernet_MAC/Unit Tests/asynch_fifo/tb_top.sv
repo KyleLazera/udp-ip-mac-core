@@ -3,7 +3,6 @@
 `include "uvm_macros.svh"  // Import UVM macros
 import uvm_pkg::*;         // Import all UVM classes
 
-//`include "fifo_if.sv"
 `include "fifo_sva.sv"
 `include "fifo_case0.sv"
 `include "fifo_case1.sv"
