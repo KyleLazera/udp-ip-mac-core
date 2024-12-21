@@ -1,6 +1,10 @@
 `ifndef _TX_MAC_ENV
 `define _TX_MAC_ENV
 
+`include "tx_mac_agent.sv"
+`include "tx_mac_scb.sv"
+`include "tx_mac_model.sv"
+
 class tx_mac_env extends uvm_env;
     `uvm_component_utils(tx_mac_env)
     
@@ -10,9 +14,9 @@ class tx_mac_env extends uvm_env;
     tx_mac_model        model;
     
     /* TLM FIFO Ports to connect agents with scb/reference model */
-    uvm_tlm_analysis_fifo#(wr_item) agent_model_fifo;
-    uvm_tlm_analysis_fifo#(wr_item) model_scb_fifo;
-    uvm_tlm_analysis_fifo#(wr_item) agent_scb_fifo;
+    uvm_tlm_analysis_fifo#(tx_mac_trans_item) agent_model_fifo;
+    uvm_tlm_analysis_fifo#(tx_mac_trans_item) model_scb_fifo;
+    uvm_tlm_analysis_fifo#(tx_mac_trans_item) agent_scb_fifo;
         
     function new(string name = "tx_mac_env", uvm_component parent);
         super.new(name, parent);

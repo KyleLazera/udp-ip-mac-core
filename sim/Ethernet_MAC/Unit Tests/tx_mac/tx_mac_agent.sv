@@ -1,6 +1,10 @@
 `ifndef _TX_MAC_AGENT
 `define _TX_MAC_AGENT
 
+`include "tx_mac_driver.sv"
+`include "tx_mac_monitor.sv"
+`include "tx_mac_trans_item.sv"
+
 class tx_mac_agent extends uvm_agent;
     `uvm_component_utils(tx_mac_agent)
     

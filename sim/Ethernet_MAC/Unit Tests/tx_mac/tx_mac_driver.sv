@@ -12,6 +12,7 @@ import uvm_pkg::*;         // Import all UVM classes
 class tx_mac_driver extends uvm_driver#(tx_mac_trans_item);
     `uvm_component_utils(tx_mac_driver)
     
+    bit mii_sel;
     virtual tx_mac_if tx_if;
     
     uvm_analysis_port#(tx_mac_trans_item)   a_port;
@@ -26,6 +27,12 @@ class tx_mac_driver extends uvm_driver#(tx_mac_trans_item);
         //Fetch virtual interface
         if(!uvm_config_db#(virtual tx_mac_if)::get(this, "", "tx_if", tx_if))
             `uvm_error("TX_MAC_DRIVER", "Failed to fetch the virtual interface")
+            
+        //Fetch the mii_sel configuration
+        if(!uvm_config_db#(bit)::get(this, "", "mii_sel", mii_sel))
+            `uvm_error("TX_MAC_DRIVER", "Failed to fetch mii configuration")  
+            
+        a_port = new("a_port", this);                   
                         
     endfunction : build_phase
     
@@ -33,13 +40,13 @@ class tx_mac_driver extends uvm_driver#(tx_mac_trans_item);
         super.run_phase(phase);
         
         forever begin
-            tx_mac_trans_item tx_item;
+            tx_mac_trans_item tx_item = new("tx_item");
             
             seq_item_port.get_next_item(tx_item);
             
             a_port.write(tx_item);
             
-            tx_if.drive_data(tx_item);
+            tx_if.drive_data(tx_item, mii_sel);
             
             seq_item_port.item_done();
             

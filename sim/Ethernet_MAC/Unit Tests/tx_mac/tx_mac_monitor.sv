@@ -22,7 +22,7 @@ class tx_mac_monitor extends uvm_monitor;
             `uvm_error("TX_MONITOR", "Failed to fetch virtual interface")
         
         //Init the analysis port
-        a_port = new(this, "a_port");
+        a_port = new("a_port", this);
     endfunction : build_phase
     
     virtual task run_phase(uvm_phase phase);
@@ -33,7 +33,7 @@ class tx_mac_monitor extends uvm_monitor;
             @(posedge tx_if.clk);
             tx_item = new("tx_item");
             
-            monitor_output_data(tx_item);    
+            tx_if.monitor_output_data(tx_item);    
             
             //Only write the data once there is no more valid data 
             if(!tx_if.rgmii_mac_tx_dv && (tx_item.payload.size() > 0))

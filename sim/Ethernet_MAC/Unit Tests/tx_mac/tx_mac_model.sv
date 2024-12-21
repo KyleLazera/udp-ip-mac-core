@@ -42,7 +42,7 @@ class tx_mac_model extends uvm_component;
             
             /* Determine Payload size and if padding is needed */
             while(tx_item.payload.size() < 46)
-                tx_item.payload.psuh_back(8'h00);
+                tx_item.payload.push_back(8'h00);
                 
             /* Calculate and append the CRC */
             crc =  crc32_reference_model(tx_item.payload);

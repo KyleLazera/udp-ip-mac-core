@@ -43,7 +43,7 @@ module tx_mac
     output wire rgmii_mac_tx_er,                            //Indicates there is an error in the data
     
     /* Configurations */
-    input wire mii_select                                   //Configures data rate (Double Data Rate (DDR) or Singale Data Rate (SDR))        
+    input wire mii_select                                   //Configures data rate (Double Data Rate (DDR) or Single Data Rate (SDR))        
 );
 
 /* Local Parameters */

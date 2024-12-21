@@ -25,10 +25,16 @@ interface tx_mac_if(input logic clk, input logic reset_n);
     
     /* Tasks to write data to the Signals */
     
-    task drive_data(tx_mac_trans_item item);
+    task drive_data(input tx_mac_trans_item item, bit mii_sel);
+    
+        mii_select <= mii_sel;
+    
+        if(mii_sel)
+            rgmii_mac_tx_rdy <= 1'b1;
+        
         // Raise the tvalid flag indicating there is data to transmit /
         if(item.payload.size() > 0)                                 
-            vif.s_tx_axis_tvalid <= 1'b1;                              
+            s_tx_axis_tvalid <= 1'b1;                              
         
         // Only transmit data when the tx MAC asserts rdy flag 
         @(posedge s_tx_axis_trdy);            
@@ -40,8 +46,8 @@ interface tx_mac_if(input logic clk, input logic reset_n);
             s_tx_axis_tlast <= item.last_byte[i];                   
             
             //If we are in MII mode, wait for the trdy flag to be raised again
-            //if(cfg.mii_sel)
-                //@(posedge s_tx_axis_trdy);               
+            if(mii_sel)
+                @(posedge s_tx_axis_trdy);               
         end
         
         // Lower the last byte flag after a clock period    

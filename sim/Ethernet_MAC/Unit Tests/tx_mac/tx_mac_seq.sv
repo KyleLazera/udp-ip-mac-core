@@ -11,13 +11,14 @@ class tx_mac_seq extends uvm_sequence#(tx_mac_trans_item);
     endfunction : new
     
     virtual task body();
-        tx_mac_trans_item   tx_item;
+        tx_mac_trans_item   tx_item = tx_mac_trans_item::type_id::create("tx_item");
+        logic [7:0] data_byte;
         
         //Randomize the size of the packet
         packet_size = $urandom_range(20, 1500);
 
         /* Packet Generation Algorithm */
-         for(int i = 0; i < packet_size; i++) begin
+         for(int i = 0; i < packet_size; i++) begin           
              /* Randomize the byte value */
              data_byte = $urandom_range(0, 255);
              
@@ -25,7 +26,7 @@ class tx_mac_seq extends uvm_sequence#(tx_mac_trans_item);
              tx_item.payload.push_back(data_byte);
              
              /* Populate the last byte queue if we are on last iteration*/
-             if(i == (pckt_size - 1))
+             if(i == (packet_size - 1))
                  tx_item.last_byte.push_back(1'b1);
              else
                  tx_item.last_byte.push_back(1'b0);
@@ -40,8 +41,8 @@ class tx_mac_seq extends uvm_sequence#(tx_mac_trans_item);
         finish_item(tx_item);
 
         // Reset queues for the next packet
-        item.payload.delete();
-        item.last_byte.delete();                
+        tx_item.payload.delete();
+        tx_item.last_byte.delete();                
         
     endtask : body
     

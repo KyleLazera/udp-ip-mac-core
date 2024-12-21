@@ -2,7 +2,6 @@
 `define _TX_MAC_SCB
 
 `include "tx_mac_trans_item.sv"
-`include "tx_mac_cfg.sv"
 
 class tx_mac_scb extends uvm_scoreboard;
     `uvm_component_utils(tx_mac_scb)
@@ -40,6 +39,8 @@ class tx_mac_scb extends uvm_scoreboard;
             
             if(!result)
                 `uvm_error("TX_MAC_SCB", "Mismatch of the packets")
+            else
+                `uvm_info("TX_MAC_SCB", "Packets Matched!", UVM_MEDIUM)
             
         end
     endtask : run_phase
