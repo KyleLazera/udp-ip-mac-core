@@ -34,7 +34,7 @@ class tx_mac_seq extends uvm_sequence#(tx_mac_trans_item);
         
         //Ensure the last byte and payload queues are same size
         assert(tx_item.last_byte.size() == tx_item.payload.size()) 
-                else `uvm_error("TX_MAC_SEQ", "Size mismatch for last byte and payload queue");
+                else `uvm_fatal("TX_MAC_SEQ", "Size mismatch for last byte and payload queue");                             
                 
         // Send the sequence item to the driver
         start_item(tx_item);

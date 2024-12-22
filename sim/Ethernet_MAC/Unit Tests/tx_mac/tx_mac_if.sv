@@ -16,7 +16,7 @@ interface tx_mac_if(input logic clk, input logic reset_n);
     
     /* RGMII Interface */
     logic rgmii_mac_tx_rdy;                            //Indicates the RGMII inteface is ready for data 
-    logic [7:0] rgmii_mac_tx_data;         //Bytes to be transmitted to the RGMII
+    logic [7:0] rgmii_mac_tx_data;                     //Bytes to be transmitted to the RGMII
     logic rgmii_mac_tx_dv;                            //Indicates the data is valid 
     logic rgmii_mac_tx_er;                            //Indicates there is an error in the data
     
@@ -26,12 +26,12 @@ interface tx_mac_if(input logic clk, input logic reset_n);
     /* Tasks to write data to the Signals */
     
     task drive_data(input tx_mac_trans_item item, bit mii_sel);
-    
-        mii_select <= mii_sel;
-    
-        if(mii_sel)
-            rgmii_mac_tx_rdy <= 1'b1;
         
+        mii_select <= mii_sel;
+        
+        if(!mii_sel)
+            rgmii_mac_tx_rdy <= 1'b1;            
+                    
         // Raise the tvalid flag indicating there is data to transmit /
         if(item.payload.size() > 0)                                 
             s_tx_axis_tvalid <= 1'b1;                              
@@ -40,10 +40,10 @@ interface tx_mac_if(input logic clk, input logic reset_n);
         @(posedge s_tx_axis_trdy);            
                           
         // Drive a packet to the txmac (simulates FIFO driving data) 
-        foreach(item.payload[i]) begin
-            @(posedge clk);                  
+        foreach(item.payload[i]) begin                              
             s_tx_axis_tdata <= item.payload[i];
             s_tx_axis_tlast <= item.last_byte[i];                   
+            @(posedge clk);
             
             //If we are in MII mode, wait for the trdy flag to be raised again
             if(mii_sel)
@@ -51,7 +51,7 @@ interface tx_mac_if(input logic clk, input logic reset_n);
         end
         
         // Lower the last byte flag after a clock period    
-        s_tx_axis_tlast = @(posedge clk) 1'b0; 
+        s_tx_axis_tlast <= 1'b0; 
         
         // Clear the valid flag after last byte was sent 
         s_tx_axis_tvalid <= 1'b0;     
