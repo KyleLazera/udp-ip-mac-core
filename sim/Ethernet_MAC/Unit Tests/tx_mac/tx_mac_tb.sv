@@ -4,14 +4,12 @@
 import uvm_pkg::*;         // Import all UVM classes
 
 `include "tx_mac_test.sv"
+`include "tx_mac_sva.sv"
 `include "tx_mac_100mbps_test.sv"
 
 module tx_mac_tb;
 
 localparam DATA_WIDTH = 8;
-localparam CRC_WIDTH = 32;
-localparam TABLE_DEPTH = (2**DATA_WIDTH);
-localparam MAX_TESTS = 10;
 
 /* Signals */
 logic clk, reset_n;
@@ -25,6 +23,15 @@ tx_mac#(.DATA_WIDTH(DATA_WIDTH)) DUT(.clk(clk), .reset_n(reset_n), .s_tx_axis_td
                                     .s_tx_axis_trdy(tx_if.s_tx_axis_trdy),.rgmii_mac_tx_rdy(tx_if.rgmii_mac_tx_rdy), .rgmii_mac_tx_data(tx_if.rgmii_mac_tx_data),
                                      .rgmii_mac_tx_dv(tx_if.rgmii_mac_tx_dv), .rgmii_mac_tx_er(tx_if.rgmii_mac_tx_er), .mii_select(tx_if.mii_select));
 
+
+//Bind systemveriog assertion file
+bind tx_mac tx_mac_sva sva_inst(.clk(clk), .reset_n(reset_n), 
+.s_tx_axis_tdata(s_tx_axis_tdata), .s_tx_axis_tvalid(s_tx_axis_tvalid),
+.s_tx_axis_tlast(s_tx_axis_tlast), .s_tx_axis_tkeep(s_tx_axis_tkeep), 
+.s_tx_axis_tuser(s_tx_axis_tuser), .s_tx_axis_trdy(s_tx_axis_trdy),
+.rgmii_mac_tx_rdy(rgmii_mac_tx_rdy), .rgmii_mac_tx_data(rgmii_mac_tx_data),
+.rgmii_mac_tx_dv(rgmii_mac_tx_dv), .rgmii_mac_tx_er(rgmii_mac_tx_er), .mii_select(mii_select)    
+);
 
 //Set clk period (8ns for 125 MHz)
 always #4 clk = ~clk;

@@ -8,6 +8,13 @@ class tx_mac_monitor extends uvm_monitor;
     
     virtual tx_mac_if tx_if;
     
+    typedef enum {IDLE,             //Initial waiting state
+                  PREAMBLE,         //Check the preamble
+                  PAYLOAD,          //Check the payload
+                  CRC,              //Check teh CRC/FCS
+                  IFG               //IFG before next packet
+                  }state_type;    
+    
     uvm_analysis_port#(tx_mac_trans_item) a_port;
     
     function new(string name = "tx_mac_monitor", uvm_component parent);
@@ -26,21 +33,94 @@ class tx_mac_monitor extends uvm_monitor;
     endfunction : build_phase
     
     virtual task run_phase(uvm_phase phase);
-        tx_mac_trans_item   tx_item;
+        tx_mac_trans_item   tx_item, copy_item;
+        int byte_ctr = 0;
+        bit last_byte = 1'b0;          
+        state_type state = IDLE; 
         super.run_phase(phase);
-        
+                             
         tx_item = new("tx_item");
         
         forever begin
-            @(posedge tx_if.clk);            
-            
-            tx_if.monitor_output_data(tx_item);    
-            
-            //Only write the data once there is no more valid data 
-            if(!tx_if.rgmii_mac_tx_dv && (tx_item.payload.size() > 0)) begin
-                a_port.write(tx_item);                        
-                tx_item.payload.delete();
-            end
+        @(posedge tx_if.clk); 
+            case(state)
+                IDLE : begin
+                    //Clear all current variables
+                    byte_ctr = 0;
+                    //If there is valid data in the FIFO go to the preamble state
+                    if(tx_if.s_tx_axis_tvalid)
+                        state = PREAMBLE;
+                end
+                PREAMBLE : begin
+                    if(byte_ctr < 7) begin
+                        #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);                        
+                        
+                        //If MII mode is selected, delay by 1 clock cycle
+                        if(tx_if.mii_select)
+                            @(posedge tx_if.clk);
+                            
+                        byte_ctr++;
+                    end else begin
+                        #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);
+                        
+                        if(tx_if.mii_select)
+                            @(posedge tx_if.clk);                        
+                        
+                        byte_ctr = 0;
+                        state = PAYLOAD;
+                    end 
+                                                                                       
+                end
+                PAYLOAD : begin  
+
+                    #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);                                  
+                    byte_ctr++;
+
+                    if(tx_if.mii_select)
+                        @(posedge tx_if.clk);
+                    
+                    if(last_byte && byte_ctr > 59) begin
+                        last_byte = 1'b0;               
+                        state = CRC;
+                        byte_ctr = 0;
+                    end else begin                                                
+                        if(tx_if.s_tx_axis_tlast) begin                                                
+                                last_byte = 1'b1;
+                        end
+                    end
+     
+                end
+                CRC : begin
+                    //Populate the CRC bytes after small delay
+                    #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);
+                    
+                    if(tx_if.mii_select)
+                        @(posedge tx_if.clk);                    
+                   
+                    if(byte_ctr == 3) begin
+                        state = IFG;
+                        byte_ctr = 0;
+                    end else
+                        byte_ctr++;
+                   
+                end
+                IFG : begin
+                
+                if(tx_if.mii_select)
+                    @(posedge tx_if.clk);                
+                
+                //Wait for the IFG and send transaction item to scoreboard
+                if(byte_ctr > 4'd12) begin 
+                    state = IDLE;
+                    copy_item = new("new_item");
+                    copy_item.payload = tx_item.payload;   
+                    a_port.write(copy_item);                        
+                    tx_item.payload.delete();  
+                                                                  
+                end else 
+                    byte_ctr++;
+                end
+            endcase          
         end
     endtask : run_phase
     

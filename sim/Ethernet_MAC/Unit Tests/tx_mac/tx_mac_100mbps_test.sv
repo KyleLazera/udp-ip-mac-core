@@ -25,12 +25,12 @@ class tx_mac_100mbps_test extends tx_mac_test;
         
         phase.raise_objection(this);
         
-        repeat (10) begin
+        repeat(10) begin
             seq.randomize();
             seq.start(env.tx_agent.seqr);            
         end
         
-        #100;
+        #1000;
         phase.drop_objection(this);
     endtask : run_phase    
     

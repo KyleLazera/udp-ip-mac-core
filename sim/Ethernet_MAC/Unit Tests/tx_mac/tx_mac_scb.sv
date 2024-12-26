@@ -35,12 +35,11 @@ class tx_mac_scb extends uvm_scoreboard;
             //get data from the reference model
             expected_data.get(exp_item);
             
-            result = actual_item.compare(exp_item);
+            //result = actual_item.compare(exp_item);
+            result = (actual_item.payload == exp_item.payload);                
             
             if(!result)
                 `uvm_error("TX_MAC_SCB", "Mismatch of the packets")
-            else
-                `uvm_info("TX_MAC_SCB", "Packets Matched!", UVM_MEDIUM)
             
         end
     endtask : run_phase

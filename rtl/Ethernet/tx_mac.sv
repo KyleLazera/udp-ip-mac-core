@@ -176,17 +176,14 @@ always @(*) begin
                     byte_ctr_next = 3'b0;
                     mii_sdr_next = 1'b0;
                     pckt_size_next = 6'b0;
-                    rgmii_dv_next = 1'b1;
+                    //rgmii_dv_next = 1'b1;
                     state_next = PREAMBLE;
                 end
             end
             PREAMBLE : begin
                 rgmii_dv_next = 1'b1;
                 //Set the s_axis_trdy flag high here, so we have incoming data when we enter the PACKET State
-                if(byte_ctr == 3'd6) begin
-                    if(~mii_select)
-                        axis_rdy_next = 1'b1; 
-                    
+                if(byte_ctr == 3'd6) begin                  
                     tx_data_next = ETH_HDR;
                     byte_ctr_next = byte_ctr + 1;
                 end

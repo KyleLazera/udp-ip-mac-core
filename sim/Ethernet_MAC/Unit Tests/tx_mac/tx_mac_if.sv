@@ -58,11 +58,16 @@ interface tx_mac_if(input logic clk, input logic reset_n);
            
     endtask : drive_data
     
+    /* Initializes the FIFO signals */
+    task init_fifo();
+        s_tx_axis_tvalid <= 1'b0;
+        s_tx_axis_tlast <= 1'b0;
+    endtask : init_fifo
+    
     task monitor_output_data(tx_mac_trans_item item);
-        @(posedge clk);
         
-        if(rgmii_mac_tx_dv)
-            item.payload.push_back(rgmii_mac_tx_data);
+            
+        
        
     endtask : monitor_output_data
 

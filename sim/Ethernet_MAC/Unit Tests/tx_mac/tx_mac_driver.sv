@@ -40,6 +40,9 @@ class tx_mac_driver extends uvm_driver#(tx_mac_trans_item);
         tx_mac_trans_item tx_item, copy_item;
         super.run_phase(phase);
         
+        //Init the FIFO signals 
+        tx_if.init_fifo();
+        
         forever begin
             tx_item = new("tx_item");
             copy_item = new("copy_item");
@@ -53,9 +56,6 @@ class tx_mac_driver extends uvm_driver#(tx_mac_trans_item);
             
             //Drive the data to teh tx_mac module
             tx_if.drive_data(tx_item, mii_sel);                        
-            
-            //`uvm_info("TX_DRV", $sformatf("Size of payload: %0d", tx_item.payload.size()), UVM_MEDIUM)
-            //`uvm_info("TX_DRV", $sformatf("Size of last byte: %0d", tx_item.last_byte.size()), UVM_MEDIUM)
             
             //Write raw data from sequencer to the reference model
             a_port.write(tx_item);            

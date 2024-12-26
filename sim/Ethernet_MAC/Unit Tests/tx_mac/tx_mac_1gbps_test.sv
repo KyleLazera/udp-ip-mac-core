@@ -30,7 +30,7 @@ class tx_mac_1gbps_test extends tx_mac_test;
             seq.start(env.tx_agent.seqr);            
         end
         
-        #100;
+        #1000;
         phase.drop_objection(this);
     endtask : run_phase    
     

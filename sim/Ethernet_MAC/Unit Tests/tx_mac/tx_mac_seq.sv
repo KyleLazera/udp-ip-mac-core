@@ -16,6 +16,7 @@ class tx_mac_seq extends uvm_sequence#(tx_mac_trans_item);
         
         //Randomize the size of the packet
         packet_size = $urandom_range(20, 1500);
+        //packet_size = 65;
 
         /* Packet Generation Algorithm */
          for(int i = 0; i < packet_size; i++) begin           

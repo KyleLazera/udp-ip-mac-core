@@ -30,7 +30,7 @@ class tx_mac_model extends uvm_component;
     endfunction : build_phase
     
     virtual task run_phase(uvm_phase phase);
-        tx_mac_trans_item tx_item;
+        tx_mac_trans_item tx_item, copy_item;
         super.run_phase(phase);
         
         //LUT Init
@@ -40,34 +40,37 @@ class tx_mac_model extends uvm_component;
             //Get data from the rx_mac driver
             port.get(tx_item);
             
+            copy_item = new("copy_tx_item");
+            copy_item.payload = tx_item.payload;
+            
             /* Determine Payload size and if padding is needed */
-            while(tx_item.payload.size() < 46)
-                tx_item.payload.push_back(8'h00);
+            while(copy_item.payload.size() < 60)
+                copy_item.payload.push_back(8'h00);              
                 
             /* Calculate and append the CRC */
-            crc =  crc32_reference_model(tx_item.payload);
+            crc =  crc32_reference_model(copy_item.payload);
             
-            for(int i = 0; i < 4; i++)
-                tx_item.payload.push_back(crc[i*8 +: 8]);
+            for(int i = 0; i < 4; i++) 
+                copy_item.payload.push_back(crc[i*8 +: 8]);
             
             /* Prepend preamble to data */
             for(int i = 7; i >= 0; i--) begin
                 
                 if(i == 7)
-                    tx_item.payload.push_front(8'hD5);
+                    copy_item.payload.push_front(8'hD5);
                 else
-                    tx_item.payload.push_front(8'h55);
+                    copy_item.payload.push_front(8'h55);
             end
                                  
             //Send new packet to scoreboard
-            wr_ap.write(tx_item);       
+            wr_ap.write(copy_item);       
         
         end
     endtask : run_phase
     
      /*
      * @Brief Reference Model that implements the CRC32 algorithm for each byte passed into it
-     * @param i_byte Takes in a byte to pass into the model
+     * @param i_byte Takes in a byte stream to pass into the model
      * @retval Returns the CRC32 current CRC value to append to the data message
     */
     function automatic [31:0] crc32_reference_model;
