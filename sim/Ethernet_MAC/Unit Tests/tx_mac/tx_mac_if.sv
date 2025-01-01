@@ -25,51 +25,67 @@ interface tx_mac_if(input logic clk, input logic reset_n);
     
     /* Tasks to write data to the Signals */
     
-    task drive_data(input tx_mac_trans_item item, bit mii_sel);
+    //This task wiggles the pins that interact directly with the FIFO 
+    task fifo_read_data(input tx_mac_trans_item item);
+        
+        // Drive the data to the DUT as long as there's data in the queue
+        if (item.payload.size() > 0) begin
+            s_tx_axis_tvalid <= 1'b1;
+            s_tx_axis_tdata <= item.payload.pop_front();
+            s_tx_axis_tlast <= item.last_byte.pop_front();
+        end else begin
+            s_tx_axis_tvalid <= 1'b0;
+        end
+    
+        // Wait for signal propagation before the while loop
+        @(posedge s_tx_axis_trdy);
+    
+        // Drive the data as long as there's data in the queue
+        while (item.payload.size() > 0) begin
+            //Wait for the next clock edge to drive data 
+            @(posedge clk);
+            //1 time unit delay - this allows the data to propogate through the DUT and s_tx_axis_trdy to be updated
+            #1;
+            // Check the ready signal to drive new data
+            if (s_tx_axis_trdy) begin
+                s_tx_axis_tvalid <= 1'b1;
+                s_tx_axis_tdata <= item.payload.pop_front();
+                s_tx_axis_tlast <= item.last_byte.pop_front();
+            end
+        end
+    
+        // Clear the valid and last signals after the last transaction
+        @(posedge clk);
+        
+        //If we are operating in 10/100mbps mode, add an extra 
+        if(mii_select)
+            @(posedge clk);
+        
+        s_tx_axis_tvalid <= 1'b0;
+        s_tx_axis_tlast <= 1'b0;
+    endtask
+
+    
+    
+    task rgmii_agent_sim(input tx_mac_trans_item item, input bit mii_sel);
         
         mii_select <= mii_sel;
         
-        if(!mii_sel)
-            rgmii_mac_tx_rdy <= 1'b1;            
-                    
-        // Raise the tvalid flag indicating there is data to transmit /
-        if(item.payload.size() > 0)                                 
-            s_tx_axis_tvalid <= 1'b1;                              
-        
-        // Only transmit data when the tx MAC asserts rdy flag 
-        @(posedge s_tx_axis_trdy);            
-                          
-        // Drive a packet to the txmac (simulates FIFO driving data) 
-        foreach(item.payload[i]) begin                              
-            s_tx_axis_tdata <= item.payload[i];
-            s_tx_axis_tlast <= item.last_byte[i];                   
-            @(posedge clk);
-            
-            //If we are in MII mode, wait for the trdy flag to be raised again
-            if(mii_sel)
-                @(posedge s_tx_axis_trdy);               
+        foreach(item.rgmii_ready[i]) begin 
+            @(posedge clk);           
+            rgmii_mac_tx_rdy = item.rgmii_ready[i];          
         end
-        
-        // Lower the last byte flag after a clock period    
-        s_tx_axis_tlast <= 1'b0; 
-        
-        // Clear the valid flag after last byte was sent 
-        s_tx_axis_tvalid <= 1'b0;     
-           
-    endtask : drive_data
+    
+    endtask : rgmii_agent_sim
+    
     
     /* Initializes the FIFO signals */
     task init_fifo();
         s_tx_axis_tvalid <= 1'b0;
         s_tx_axis_tlast <= 1'b0;
+        //rgmii_mac_tx_rdy <= 1'b0;
     endtask : init_fifo
     
-    task monitor_output_data(tx_mac_trans_item item);
-        
-            
-        
-       
-    endtask : monitor_output_data
 
 endinterface : tx_mac_if
 

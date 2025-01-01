@@ -25,7 +25,7 @@ class tx_mac_1gbps_test extends tx_mac_test;
         
         phase.raise_objection(this);
         
-        repeat (10) begin
+        repeat (50) begin
             seq.randomize();
             seq.start(env.tx_agent.seqr);            
         end

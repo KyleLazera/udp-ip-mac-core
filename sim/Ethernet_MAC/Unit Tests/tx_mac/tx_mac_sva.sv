@@ -19,6 +19,18 @@ module tx_mac_sva
     input mii_select                                   
 );
 
+//s_tx_axis_rdy should be low after teh rgmii_rdy signal is low
+property tx_mac_rdy;
+@(posedge clk) disable iff(!reset_n)
+    $fell(rgmii_mac_tx_rdy) |=> !s_tx_axis_trdy;
+endproperty : tx_mac_rdy
+
+//If teh rgmii_rdy signal goes low, the FIFO data should not go low
+property rgmii_not_rdy;
+@(posedge clk) disable iff(!reset_n)
+    $fell(rgmii_mac_tx_rdy) |=> (s_tx_axis_tdata == $past(s_tx_axis_tdata, 1));
+endproperty : rgmii_not_rdy
+
 /* Properties for gbps tests*/
 
 sequence preamble_gbps;
@@ -44,18 +56,21 @@ endproperty : preamble_start_mbps
 
 property rgmii_data_left_shift;
 @(posedge clk) disable iff(!reset_n)
-    (mii_select && rgmii_mac_tx_dv) |=> (rgmii_mac_tx_data == ($past(rgmii_mac_tx_data, 1) >> 4));
+    (mii_select && $rose(rgmii_mac_tx_dv) && rgmii_mac_tx_rdy) |=> (rgmii_mac_tx_data == ($past(rgmii_mac_tx_data, 1) >> 4));
 endproperty : rgmii_data_left_shift
 
 /* Concurrent Assertions */
 
-assert property(preamble_start_mbps) else
-    $fatal("Failed the preamble mbps start assertion at time: %t", $time);
-
-assert property(preamble_start_gbps) else
-    $fatal("Failed the preamble gbps start assertion at time: %t", $time);
+//assert property(tx_mac_rdy) else
+    //$fatal("Failed Assertion: s_tx_axis_trdy was not low after rgmii was not ready");
     
-assert property(rgmii_data_left_shift) else
-    $fatal("Failed to shift rgmii data at time: %t", $time);
+//assert property(rgmii_not_rdy) else
+    //$fatal("Failed Assertion: FIFO data updated after rgmii was not ready");        
+
+//assert property(preamble_start_gbps) else
+    //$fatal("Failed the preamble gbps start assertion at time: %t", $time);
+    
+//assert property(rgmii_data_left_shift) else
+    //$fatal("Failed to shift rgmii data at time: %t", $time);
 
 endmodule

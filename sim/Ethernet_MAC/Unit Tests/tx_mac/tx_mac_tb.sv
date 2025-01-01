@@ -50,8 +50,8 @@ initial begin
     uvm_config_db#(virtual tx_mac_if)::set(null, "uvm_test_top.tx_mac_env.tx_mac_agent.tx_mac_driver", "tx_if", tx_if);
     uvm_config_db#(virtual tx_mac_if)::set(null, "uvm_test_top.tx_mac_env.tx_mac_agent.tx_mac_monitor", "tx_if", tx_if);
         
-    //run_test("tx_mac_1gbps_test");
-    run_test("tx_mac_100mbps_test");
+    run_test("tx_mac_1gbps_test");
+    //run_test("tx_mac_100mbps_test");
 end
 
 endmodule

@@ -52,57 +52,51 @@ class tx_mac_monitor extends uvm_monitor;
                         state = PREAMBLE;
                 end
                 PREAMBLE : begin
-                    if(byte_ctr < 7) begin
-                        #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);                        
-                        
-                        //If MII mode is selected, delay by 1 clock cycle
-                        if(tx_if.mii_select)
-                            @(posedge tx_if.clk);
-                            
+                    #1 if(byte_ctr < 7 && tx_if.rgmii_mac_tx_dv) begin
+                        //`uvm_info("MON", $sformatf("Preamble Data: %0h", tx_if.rgmii_mac_tx_data), UVM_MEDIUM)  
+                        #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);                                                                            
                         byte_ctr++;
-                    end else begin
-                        #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);
-                        
-                        if(tx_if.mii_select)
-                            @(posedge tx_if.clk);                        
-                        
+                    end else if(byte_ctr >= 7 && tx_if.rgmii_mac_tx_dv) begin
+                        #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);   
+                        //`uvm_info("MON", $sformatf("Preamble Data: %0h", tx_if.rgmii_mac_tx_data), UVM_MEDIUM)                                                                    
                         byte_ctr = 0;
                         state = PAYLOAD;
                     end 
                                                                                        
                 end
                 PAYLOAD : begin  
-
-                    #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);                                  
-                    byte_ctr++;
-
-                    if(tx_if.mii_select)
-                        @(posedge tx_if.clk);
+                    //only if data is valid, sample the data
+                    #1 if(tx_if.rgmii_mac_tx_dv) begin 
+                        tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);   
+                        //`uvm_info("MON", $sformatf("Payload Data: %0h", tx_if.rgmii_mac_tx_data), UVM_MEDIUM)                            
+                        byte_ctr++;
+                    end
                     
                     if(last_byte && byte_ctr > 59) begin
                         last_byte = 1'b0;               
                         state = CRC;
                         byte_ctr = 0;
                     end else begin                                                
-                        if(tx_if.s_tx_axis_tlast) begin                                                
+                        #1 if(tx_if.s_tx_axis_tlast) begin                                                
                                 last_byte = 1'b1;
+                                
+                                if(tx_if.mii_select)
+                                    @(posedge tx_if.clk);
                         end
                     end
      
                 end
                 CRC : begin
                     //Populate the CRC bytes after small delay
-                    #1 tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);
-                    
-                    if(tx_if.mii_select)
-                        @(posedge tx_if.clk);                    
+                    #1 if(tx_if.rgmii_mac_tx_dv) begin
+                        tx_item.payload.push_back(tx_if.rgmii_mac_tx_data);                  
+                        byte_ctr++;
+                    end
                    
-                    if(byte_ctr == 3) begin
+                    if(byte_ctr == 4) begin
                         state = IFG;
                         byte_ctr = 0;
-                    end else
-                        byte_ctr++;
-                   
+                    end  
                 end
                 IFG : begin
                 
@@ -113,7 +107,12 @@ class tx_mac_monitor extends uvm_monitor;
                 if(byte_ctr > 4'd12) begin 
                     state = IDLE;
                     copy_item = new("new_item");
-                    copy_item.payload = tx_item.payload;   
+                    copy_item.payload = tx_item.payload;  
+                    
+                    //foreach(copy_item.payload[i]) begin
+                        //`uvm_info("MON", $sformatf("monitor data: %0h", copy_item.payload[i]), UVM_MEDIUM)
+                    //end                    
+                     
                     a_port.write(copy_item);                        
                     tx_item.payload.delete();  
                                                                   

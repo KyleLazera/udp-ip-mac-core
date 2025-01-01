@@ -40,15 +40,17 @@ class tx_mac_model extends uvm_component;
             //Get data from the rx_mac driver
             port.get(tx_item);
             
-            copy_item = new("copy_tx_item");
-            copy_item.payload = tx_item.payload;
+            copy_item = tx_mac_trans_item::type_id::create("copy_tx_item");
+            copy_item.copy(tx_item);
             
             /* Determine Payload size and if padding is needed */
             while(copy_item.payload.size() < 60)
-                copy_item.payload.push_back(8'h00);              
+                copy_item.payload.push_back(8'h00);                   
                 
             /* Calculate and append the CRC */
             crc =  crc32_reference_model(copy_item.payload);
+            
+            `uvm_info("MODEL", $sformatf("Model CRC: %0h", crc), UVM_MEDIUM)
             
             for(int i = 0; i < 4; i++) 
                 copy_item.payload.push_back(crc[i*8 +: 8]);
@@ -60,7 +62,7 @@ class tx_mac_model extends uvm_component;
                     copy_item.payload.push_front(8'hD5);
                 else
                     copy_item.payload.push_front(8'h55);
-            end
+            end          
                                  
             //Send new packet to scoreboard
             wr_ap.write(copy_item);       
