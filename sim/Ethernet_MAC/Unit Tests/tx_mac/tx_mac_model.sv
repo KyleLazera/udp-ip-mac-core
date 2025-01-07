@@ -50,8 +50,6 @@ class tx_mac_model extends uvm_component;
             /* Calculate and append the CRC */
             crc =  crc32_reference_model(copy_item.payload);
             
-            `uvm_info("MODEL", $sformatf("Model CRC: %0h", crc), UVM_MEDIUM)
-            
             for(int i = 0; i < 4; i++) 
                 copy_item.payload.push_back(crc[i*8 +: 8]);
             
