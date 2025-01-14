@@ -1,6 +1,7 @@
 `ifndef _RX_MAC_AGENT
 `define _RX_MAC_AGENT
 
+`include "rx_mac_rgmii_item.sv"
 `include "rx_mac_driver.sv"
 `include "rx_mac_monitor.sv"
 

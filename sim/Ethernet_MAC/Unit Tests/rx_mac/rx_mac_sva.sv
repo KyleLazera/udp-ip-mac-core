@@ -12,10 +12,6 @@
  *  4) When the axis_tuser signal is raised, this indicates an error, and teh axis_tvalid signal should go low 1 clock cycle later        
 */
 
-/* Todo:
- * 1) Ensure functionality is correct if teh fifo_rdy signal goes low during transaction -> the tuser (error) signal should
- *      be raised, and the data should no longer be sampled
-*/
 
 module rx_mac_sva
 #(parameter DATA_WIDTH = 8)
@@ -67,14 +63,14 @@ endproperty : tuser_error
 
 /* Concurrent Assertions */
 
-assert property(rgmii_to_fifo) else $display("Failed Assertion");
+assert property(rgmii_to_fifo) else $fatal("Failed Assertion");
 
-assert property(hdr_check) else $display("Header assertion Failed");
+assert property(hdr_check) else $fatal("Header assertion Failed");
 
-assert property(last_byte) else $display("Last Byte Assertion Failed");
+assert property(last_byte) else $fatal("Last Byte Assertion Failed");
 
-assert property (rgmii_dv_to_last_byte) else $display("AXIS Data Validassertion failed");
+assert property (rgmii_dv_to_last_byte) else $fatal("AXIS Data Validassertion failed");
 
-assert property (tuser_error) else $display("Error Assertion Failed");
+assert property (tuser_error) else $fatal("Error Assertion Failed");
 
 endmodule

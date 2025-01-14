@@ -1,9 +1,9 @@
 `ifndef _RX_MAC_SCB
 `define _RX_MAC_SCB
 
-/* Todo: RX Mac may not need scoreboard, and systemverilog assertions could be used since 
- *          the module just simply de-encapsulates a package and passes it on to the FIFO, 
- *          which is checked using the systemverilog assertions file 
+/* Note: Scoreboard is not used in this verification plan - Due to the rx mac simply de-encapsulating a recieved packet, 
+ *      the functionality is checked using a systemverilog assertion. The assertion ensures there is a header presented on the
+ *      rgmii data line, and then compares the data from the rgmii data line to teh data that is transmitted on to the FIFO.
  */
 
 class rx_mac_scb extends uvm_scoreboard;
@@ -26,7 +26,6 @@ class rx_mac_scb extends uvm_scoreboard;
         analysis_port = new("analysis_imp", this);        
     endfunction : build_phase
     
-    /* Add functional verification here */
     virtual function void write(rx_mac_rgmii_item item);
         `uvm_info("SCB", "Item Recieved", UVM_HIGH);
     endfunction : write    

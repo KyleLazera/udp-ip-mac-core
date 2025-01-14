@@ -32,7 +32,7 @@ class rx_eth_packet extends uvm_object;
     endfunction : new
     
     /* Function to generate a packet */
-    function void generate_packet();
+    function void generate_packet(bit err, bit fifo_not_rdy);
        
        //Init CRC32 class for CRC calculation
        crc32_checksum crc = new();
@@ -47,16 +47,24 @@ class rx_eth_packet extends uvm_object;
             packet[i] = rx_mac_rgmii_item::type_id::create($sformatf("Header %0d", i));
             
             //8th byte should be the SFD
-            if(i < 7)                 
+            if(i < 7) 
                 packet[i].randomize() with {packet[i].data == ETH_HDR;};
-            else
+            else    
                 packet[i].randomize() with {packet[i].data == ETH_SFD;};      
+        
         end
         
         //Generate & Append payload
         for(int i = 0; i < packet_size; i++) begin
             packet[HEADER_BYTES + i] = rx_mac_rgmii_item::type_id::create($sformatf("Payload %0d", i));
-            packet[HEADER_BYTES + i].randomize();
+            
+            if(err)
+                packet[HEADER_BYTES + i].randomize() with {packet[i].er dist {1 := 1, 0 := 99};};
+            else if(fifo_not_rdy)
+                packet[HEADER_BYTES + i].randomize() with {packet[i].fifo_rdy dist {1 := 99, 0 := 1};};
+            else
+                packet[HEADER_BYTES + i].randomize();
+                
             data_payload[i] = packet[HEADER_BYTES + i].data;
         end
         

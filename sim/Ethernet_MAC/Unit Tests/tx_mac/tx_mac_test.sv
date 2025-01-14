@@ -4,6 +4,8 @@
 `include "tx_mac_env.sv"
 `include "tx_mac_seq.sv"
 
+/* This class is the base testcase that all other testcases inherit from */
+
 class tx_mac_test extends uvm_test;
     `uvm_component_utils(tx_mac_test)        
     

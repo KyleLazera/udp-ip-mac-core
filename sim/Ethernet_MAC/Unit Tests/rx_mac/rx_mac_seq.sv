@@ -9,11 +9,15 @@ class rx_mac_seq extends uvm_sequence;
     
     /* Class Variables */
     rand int num_pckts;                     //Num of packets to be sent
+    rand bit data_error;
+    rand bit fifo_not_rdy;
     //rand int clk_prd;                       //Clock period for rgmii rxc  
     string TAG = "SEQ";  
     
     /* Constraints */         
-    constraint num_pckts_const {num_pckts inside{[5:10]};}             
+    constraint num_pckts_const {num_pckts inside{[10:15]};}       
+    constraint data_error_const {data_error dist {1 := 30, 0 := 70};}      
+    constraint fifo_not_rdy_const {fifo_not_rdy dist {1 := 30, 0 := 70};}  
     
     /* Constructor */
     function new(string name = "Gen_Item_Seq");
@@ -28,8 +32,8 @@ class rx_mac_seq extends uvm_sequence;
             //Create an instance of the packet generation class
             rx_eth_packet ethernet_packet = rx_eth_packet::type_id::create($sformatf("eth packet %0d", i));          
             
-            //Generate the packet to transmit (Function formats the packet correctly)
-            ethernet_packet.generate_packet();
+            //Generate the packet to transmit - this function formats packet correctly 
+            ethernet_packet.generate_packet(data_error, fifo_not_rdy);
             
             //Send each item of the packet to the driver
             foreach(ethernet_packet.packet[i]) begin

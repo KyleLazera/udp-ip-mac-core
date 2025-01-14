@@ -52,6 +52,7 @@ module rx_mac
 
 /* Local variables */
 localparam [7:0] ETH_SFD = 8'hD5; 
+localparam [7:0] ETH_HDR = 8'h55;
 
 /* FSM Declarations */
 typedef enum {IDLE,                                             //State that waits to detect a SFD
@@ -194,7 +195,7 @@ always @(*) begin
     
     case(state_reg) 
         IDLE : begin
-            //If data valid is high, SFD is found & FIFO is ready for data  
+            //If data valid is high, SFD & HDR is found & FIFO is ready for data  
             if(rgmii_rdx_4 == ETH_SFD && rgmii_dv_4 && s_rx_axis_trdy) begin
                 sof = 1'b1;      
                 crc_en_next = 1'b1;         

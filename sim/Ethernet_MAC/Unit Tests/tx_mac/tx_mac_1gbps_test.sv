@@ -16,7 +16,7 @@ class tx_mac_1gbps_test extends tx_mac_test;
         //Set the mii select variable to 1 - this indicates 1gbps operation
         uvm_config_db#(bit)::set(this, "tx_mac_env.tx_mac_agent.tx_mac_driver", "mii_sel", 1'b0);
         
-        //Create and randomize sequence
+        //Create sequence
         seq = tx_mac_seq::type_id::create("tx_mac_seq");               
     endfunction : build_phase
     

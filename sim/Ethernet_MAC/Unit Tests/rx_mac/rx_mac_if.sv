@@ -1,12 +1,11 @@
 `ifndef _RX_MAC_IF
 `define _RX_MAC_IF
 
-interface rx_mac_if(input logic clk);
+interface rx_mac_if(input logic clk, input logic reset_n);
     /* LocalParams */
     localparam DATA_WIDTH = 8;
     
     /* Signals */
-    logic reset_n;
     logic [DATA_WIDTH-1:0] m_rx_axis_tdata;             
     logic m_rx_axis_tvalid;                             
     logic m_rx_axis_tuser;                              
