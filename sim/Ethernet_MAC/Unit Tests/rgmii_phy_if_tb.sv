@@ -16,7 +16,7 @@ localparam LINK_1000 = 2'b10;
 
 //Signal Declarations
 logic clk_125;                       //125MHz MAC Domain Clock 
-logic clk90;                         //125MHz clock with a 90 degree phase shift (Used for TXC)
+logic clk90_125;                         //125MHz clock with a 90 degree phase shift (Used for TXC)
 logic reset_n;                       //Active low reset signal
 /* PHY Interface */
 logic rgmii_phy_rxc;                 //recieved clock from the PHY
@@ -169,8 +169,8 @@ initial begin
     rxc_prd = 8;
     clk_125 = 1'b0;
     rgmii_phy_rxc = 1'b0;
-    #2 clk90 = 1'b0;
-    forever #4 clk90 = ~clk90;
+    #2 clk90_125 = 1'b0;
+    forever #4 clk90_125 = ~clk90_125;
 end
 
 initial begin

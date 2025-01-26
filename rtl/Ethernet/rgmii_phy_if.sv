@@ -8,16 +8,11 @@
  * clock signal with the correct clock skew.
 */
 
-/* 
- * TODO: Assess possibility of change in link bandwidth/speed causing a timing violation - possibly incoporate a rst signal
- * when there is a change in link speed?
-*/
-
 
 module rgmii_phy_if
 (
     input wire clk_125,                       //125MHz MAC Domain Clock 
-    input wire clk90,                         //125MHz clock with a 90 degree phase shift (Used for TXC)
+    input wire clk90_125,                     //125MHz clock with a 90 degree phase shift (Used for TXC)
     input wire reset_n,                       //Active low reset signal
     
     /* PHY Interface */
@@ -39,7 +34,7 @@ module rgmii_phy_if
     output wire rgmii_mac_rx_er,              //RX error signal - falling edge of rxc drives error XOR data_valid
    
    /* Control Signal(s) */
-    input wire [1:0] link_speed                      //Indicates the speed of the rxc (used to dictate speed of txc)
+    input wire [1:0] link_speed               //Indicates the speed of the rxc (used to dictate speed of txc)
 );
 
 /*** PHY RX (Data reception) ***/
@@ -102,7 +97,7 @@ always @(posedge clk_125) begin
         else if(link_speed == 2'b01) begin
             counter_reg <= counter_reg + 1;
             rgmii_tx_data_rdy <= 1'b0;
-            //If hald period has passed raise the clock
+            //If half period has passed raise the clock
             if(counter_reg == 6'd2) begin
                 rgmii_txc_1 <= 1'b1;
                 rgmii_txc_2 <= 1'b1;
