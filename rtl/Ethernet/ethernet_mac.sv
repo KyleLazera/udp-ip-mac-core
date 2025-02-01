@@ -1,6 +1,5 @@
 `timescale 1ns / 1ps
 
-//TODO: Add parameters to communicate with RGMII_PHY, rx & tx mac
 
 module ethernet_mac
 #(
@@ -24,7 +23,7 @@ module ethernet_mac
     input wire [FIFO_DATA_WIDTH-1:0] s_tx_axis_tdata,           //Incoming bytes of data from the FIFO    
     input wire s_tx_axis_tvalid,                                //Indicates FIFO has valid data (is not empty)
     input wire s_tx_axis_tlast,                                 //Indicates last beat of transaction (final byte in packet)
-    output wire s_tx_axis_trdy,                                 //Indicates to FIFO that it can read data (used to set rd_en for FIFO)
+    output wire s_tx_axis_trdy,                                 //Indicates to FIFO that it can read data (used to set rd_en for FIFIO)
 
     /* RX FIFO Interface */
     output wire [FIFO_DATA_WIDTH-1:0] m_rx_axis_tdata,          //Data to transmit to asynch FIFO
@@ -139,7 +138,7 @@ rgmii_phy_if rgmii_phy
     .rgmii_mac_rx_clk(rgmii_mac_rx_clk),             
     .rgmii_mac_rx_data(rgmii_mac_rx_data),      
     .rgmii_mac_rx_dv(rgmii_mac_rx_dv),              
-    .rgmii_mac_rx_er(),              
+    .rgmii_mac_rx_er(rgmii_mac_rx_er),              
    
     // Control Signal(s)
     .link_speed(link_speed)              
@@ -154,23 +153,23 @@ tx_mac
 (
     .clk(clk_125),                                 
     .reset_n(reset_n),                             
-                                                    
+                                                
     // AXI Stream Input - FIFO                 
     .s_tx_axis_tdata(s_tx_axis_tdata),    
     .s_tx_axis_tvalid(s_tx_axis_tvalid),                    
     .s_tx_axis_tlast(s_tx_axis_tlast),                     
     .s_tx_axis_tkeep(),                     
     .s_tx_axis_tuser(),                     
-                                                    
+                                                
     // AXI Stream Output - FIFO                   
     .s_tx_axis_trdy(s_tx_axis_trdy),                     
-                                                    
+                                                
     // RGMII Interface                           
     .rgmii_mac_tx_rdy(rgmii_mac_tx_rdy),                    
     .rgmii_mac_tx_data(mac_rgmii_tx_data), 
     .rgmii_mac_tx_dv(mac_rgmii_tx_dv),                    
     .rgmii_mac_tx_er(mac_rgmii_tx_er),                    
-                                                    
+                                                
     // Control signals(s)                            
     .mii_select(mii_sel)                           
 );
@@ -184,16 +183,16 @@ rx_mac_module
 (
     .clk(rgmii_mac_rx_clk),                               
     .reset_n(reset_n),                           
-                                                  
+                                              
     // AXI Stream Output - FIFO                 
     .m_rx_axis_tdata(m_rx_axis_tdata), 
     .m_rx_axis_tvalid(m_rx_axis_tvalid),                 
     .m_rx_axis_tuser(m_rx_axis_tuser),                  
     .m_rx_axis_tlast(m_rx_axis_tlast),                  
-                                                  
+                                              
     // FIFO Input/Control Signals              
     .s_rx_axis_trdy(s_rx_axis_trdy),                    
-                                                  
+                                              
     // RGMII Interface                          
     .rgmii_mac_rx_data(rgmii_mac_rx_data),
     .rgmii_mac_rx_dv(rgmii_mac_rx_dv),                   

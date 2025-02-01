@@ -3,6 +3,7 @@
 /* Virtual interface for writing to the FIFO */
 
 interface wr_if(input clk_wr, input reset_n);
+    /* DUT SIgnals */
     bit [7:0] data_in;
     bit wr_en;
     bit almost_full;
@@ -26,6 +27,7 @@ endinterface : wr_if
 /* Virtual Interface for Reading from the FIFO */
 
 interface rd_if(input clk_rd, input reset_n);
+    /* DUT Signals */
     bit [7:0] data_out;
     bit rd_en;
     bit almost_empty;
