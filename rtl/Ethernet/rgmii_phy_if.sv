@@ -6,6 +6,7 @@
  * 10/100/1000 Mbps link speeds for the txc and utilizes the input speed signal to determine what the output link
  * speed should be. This module is also responsible for buffering the input and output signals and to generate the tx 
  * clock signal with the correct clock skew.
+ * This also transmits data out most significant bit first, which is based on the ethernet rgmii standard.
 */
 
 
@@ -62,6 +63,7 @@ reg rgmii_txc_1, rgmii_txc_2;
 reg [3:0] rgmii_txd_1, rgmii_txd_2;
 reg rgmii_txctl_1, rgmii_txctl_2;
 reg [5:0] counter_reg;
+wire rgmii_tx_clk;
 
 //Logic to determine the tx clock for the PHY 
 always @(posedge clk_125) begin
@@ -136,7 +138,7 @@ always @(*) begin
             rgmii_txctl_2 = rgmii_mac_tx_dv;            
         end
     end 
-    //1000Mbps - Transmit at Double Data Rate (DDR)
+    //1000Mbps/1Gbps - Transmit at Double Data Rate (DDR)
     else begin
         rgmii_txd_1 = rgmii_mac_tx_data[3:0];
         rgmii_txd_2 = rgmii_mac_tx_data[7:4];
@@ -148,20 +150,21 @@ end
 //Pass the output signals through an ODDR primitive to be passed to PHY:
 //Tx Clock signal 
 output_buffers#(.DATA_WIDTH(1))
-clk_oddr(.clk(clk90),
+clk_oddr(.clk(clk90_125),
          .d_in_1(rgmii_txc_1),
          .d_in_2(rgmii_txc_2),
-         .d_out(rgmii_phy_txc)
+         .d_out(rgmii_tx_clk)
          );
          
 //Data and Control Signals
 output_buffers#(.DATA_WIDTH(5))
 data_oddr(.clk(clk_125),
-         .d_in_1({rgmii_txd_1, rgmii_txctl_1}),
-         .d_in_2({rgmii_txd_2, rgmii_txctl_2}),
-         .d_out({rgmii_phy_txd, rgmii_phy_txctl})
-         );         
+          .d_in_1({rgmii_txd_1, rgmii_txctl_1}),
+          .d_in_2({rgmii_txd_2, rgmii_txctl_2}),
+          .d_out({rgmii_phy_txd, rgmii_phy_txctl})
+          );         
 
 assign rgmii_mac_tx_rdy = rgmii_tx_data_rdy;
+assign rgmii_phy_txc = rgmii_tx_clk;
 
 endmodule

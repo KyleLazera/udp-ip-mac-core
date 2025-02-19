@@ -186,6 +186,7 @@ always @(*) begin
                 if(byte_ctr == 3'd6) begin                  
                     tx_data_next = ETH_HDR;
                     byte_ctr_next = byte_ctr + 1;
+                    axis_rdy_next = 1'b1;
                 end
                 //If all 7 bytes of the Header have been sent, transmit the SFD  
                 else if(byte_ctr == 3'd7) begin
@@ -276,6 +277,6 @@ end
 assign rgmii_mac_tx_data = tx_data_reg;
 assign s_tx_axis_trdy = axis_rdy_reg;
 assign rgmii_mac_tx_dv = rgmii_dv_reg;
-
+assign rgmii_mac_tx_er = rgmii_er_reg;
 
 endmodule

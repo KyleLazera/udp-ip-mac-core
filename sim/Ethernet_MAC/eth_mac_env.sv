@@ -4,60 +4,82 @@
 `include "uvm_macros.svh"  // Import UVM macros
 import uvm_pkg::*;         // Import all UVM classes
 
-`include "eth_mac_wr_item.sv"
+`include "eth_mac_item.sv"
 `include "eth_mac_scb.sv"
 `include "eth_mac_virtual_seqr.sv"
-`include "eth_mac_wr_agent.sv"
-`include "eth_mac_wr_ref_model.sv"
+`include "eth_mac_tx_agent.sv"
+`include "eth_mac_rx_agent.sv"
+`include "eth_mac.sv"
+`include "eth_mac_cfg.sv"
 
 class eth_mac_env extends uvm_env;
     `uvm_component_utils(eth_mac_env)
 
+    /* Configuration varibales */
+    bit rx_enable = 0;
+
     /* Declare Agents & Components */
-    eth_mac_wr_agent        wr_agent;
-    eth_mac_wr_ref_model    wr_ref_model;
+    eth_mac_tx_agent        tx_agent;
+    eth_mac_rx_agent        rx_agent;
     eth_mac_scb             eth_scb;
-    eth_mac_virtual_seqr    v_seqr;    
+    eth_mac_virtual_seqr    v_seqr;  
+    eth_mac_cfg             cfg;  
 
     /* Declare FIFO ports */
-    uvm_tlm_analysis_fifo#(eth_mac_wr_item) wr_mon_scb;
-    uvm_tlm_analysis_fifo#(eth_mac_wr_item) wr_agent_model;
-    uvm_tlm_analysis_fifo#(eth_mac_wr_item) wr_ref_scb;
+    uvm_tlm_analysis_fifo#(eth_mac_item) tx_mon_scb;
+    uvm_tlm_analysis_fifo#(eth_mac_item) tx_drv_scb;
+    uvm_tlm_analysis_fifo#(eth_mac_item) rx_mon_scb;
+    uvm_tlm_analysis_fifo#(eth_mac_item) rx_drv_scb;    
 
-    function void new(string name = "eth_mac_env", uvm_component parent);
+    function new(string name = "eth_mac_env", uvm_component parent);
         super.new(name, parent);
     endfunction : new
 
     virtual function void build_phase(uvm_phase phase);
-        super.build_phase(phase);
+        super.build_phase(phase);   
+        
+        //Fetch the ethernet configuration
+        if (!uvm_config_db#(eth_mac_cfg)::get(this, "", "cfg", cfg)) begin
+            `uvm_fatal("environment", "Could not get eth_mac_cfg from config_db")
+        end    
+
         /* Instantiate Agents*/
-        wr_agent = eth_mac_wr_agent::type_id::create("wr_agent", this);
+        tx_agent = eth_mac_tx_agent::type_id::create("tx_agent", this);
+        rx_agent = eth_mac_rx_agent::type_id::create("rx_agent", this);
         eth_scb = eth_mac_scb::type_id::create("eth_scb", this);
-        v_seqr = eth_mac_virtual_seqr::type_id::create("v_seqr", this);
-        wr_ref_model = eth_mac_wr_ref_model::type_id::create("wr_ref_model", this);
+        v_seqr = eth_mac_virtual_seqr::type_id::create("v_seqr", this);     
+        
         /* Instantiate FIFO's */
-        wr_agent_model = new("wr_agent_model");
-        wr_ref_scb = new("wr_ref_scb");
-        wr_mon_scb = new("wr_mon_scb");
+        tx_drv_scb = new("tx_drv_scb");
+        tx_mon_scb = new("tx_mon_scb");
+        rx_mon_scb = new("rx_mon_scb");
+        rx_drv_scb = new("rx_drv_scb");
     endfunction : build_phase
 
     virtual function void connect_phase(uvm_phase phase);
         super.connect_phase(phase);
-        
-        //Connect write agent analysis port to export side of tlm fifo for scb
-        wr_agent.a_port.connect(wr_mon_scb.analysis_export);
-        eth_scb.eth_wr_import.connect(wr_mon_scb.blocking_get_export);
 
-        //Connect agent and reference model via tlm fifo
-        wr_agent.drv_a_port.connect(wr_agent_model.analysis_export);
-        wr_ref_model.i_driver_port.connect(wr_agent_model.blocking_get_export);
+        //Pass the config class to components
+        rx_agent.rx_monitor.cfg = cfg;
+        eth_scb.cfg = cfg;          
 
-        //Connect reference model to scoreboard
-        wr_ref_model.o_scb_port.connect(wr_ref_scb.analysis_export);
-        eth_scb.eth_wr_ref.connect(wr_ref_scb.blocking_get_export);
+        //Connecting teh tx agent anlsysis exports 
+        tx_agent.tx_drv_a_port.connect(tx_drv_scb.analysis_export);
+        eth_scb.tx_drv_port.connect(tx_drv_scb.blocking_get_export);
+
+        tx_agent.tx_mon_a_port.connect(tx_mon_scb.analysis_export);
+        eth_scb.tx_mon_port.connect(tx_mon_scb.blocking_get_export);
+
+        //Connecting the rx agent analysis ports
+        rx_agent.rx_drv_a_port.connect(rx_mon_scb.analysis_export);
+        eth_scb.rx_drv_port.connect(rx_mon_scb.blocking_get_export);
+
+        rx_agent.rx_mon_a_port.connect(rx_drv_scb.analysis_export);
+        eth_scb.rx_mon_port.connect(rx_drv_scb.blocking_get_export);
 
         //Connect virtual sequencers
-        v_seqr.wr_vseqr = wr_agent.wr_seqr;
+        v_seqr.tx_vseqr = tx_agent.tx_seqr;
+        v_seqr.rx_vseqr = rx_agent.rx_seqr;
 
     endfunction : connect_phase
 

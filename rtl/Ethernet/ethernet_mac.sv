@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 
+//TODO: Link speed/mii select value should not change mid transactions
 
 module ethernet_mac
 #(
@@ -70,7 +71,7 @@ always @(posedge clk_125) begin
         //If the reference counter reached its maximum value - this indicates 2.5MHz clock speed
         if(&rxc_ref_cntr == 1) begin
             rxc_edge_cntr <= 3'h0;
-            link_speed_reg <= 2'b00;
+            //link_speed_reg <= 2'b00;
         end
 
         /*If we have found 3 edges on the re-timed rxc - this indicates a full period has been completed

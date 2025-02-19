@@ -4,7 +4,7 @@
 module output_buffers
 #(parameter DATA_WIDTH = 5)
 (
-    input wire clk,                             //Input clock to dirve the ODDR Flip Flop (Must have 90 degree phase shift to align data)
+    input wire clk,                             //Input clock to dirve the ODDR Flip Flop (Must have 90 degree phase shift to align data) 
     input wire [DATA_WIDTH-1:0] d_in_1,         //Data line 1
     input wire [DATA_WIDTH-1:0] d_in_2,         //Data line 2
     output wire [DATA_WIDTH-1:0] d_out          //Ouput data signal

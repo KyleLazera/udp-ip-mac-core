@@ -25,7 +25,7 @@ interface eth_mac_wr_if
     logic [FIFO_DATA_WIDTH-1:0] s_tx_axis_tdata;           //Incoming bytes of data from the FIFO    
     logic s_tx_axis_tvalid;                                //Indicates FIFO has valid data (is not empty)
     logic s_tx_axis_tlast;                                 //Indicates last beat of transaction (final byte in packet)
-    logic s_tx_axis_trdy;                                 //Indicates to FIFO that it can read data (used to set rd_en for FIFIO)
+    logic s_tx_axis_trdy;                                  //Indicates to FIFO that it can read data (used to set rd_en for FIFIO)
 
     /* Clocking Block for input from TX FIFO */
     clocking tx_fifo_cb @(posedge clk_125);
@@ -35,32 +35,48 @@ interface eth_mac_wr_if
         input  s_tx_axis_trdy;
     endclocking
 
-    /* Clocking Block for RGMII Data Capture */
-    clocking rgmii_cb @(posedge rgmii_phy_txc);
-        input rgmii_phy_txd;
-        input rgmii_phy_txctl;
-    endclocking
-
     /* BFM Tasks */
     
-    task tx_fifo_drive_data(logic [7:0] ref_fifo[$]);
+    //This simulates a FIFO driving data into the module
+    task tx_fifo_drive_data(bit [7:0] ref_fifo[$]);
         int fifo_size = ref_fifo.size();
+        
+        //Wait for the tx mac to indciate it is ready to recieve data
+        @(tx_fifo_cb.s_tx_axis_trdy);
+        //Drive the data out of the FIFO
         while (fifo_size > 0) begin
-            @(tx_fifo_cb);
-            if (tx_fifo_cb.s_tx_axis_trdy) begin
-                tx_fifo_cb.s_tx_axis_tvalid <= 1;
+            tx_fifo_cb.s_tx_axis_tvalid <= 1;
+            @(tx_fifo_cb);         
+            if (tx_fifo_cb.s_tx_axis_trdy) begin  
+                tx_fifo_cb.s_tx_axis_tlast <= (fifo_size == 1);              
                 tx_fifo_cb.s_tx_axis_tdata <= ref_fifo.pop_back();
-                tx_fifo_cb.s_tx_axis_tlast <= (fifo_size == 1);
                 fifo_size--;
             end
         end
+        
+        @(tx_fifo_cb);
+        tx_fifo_cb.s_tx_axis_tlast <= (fifo_size == 1);
     endtask : tx_fifo_drive_data
 
-    task read_rgmii_data(output logic[7:0] rgmii_data[$]);
-        while (rgmii_cb.rgmii_phy_txctl) begin
-            @(rgmii_cb);
-            rgmii_data.push_back(rgmii_cb.rgmii_phy_txd);
+    //Currently only supports 1gbit operation reading - DDR
+    task read_rgmii_data(ref bit[7:0] rgmii_data[$]);
+        @(posedge rgmii_phy_txctl);
+        while (rgmii_phy_txctl) begin
+            logic [3:0] pos_edge, neg_edge;
+            logic [7:0] sampled_byte;
+            @(posedge rgmii_phy_txc);
+            //Before sampling ensure the ctl signal is high. The reason for this is because the ctl signal is synchronized to the
+            // clk_125, therefore, the ctl signal will only go low at the next clk_125 edge after all data has been transmitted. This
+            // could lead to the while loop iterating one extra time and sampling one extra byte of data. This conditional helps avoid this.
+            if(rgmii_phy_txctl) begin
+                pos_edge = rgmii_phy_txd;
+                @(negedge rgmii_phy_txc);        
+                neg_edge = rgmii_phy_txd;
+                sampled_byte = {neg_edge, pos_edge};            
+                rgmii_data.push_back(sampled_byte);
+            end
         end
+        
     endtask : read_rgmii_data
 
 endinterface : eth_mac_wr_if
