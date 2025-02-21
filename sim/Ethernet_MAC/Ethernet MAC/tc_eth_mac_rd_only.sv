@@ -57,7 +57,7 @@ class tc_eth_mac_rd_only extends eth_mac_base_test;
 
         cfg.enable_rx_monitor();
         cfg.disable_tx_monitor();
-        cfg.set_link_speed(cfg.GBIT_SPEED);
+        cfg.set_link_speed(cfg.MB_100_SPEED);
        
         //Set wr_only as the default sequence to run 
         uvm_config_db#(uvm_object_wrapper)::set(this, "eth_mac_env.v_seqr.main_phase", "default_sequence", 
