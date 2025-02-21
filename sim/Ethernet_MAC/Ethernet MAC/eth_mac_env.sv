@@ -61,6 +61,8 @@ class eth_mac_env extends uvm_env;
 
         //Pass the config class to components
         rx_agent.rx_monitor.cfg = cfg;
+        rx_agent.rx_driver.cfg = cfg;
+        tx_agent.tx_monitor.cfg = cfg;
         eth_scb.cfg = cfg;          
 
         //Connecting teh tx agent anlsysis exports 

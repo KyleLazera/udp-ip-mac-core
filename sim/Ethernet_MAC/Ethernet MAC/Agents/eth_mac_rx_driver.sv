@@ -6,6 +6,8 @@
 class eth_mac_rx_driver extends uvm_driver#(eth_mac_item);
 `uvm_component_utils(eth_mac_rx_driver)
 
+eth_mac_cfg cfg;
+
 uvm_analysis_port#(eth_mac_item) drv_scb_port;
 virtual eth_mac_rd_if rd_if;
 string TAG = "eth_mac_rx_driver";
@@ -31,12 +33,20 @@ virtual task main_phase(uvm_phase phase);
     /* Instantiate instace of eth_mac for simulation */
     eth_mac_base = eth_mac::type_id::create("eth_mac_base");
 
+    @(posedge rd_if.reset_n);
+
     forever begin
+
         tx_item_copy = eth_mac_item::type_id::create("tx_item_copy");
         //Fetch sequence item to write
         seq_item_port.get_next_item(tx_item);
         //Copy data to send to the screoboard for reference
         tx_item_copy.copy(tx_item);
+
+        //if the data to send is less than 60 we need to add padding
+        if(tx_item_copy.tx_data.size() < 60) begin
+            eth_mac_base.pad_packet(tx_item_copy.tx_data);
+        end
 
         //Send copied data to the scoreboard
         drv_scb_port.write(tx_item_copy);
@@ -48,19 +58,16 @@ virtual task main_phase(uvm_phase phase);
         fork
             begin
                 //Generate rxc clock for the rgmii data 
-                rd_if.generate_clock(); 
+                rd_if.generate_clock(cfg.link_speed); 
             end
             begin
                 //Drive the rgmii data based on the rxc 
-                rd_if.rgmii_drive_data(tx_item.tx_data);
+                rd_if.rgmii_drive_data(tx_item.tx_data, cfg.link_speed);
             end
         join_any
 
-        //todo: Send some junk data for an IFG
-
         //Signal seqr for more data    
         seq_item_port.item_done();
-        
     end 
 endtask : main_phase
 

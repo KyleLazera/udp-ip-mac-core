@@ -17,6 +17,7 @@ module input_buffers
 
 wire i_clk;                         //Signal for the input clock from the PHY
 wire clk_io;                        //Clock signal that is output from the BUFIO & used to drive other IO primitives
+wire delayed_clk_io;                //This is only needed for simulation to ensure correct functionality of IDDR in testbench
 
 assign i_clk = clk;
 
@@ -40,6 +41,8 @@ BUFR_inst (
  .I(i_clk)          // 1-bit input: Clock buffer input driven by an IBUF, MMCM or local interconnect
 );
 
+assign #1 delayed_clk_io = clk_io; //Only for simulation
+
 /** Input Data Buffering **/
 
 generate 
@@ -57,7 +60,7 @@ generate
         ) IDDR_inst (
          .Q1(q1[i]),            // 1-bit output for positive edge of clock
          .Q2(q2[i]),            // 1-bit output for negative edge of clock
-         .C(clk_io),            // 1-bit clock input
+         .C(delayed_clk_io),    // 1-bit clock input
          .CE(1'b1),             // 1-bit clock enable input
          .D(d_in[i]),           // 1-bit DDR data input
          .R(1'b0),              // 1-bit reset

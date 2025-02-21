@@ -9,7 +9,6 @@
  * This also transmits data out most significant bit first, which is based on the ethernet rgmii standard.
 */
 
-
 module rgmii_phy_if
 (
     input wire clk_125,                       //125MHz MAC Domain Clock 
@@ -30,12 +29,12 @@ module rgmii_phy_if
     input wire rgmii_mac_tx_er,               //tx data error - Indicates an error in the data
     output wire rgmii_mac_tx_rdy,             //Signal to indicate new data can be driven from MAC
     output wire rgmii_mac_rx_clk,             //RX PHY clock
-    output wire [7:0] rgmii_mac_rx_data,      //Data recieved from PHY
+    output reg [7:0] rgmii_mac_rx_data,       //Data recieved from PHY
     output wire rgmii_mac_rx_dv,              //RX data valid signal - driven on the posedge of the rxctl signal
     output wire rgmii_mac_rx_er,              //RX error signal - falling edge of rxc drives error XOR data_valid
    
    /* Control Signal(s) */
-    input wire [1:0] link_speed               //Indicates the speed of the rxc (used to dictate speed of txc)
+    input wire [1:0] link_speed               //Indicates the speed of the rxc (used to dictate speed of txc) 
 );
 
 /*** PHY RX (Data reception) ***/
@@ -46,9 +45,10 @@ wire rgmii_rx_dv, rgmii_rx_er;
 input_buffers #(.DATA_WIDTH(5)) 
 i_buff(.clk(rgmii_phy_rxc),
        .d_in({rgmii_phy_rxd, rgmii_phy_rxctl}),         //Input signals from PHY
-       .o_clk(rgmii_mac_rx_clk),                        //Output clock for MAC - passed through BUFR
+       .o_clk(rgmii_mac_rx_clk),                        //Output clock for MAC - passed through BUFR   
        .q1({rgmii_mac_rx_data[3:0], rgmii_rx_dv}),      //Rising edge data
        .q2({rgmii_mac_rx_data[7:4], rgmii_rx_er}));     //Falling edge data 
+
 
 //The rxctl signal provides 2 values: on rising edge, it provides data valid and on falling edge 
 //it produces the XOR with dava valid and error flag - this is from the RGMII standard

@@ -1,6 +1,14 @@
 `timescale 1ns / 1ps
 
-//TODO: Link speed/mii select value should not change mid transactions
+/* 
+ * This module connects teh tx mac, rx mac and rgmii interface and adds custom logic used to determine the link speed of
+ * the ethernet line.
+*/
+
+/* 
+ * todo: Add an MDIO interface in this section. The MDIO will be used to read the link speed from the PHY 
+ * to avoid the need of custom logic.
+*/
 
 module ethernet_mac
 #(

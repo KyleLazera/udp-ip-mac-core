@@ -4,8 +4,10 @@
 import uvm_pkg::*;         // Import all UVM classes
 
 `include "tc_eth_mac_wr_only.sv"
+`include "tc_eth_mac_rd_wr.sv"
 `include "eth_mac_wr_if.sv"
 `include "eth_mac_rd_if.sv"
+
 
 module ethernet_mac_top_tb;
 
@@ -57,7 +59,7 @@ end
 //Reset Block 
 initial begin
    reset_n = 1'b0;
-   #100;
+   #1000;
    reset_n = 1'b1;
 end
 
@@ -67,8 +69,9 @@ initial begin
     uvm_config_db#(virtual eth_mac_rd_if)::set(null, "uvm_test_top.eth_mac_env.rx_agent.rx_driver", "eth_mac_rd_if", eth_rd_if);
     uvm_config_db#(virtual eth_mac_rd_if)::set(null, "uvm_test_top.eth_mac_env.rx_agent.rx_monitor", "eth_mac_rd_if", eth_rd_if);    
 
-    run_test("tc_eth_mac_rd_only");
+    //run_test("tc_eth_mac_rd_only");
     //run_test("tc_eth_mac_wr_only");
+    run_test("tc_eth_mac_rd_wr");
 end
 
 
