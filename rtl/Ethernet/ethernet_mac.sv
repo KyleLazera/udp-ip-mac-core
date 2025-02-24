@@ -63,11 +63,11 @@ end
 
 /* Logic to determine the link speed */
 always @(posedge clk_125) begin
-    if(!reset_n) begin
+    /*(if(!reset_n) begin
         rxc_ref_cntr <= 7'h0; 
         link_speed_reg <= 2'b10;   
         rxc_edge_cntr <= 3'h0;   
-    end else begin
+    end else begin*/
         rxc_ref_cntr <= rxc_ref_cntr + 1;
 
         rgmii_rxc_rt <= {rgmii_rxc_rt[1:0], rgmii_rxc_cntr[2]};
@@ -100,7 +100,7 @@ always @(posedge clk_125) begin
                 link_speed_reg <= 2'b10;
 
         end
-    end
+    //end
 end
 
 /* Output Logic */
@@ -123,6 +123,7 @@ wire rgmii_mac_rx_clk;
 wire [FIFO_DATA_WIDTH-1:0] rgmii_mac_rx_data;
 wire rgmii_mac_rx_dv;
 wire rgmii_mac_rx_er;
+wire rgmii_mac_rx_rdy;
 
 //RGMII PHY 
 rgmii_phy_if rgmii_phy
@@ -147,7 +148,8 @@ rgmii_phy_if rgmii_phy
     .rgmii_mac_rx_clk(rgmii_mac_rx_clk),             
     .rgmii_mac_rx_data(rgmii_mac_rx_data),      
     .rgmii_mac_rx_dv(rgmii_mac_rx_dv),              
-    .rgmii_mac_rx_er(rgmii_mac_rx_er),              
+    .rgmii_mac_rx_er(rgmii_mac_rx_er), 
+    .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy),             
    
     // Control Signal(s)
     .link_speed(link_speed)              
@@ -205,7 +207,8 @@ rx_mac_module
     // RGMII Interface                          
     .rgmii_mac_rx_data(rgmii_mac_rx_data),
     .rgmii_mac_rx_dv(rgmii_mac_rx_dv),                   
-    .rgmii_mac_rx_er(rgmii_mac_rx_er)                    
+    .rgmii_mac_rx_er(rgmii_mac_rx_er),
+    .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy)                 
 ); 
 
 

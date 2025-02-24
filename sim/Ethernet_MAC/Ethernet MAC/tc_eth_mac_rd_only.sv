@@ -56,7 +56,6 @@ class tc_eth_mac_rd_only extends eth_mac_base_test;
         super.build_phase(phase);
 
         cfg.enable_rx_monitor();
-        cfg.disable_tx_monitor();
         cfg.set_link_speed(cfg.MB_100_SPEED);
        
         //Set wr_only as the default sequence to run 
@@ -71,4 +70,4 @@ class tc_eth_mac_rd_only extends eth_mac_base_test;
 
 endclass : tc_eth_mac_rd_only
 
-`endif //TC_RD_ONLY
+`endif // TC_RD_ONLY

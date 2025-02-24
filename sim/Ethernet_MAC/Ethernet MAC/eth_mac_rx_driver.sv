@@ -33,7 +33,15 @@ virtual task main_phase(uvm_phase phase);
     /* Instantiate instace of eth_mac for simulation */
     eth_mac_base = eth_mac::type_id::create("eth_mac_base");
 
+    //Start the rxc on the RGMII line
+    fork
+        rd_if.generate_clock(cfg.link_speed); 
+    join_none
+    
+
     @(posedge rd_if.reset_n);
+
+    #1000;
 
     forever begin
 
@@ -43,28 +51,20 @@ virtual task main_phase(uvm_phase phase);
         //Copy data to send to the screoboard for reference
         tx_item_copy.copy(tx_item);
 
-        //if the data to send is less than 60 we need to add padding
-        if(tx_item_copy.tx_data.size() < 60) begin
+        //Switch the endianess of teh data and if teh packet is less than 60 bytes add padding
+        if(tx_item_copy.tx_data.size() < 60) 
             eth_mac_base.pad_packet(tx_item_copy.tx_data);
-        end
+        else
+            tx_item_copy.tx_data = {<<8{tx_item_copy.tx_data}};
 
         //Send copied data to the scoreboard
         drv_scb_port.write(tx_item_copy);
 
         //Encapsulate data before sending on RGMII
-        eth_mac_base.encapsulate_data(tx_item.tx_data);        
-        
-        //Drive data to the DUT (RGMII Side)
-        fork
-            begin
-                //Generate rxc clock for the rgmii data 
-                rd_if.generate_clock(cfg.link_speed); 
-            end
-            begin
-                //Drive the rgmii data based on the rxc 
-                rd_if.rgmii_drive_data(tx_item.tx_data, cfg.link_speed);
-            end
-        join_any
+        eth_mac_base.encapsulate_data(tx_item.tx_data); 
+
+        //Drive data on the RGMII signals to the MAC
+        rd_if.rgmii_drive_data(tx_item.tx_data, cfg.link_speed);       
 
         //Signal seqr for more data    
         seq_item_port.item_done();

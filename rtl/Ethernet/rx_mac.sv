@@ -47,7 +47,8 @@ module rx_mac
     /* RGMII Interface */
     input wire [DATA_WIDTH-1:0] rgmii_mac_rx_data,              //Input data from the RGMII PHY interface
     input wire rgmii_mac_rx_dv,                                 //Indicates data from PHY is valid
-    input wire rgmii_mac_rx_er                                  //Indicates an error in the data from the PHY
+    input wire rgmii_mac_rx_er,                                 //Indicates an error in the data from the PHY
+    input wire rgmii_mac_rx_rdy                                 //Used as a valid signal for the rx data
 );
 
 /* Local variables */
@@ -99,6 +100,8 @@ reg [DATA_WIDTH-1:0] rgmii_dv_2, rgmii_er_2;
 reg [DATA_WIDTH-1:0] rgmii_dv_3, rgmii_er_3;
 reg [DATA_WIDTH-1:0] rgmii_dv_4, rgmii_er_4;
 
+//Intermediary signals
+reg [2:0] hdr_cnt = 4'b0;
 
 /* Logic for shifting data & signals into shift registers from RGMII */
 always @(posedge clk) begin
@@ -126,26 +129,28 @@ always @(posedge clk) begin
         rgmii_er_4 <= 8'b0;           
         
     end else begin
-        /* Shifting Data bytes in */
-        rgmii_rdx_4 <= rgmii_rdx_3;
-        rgmii_rdx_3 <= rgmii_rdx_2;
-        rgmii_rdx_2 <= rgmii_rdx_1;                    
-        rgmii_rdx_1 <= rgmii_rdx_0;
-        rgmii_rdx_0 <= rgmii_mac_rx_data;
+        if(rgmii_mac_rx_rdy) begin
+            /* Shifting Data bytes in */
+            rgmii_rdx_4 <= rgmii_rdx_3;
+            rgmii_rdx_3 <= rgmii_rdx_2;
+            rgmii_rdx_2 <= rgmii_rdx_1;                    
+            rgmii_rdx_1 <= rgmii_rdx_0;
+            rgmii_rdx_0 <= rgmii_mac_rx_data;
                            
-        /* Shifting Data Valid Signals */
-        rgmii_dv_4 <= rgmii_dv_3;
-        rgmii_dv_3 <= rgmii_dv_2;
-        rgmii_dv_2 <= rgmii_dv_1;
-        rgmii_dv_1 <= rgmii_dv_0;
-        rgmii_dv_0 <= rgmii_mac_rx_dv;
+            /* Shifting Data Valid Signals */
+            rgmii_dv_4 <= rgmii_dv_3;
+            rgmii_dv_3 <= rgmii_dv_2;
+            rgmii_dv_2 <= rgmii_dv_1;
+            rgmii_dv_1 <= rgmii_dv_0;
+            rgmii_dv_0 <= rgmii_mac_rx_dv;
 
-        /* Shifting Error Signals in */
-        rgmii_er_4 <= rgmii_er_3;
-        rgmii_er_3 <= rgmii_er_2;
-        rgmii_er_2 <= rgmii_er_1;
-        rgmii_er_1 <= rgmii_er_0;
-        rgmii_er_0 <= rgmii_mac_rx_er;                                                 
+            /* Shifting Error Signals in */
+            rgmii_er_4 <= rgmii_er_3;
+            rgmii_er_3 <= rgmii_er_2;
+            rgmii_er_2 <= rgmii_er_1;
+            rgmii_er_1 <= rgmii_er_0;
+            rgmii_er_0 <= rgmii_mac_rx_er;     
+        end                                            
     end      
 end
 
@@ -174,9 +179,23 @@ always @(posedge clk) begin
         else if(crc_en)
             crc_state <= crc_next;
         else
-            crc_state <= crc_state;        
+            crc_state <= crc_state;    
     end
 end
+
+/* Block used to count the total number of header frames */
+always @(posedge clk) begin
+    if(!reset_n)
+        hdr_cnt <= 3'b0;
+    else begin
+        if(rgmii_mac_rx_rdy) begin
+            if(rgmii_rdx_4 == ETH_HDR)
+                hdr_cnt <= hdr_cnt + 1;
+            else
+                hdr_cnt <= 3'b0;
+        end
+    end
+end 
 
 /* Control Signals */
 assign crc_en = crc_en_reg;
@@ -192,11 +211,15 @@ always @(*) begin
     crc_en_next = 1'b0;
     axis_user_next = 1'b0;
     sof = 1'b0;
-    
+
+    if(!rgmii_mac_rx_rdy) begin
+        axis_data_next = axis_data_reg;
+    end else begin    
     case(state_reg) 
         IDLE : begin
+
             //If data valid is high, SFD & HDR is found & FIFO is ready for data  
-            if(rgmii_rdx_4 == ETH_SFD && rgmii_dv_4 && s_rx_axis_trdy) begin
+            if(rgmii_rdx_4 == ETH_SFD && hdr_cnt == 3'd7 && rgmii_dv_4 && s_rx_axis_trdy) begin
                 sof = 1'b1;      
                 crc_en_next = 1'b1;         
                 state_next = PAYLOAD;
@@ -234,7 +257,7 @@ always @(*) begin
                 state_next = IDLE;
         end
     endcase
-    
+    end
 end
 
 /* Output Logic */

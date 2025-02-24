@@ -58,7 +58,7 @@ class eth_mac extends uvm_object;
         
     endfunction : crc32_reference_model 
 
-    function pad_packet(ref bit [7:0] driver_data[$]);
+    function void pad_packet(ref bit [7:0] driver_data[$]);
         int packet_size;
         
         //Reverse the endianess byte-wise
@@ -78,16 +78,7 @@ class eth_mac extends uvm_object;
         
         //int packet_size;
         logic [31:0] crc;
-        //Reverse teh endianess
-        //driver_data =  {<<8{driver_data}};        
 
-        /*packet_size = driver_data.size();
-        `uvm_info("encap_data", $sformatf("Packet size: %0d", packet_size), UVM_MEDIUM)
-        //If the packet had less than 60 bytes, we need to pad it
-        while(packet_size < MIN_BYTES) begin
-            driver_data.push_back(PADDING);
-            packet_size++;
-        end*/
         pad_packet(driver_data);
 
         //Calculate the CRC for the Payload & append to the back

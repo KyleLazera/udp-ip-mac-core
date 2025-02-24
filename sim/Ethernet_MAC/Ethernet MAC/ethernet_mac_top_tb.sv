@@ -4,6 +4,7 @@
 import uvm_pkg::*;         // Import all UVM classes
 
 `include "tc_eth_mac_wr_only.sv"
+`include "tc_eth_mac_rd_only.sv"
 `include "tc_eth_mac_rd_wr.sv"
 `include "eth_mac_wr_if.sv"
 `include "eth_mac_rd_if.sv"

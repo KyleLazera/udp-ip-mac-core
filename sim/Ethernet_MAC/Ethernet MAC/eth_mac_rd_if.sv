@@ -71,12 +71,14 @@ interface eth_mac_rd_if
     
     endtask : generate_clock
 
-    //todo: See if there can be improvement on this function
     task read_rx_fifo(ref bit [7:0] rx_fifo[$]);
         s_rx_axis_trdy <= 1'b1;
         @(m_rx_axis_tvalid);   
-        while(m_rx_axis_tvalid & !m_rx_axis_tlast) begin            
-            #1 rx_fifo.push_back(m_rx_axis_tdata);
+        while(!m_rx_axis_tlast) begin                 
+            #1;
+            if(m_rx_axis_tvalid) begin       
+                rx_fifo.push_back(m_rx_axis_tdata);                
+            end
             @(posedge rgmii_phy_rxc);
         end
 

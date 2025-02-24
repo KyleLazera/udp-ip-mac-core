@@ -9,6 +9,10 @@
  * This also transmits data out most significant bit first, which is based on the ethernet rgmii standard.
 */
 
+/*
+ * todo: Add logic to sample 10/100 mbps using IDDR flip flops
+*/
+
 module rgmii_phy_if
 (
     input wire clk_125,                       //125MHz MAC Domain Clock 
@@ -32,6 +36,7 @@ module rgmii_phy_if
     output reg [7:0] rgmii_mac_rx_data,       //Data recieved from PHY
     output wire rgmii_mac_rx_dv,              //RX data valid signal - driven on the posedge of the rxctl signal
     output wire rgmii_mac_rx_er,              //RX error signal - falling edge of rxc drives error XOR data_valid
+    output wire rgmii_mac_rx_rdy,             //This is used for SDR to ensure the rx mac is taking in teh correct data
    
    /* Control Signal(s) */
     input wire [1:0] link_speed               //Indicates the speed of the rxc (used to dictate speed of txc) 
@@ -40,20 +45,65 @@ module rgmii_phy_if
 /*** PHY RX (Data reception) ***/
 
 wire rgmii_rx_dv, rgmii_rx_er;
+reg [3:0] rgmii_rxd_rising_edge;
+reg [3:0] rgmii_rxd_falling_edge;
+reg [3:0] rxd_lower_nibble = 3'b0;
+reg [3:0] rx_dv, rx_er;
+reg [1:0] rxc_cntr;                 //Used to count the number of rxc positive edge - this is needed for single data rate
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Counts the number of clock edges from the rgmii receieved clock. This is important for 10/100mbps 
+// where data transmission occurs at single data rate. For single data rate, we sample a nibble of data
+// on each clock edge. The first clock edge sends the upper data nibble (most significant bits) and the second 
+// rising edge sends the lower nibble (least significant bits). Therefore, for each transaction in SDR mode, 
+// we need to know when 2 clock edge have occured to create out byte of data.
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+always @(posedge rgmii_mac_rx_clk) begin
+    if(!reset_n)
+        rxc_cntr <= 2'b00;
+    else begin
+        rxc_cntr <= (rxc_cntr == 2'b10) ? 2'b01 : rxc_cntr + 1;
+    end
+end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Logic to drive the correct data depending on the link speed/throughput - when throughput is 10/100mbps, 
+// we cannot use the IDDR output data because the RGMII will recieve a new nibble of data on each rising
+// edge as opposed to each rising and falling edge. 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+always @(posedge rgmii_mac_rx_clk) begin
+    if(link_speed == 2'b10) begin
+        rgmii_mac_rx_data <= {rgmii_rxd_falling_edge, rgmii_rxd_rising_edge};
+        rx_dv <= rgmii_rx_dv;
+        rx_er <= rgmii_rx_er;
+    end else begin
+
+        if(rxc_cntr == 2'b01) 
+            rxd_lower_nibble <= rgmii_rxd_rising_edge;
+    
+        if(rxc_cntr == 2'b10) begin
+            rgmii_mac_rx_data <= {rgmii_rxd_rising_edge, rxd_lower_nibble};
+            rx_dv <= rgmii_rx_dv;
+            rx_er <= rgmii_rx_er;        
+        end    
+    end
+end
 
 //Input buffers for the PHY signals through IDDR
 input_buffers #(.DATA_WIDTH(5)) 
 i_buff(.clk(rgmii_phy_rxc),
        .d_in({rgmii_phy_rxd, rgmii_phy_rxctl}),         //Input signals from PHY
        .o_clk(rgmii_mac_rx_clk),                        //Output clock for MAC - passed through BUFR   
-       .q1({rgmii_mac_rx_data[3:0], rgmii_rx_dv}),      //Rising edge data
-       .q2({rgmii_mac_rx_data[7:4], rgmii_rx_er}));     //Falling edge data 
-
+       .q1({rgmii_rxd_rising_edge, rgmii_rx_dv}),      //Rising edge data
+       .q2({rgmii_rxd_falling_edge, rgmii_rx_er}));     //Falling edge data        
 
 //The rxctl signal provides 2 values: on rising edge, it provides data valid and on falling edge 
 //it produces the XOR with dava valid and error flag - this is from the RGMII standard
-assign rgmii_mac_rx_dv = rgmii_rx_dv;
-assign rgmii_mac_rx_er = rgmii_rx_er ^ rgmii_rx_dv;
+assign rgmii_mac_rx_dv = rx_dv;
+assign rgmii_mac_rx_er = rx_er ^ rx_dv;
+assign rgmii_mac_rx_rdy = (link_speed == 2'b10) ? 1'b1 : (rxc_cntr == 2'b10); 
 
 /*** PHY TX (Data Transmission) ***/
 
