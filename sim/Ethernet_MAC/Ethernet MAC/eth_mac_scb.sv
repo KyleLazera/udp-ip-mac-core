@@ -36,8 +36,6 @@ class eth_mac_scb extends uvm_scoreboard;
             /* RX scoreboard */
             begin
                 forever begin
-                    //if(cfg.get_rx_enable()) begin
-
                         `uvm_info("scb", "rx monitor enabled", UVM_MEDIUM)
 
                         rx_mon_port.get(rx_fifo);
@@ -50,21 +48,18 @@ class eth_mac_scb extends uvm_scoreboard;
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                         end else  begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                            `uvm_fatal("SCB", $sformatf("RX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH", rx_rgmii.tx_data.size(), rx_fifo.rx_data.size()));
+                            `uvm_fatal("scb", $sformatf("RX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH", rx_rgmii.tx_data.size(), rx_fifo.rx_data.size()));
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                         end
                 
                         foreach(rx_fifo.rx_data[i])
                             assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i]) `uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
                             else `uvm_error("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));
-                    //end
                 end
             end
             /* TX scoreboard */
             begin
                 forever begin
-                    
-                    //if(cfg.get_tx_enable()) begin
                         //Fetch teh data from the monitor FIFO              
                         tx_mon_port.get(eth_wr_data);        
                         //Fetch the data from the reference model FIFO
@@ -72,68 +67,20 @@ class eth_mac_scb extends uvm_scoreboard;
 
                         assert(eth_wr_data.rx_data.size() == eth_wr_ref_data.tx_data.size()) begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                            `uvm_info("scb", $sformatf("TX Driver Packet size: %0d == Monitor Packet size: %0d MATCH",  eth_wr_data.tx_data.size(), eth_wr_ref_data.rx_data.size()), UVM_MEDIUM)
+                            `uvm_info("scb", $sformatf("TX Driver Packet size: %0d == Monitor Packet size: %0d MATCH",  eth_wr_data.rx_data.size(), eth_wr_ref_data.tx_data.size()), UVM_MEDIUM)
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                         end else  begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                            `uvm_fatal("SCB", $sformatf("TX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH",  eth_wr_data.tx_data.size(), eth_wr_ref_data.rx_data.size()));
+                            `uvm_fatal("scb", $sformatf("TX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH",  eth_wr_data.rx_data.size(), eth_wr_ref_data.tx_data.size()));
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                         end                    
                 
-                        foreach(eth_wr_data.rx_data[i])
+                        foreach(eth_wr_ref_data.tx_data[i])
                             assert(eth_wr_data.rx_data[i] == eth_wr_ref_data.tx_data[i]) `uvm_info("SCB", $sformatf("TX Monitor Data : %0h == TX Reference Data : %0h MATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]), UVM_MEDIUM)
                             else `uvm_error("scb", $sformatf("TX Monitor Data : %0h != TX Reference Data : %0h MISMATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]));            
-                        //end
                 end
             end
         join
-        
-        /*forever begin
-            if(cfg.get_rx_enable()) begin
-
-                `uvm_info("scb", "rx monitor enabled", UVM_MEDIUM)
-
-                rx_mon_port.get(rx_fifo);
-                rx_drv_port.get(rx_rgmii);
-
-                //Make sure the reference model data size and the monitor data size are equivelent
-                assert(rx_fifo.rx_data.size() == rx_rgmii.tx_data.size()) begin
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                    `uvm_info("scb", $sformatf("RX Driver Packet size: %0d == Monitor Packet size: %0d MATCH", rx_rgmii.tx_data.size(), rx_fifo.rx_data.size()), UVM_MEDIUM)
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                end else  begin
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                    `uvm_fatal("SCB", $sformatf("RX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH", rx_rgmii.tx_data.size(), rx_fifo.rx_data.size()));
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                end
-                
-                foreach(rx_fifo.rx_data[i])
-                    assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i]) `uvm_info("SCB", $sformatf("Monitor Data : %0h == Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
-                    else `uvm_error("scb", $sformatf("Monitor Data : %0h == Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));
-
-            end else begin
-            
-                //Fetch teh data from the monitor FIFO              
-                tx_mon_port.get(eth_wr_data);        
-                //Fetch the data from the reference model FIFO
-                tx_drv_port.get(eth_wr_ref_data);
-
-                assert(eth_wr_data.rx_data.size() == eth_wr_ref_data.tx_data.size()) begin
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                    `uvm_info("scb", $sformatf("TX Driver Packet size: %0d == Monitor Packet size: %0d MATCH",  eth_wr_data.tx_data.size(), eth_wr_ref_data.rx_data.size()), UVM_MEDIUM)
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                end else  begin
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                    `uvm_fatal("SCB", $sformatf("TX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH",  eth_wr_data.tx_data.size(), eth_wr_ref_data.rx_data.size()));
-                    `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                end                    
-                
-                foreach(eth_wr_data.rx_data[i])
-                    assert(eth_wr_data.rx_data[i] == eth_wr_ref_data.tx_data[i]) `uvm_info("SCB", $sformatf("Monitor Data : %0h == Reference Data : %0h MATCH", eth_wr_data.tx_data[i], eth_wr_ref_data.tx_data[i]), UVM_MEDIUM)
-                    else `uvm_error("scb", $sformatf("Monitor Data : %0h == Reference Data : %0h MISMATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]));            
-
-            end
-        end*/
 
     endtask : main_phase
 

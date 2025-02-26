@@ -63,11 +63,11 @@ end
 
 /* Logic to determine the link speed */
 always @(posedge clk_125) begin
-    /*(if(!reset_n) begin
+    if(!reset_n) begin
         rxc_ref_cntr <= 7'h0; 
         link_speed_reg <= 2'b10;   
         rxc_edge_cntr <= 3'h0;   
-    end else begin*/
+    end else begin
         rxc_ref_cntr <= rxc_ref_cntr + 1;
 
         rgmii_rxc_rt <= {rgmii_rxc_rt[1:0], rgmii_rxc_cntr[2]};
@@ -79,7 +79,7 @@ always @(posedge clk_125) begin
         //If the reference counter reached its maximum value - this indicates 2.5MHz clock speed
         if(&rxc_ref_cntr == 1) begin
             rxc_edge_cntr <= 3'h0;
-            //link_speed_reg <= 2'b00;
+            link_speed_reg <= 2'b00;
         end
 
         /*If we have found 3 edges on the re-timed rxc - this indicates a full period has been completed
@@ -100,7 +100,7 @@ always @(posedge clk_125) begin
                 link_speed_reg <= 2'b10;
 
         end
-    //end
+    end
 end
 
 /* Output Logic */

@@ -34,21 +34,22 @@ virtual task main_phase(uvm_phase phase);
     end else 
         `uvm_info("tx_monitor", "tx_monitor enabled", UVM_MEDIUM)      
 
-    forever begin
-        //todo: Possibly remove the needs for a copied item        
-        
+    forever begin        
         @(wr_if.clk_125);      
         
         if(wr_if.reset_n) begin 
             eth_mac_item real_data = eth_mac_item::type_id::create("real_data");
             eth_mac_item copied_data = eth_mac_item::type_id::create("copied_data");
-            //Read data from the RGMII end of DUT 
-            //todo: Add support for gbit/mbit (DDR and SDR)          
-            wr_if.read_rgmii_data(real_data.rx_data);           
-           //`uvm_info("tx_monitor", $sformatf("tx monitor size: %0d", real_data.rx_data.size()), UVM_MEDIUM)           
+            
+            //Read data from the RGMII end of DUT         
+            wr_if.read_rgmii_data(real_data.rx_data, cfg.link_speed);           
+            `uvm_info("tx_monitor", $sformatf("tx monitor size: %0d", real_data.rx_data.size()), UVM_MEDIUM)           
             //Copy the sampled data into the copied item
             copied_data.copy(real_data);
-            //`uvm_info("tx_monitor", $sformatf("tx monitor copied data size: %0d", copied_data.rx_data.size()), UVM_MEDIUM)
+
+            //foreach(copied_data.rx_data[i])
+                //`uvm_info("tx_drv", $sformatf("%0h", copied_data.rx_data[i]), UVM_MEDIUM)  
+
             //Send the copied data to the scb
             tx_mon_scb_port.write(copied_data);            
         end

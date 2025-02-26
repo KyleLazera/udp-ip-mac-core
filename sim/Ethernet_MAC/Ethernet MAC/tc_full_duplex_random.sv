@@ -54,8 +54,8 @@ class eth_rd_wr_seq extends uvm_sequence;
 endclass : eth_rd_wr_seq
 
 //Test case for sequence above
-class tc_eth_mac_rd_wr extends eth_mac_base_test;
-    `uvm_component_utils(tc_eth_mac_rd_wr)
+class tc_full_duplex_random extends eth_mac_base_test;
+    `uvm_component_utils(tc_full_duplex_random)
 
     function new(string name = "tx_rd_wr", uvm_component parent);
         super.new(name, parent);
@@ -66,7 +66,12 @@ class tc_eth_mac_rd_wr extends eth_mac_base_test;
 
         cfg.enable_rx_monitor();
         cfg.enable_tx_monitor();
-        cfg.set_link_speed(cfg.GBIT_SPEED);
+
+        randcase           
+            1 : cfg.set_link_speed(cfg.MB_100_SPEED);
+            1 : cfg.set_link_speed(cfg.GBIT_SPEED);
+            1 : cfg.set_link_speed(cfg.MB_10_SPEED);
+        endcase
        
         //Set wr_only as the default sequence to run 
         uvm_config_db#(uvm_object_wrapper)::set(this, "eth_mac_env.v_seqr.main_phase", "default_sequence", 
@@ -78,6 +83,6 @@ class tc_eth_mac_rd_wr extends eth_mac_base_test;
         uvm_top.print_topology();
     endtask : main_phase    
 
-endclass : tc_eth_mac_rd_wr
+endclass : tc_full_duplex_random
 
 `endif //TC_RD_WR

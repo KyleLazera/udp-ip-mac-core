@@ -47,10 +47,15 @@ class eth_mac_base_test extends uvm_test;
         server = get_report_server();
         err_num = server.get_severity_count(UVM_ERROR);
         
-        if (err_num != 0) 
-           $display("TEST CASE FAILED");
-        else 
-           $display("TEST CASE PASSED");
+        if (err_num == 0) begin
+           `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
+           `uvm_info("base_test", "TESTCASE PASSED", UVM_MEDIUM)
+           `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
+        end else begin
+           `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
+           `uvm_info("base_test", "TESTCASE FAILED", UVM_MEDIUM)
+           `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
+        end
         
     endfunction : report_phase
 

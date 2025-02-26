@@ -59,9 +59,9 @@ interface eth_mac_rd_if
 
         /* Determine the clock period based on the mode */
         case(mode) 
-            2'b00 : period = 4;     //Gbit - 8ns clock period
+            2'b00: period = 4;     //Gbit - 8ns clock period
             2'b01: period = 20;     //100 mbps - 40ns clock period
-            2'b11: period = 100;    // 10mbps - 400ns clock period
+            2'b10: period = 200;    //10mbps - 400ns clock period
             default : period = 4;
         endcase
 

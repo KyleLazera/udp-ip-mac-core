@@ -149,18 +149,24 @@ always @(posedge clk_125) begin
         else if(link_speed == 2'b01) begin
             counter_reg <= counter_reg + 1;
             rgmii_tx_data_rdy <= 1'b0;
+            
+            if(counter_reg == 6'd0) begin
+                rgmii_txc_1 <= 1'b0;
+                rgmii_txc_2 <= 1'b0;
+            end 
             //If half period has passed raise the clock
-            if(counter_reg == 6'd2) begin
+            else if(counter_reg == 6'd2) begin
                 rgmii_txc_1 <= 1'b1;
                 rgmii_txc_2 <= 1'b1;
-            end
+            end          
             //After full period, falling edge
             else if(counter_reg >= 6'd4) begin
-                rgmii_txc_1 <= 1'b0;
+                rgmii_txc_1 <= 1'b1;
                 rgmii_txc_2 <= 1'b0; 
                 rgmii_tx_data_rdy <= 1'b1;   
                 counter_reg <= 6'b0;    
-            end      
+            end 
+    
         end
         //1000Mbps - Clock speed of 125MHz
         else if(link_speed == 2'b10) begin

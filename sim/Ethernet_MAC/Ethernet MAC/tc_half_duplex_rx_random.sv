@@ -4,8 +4,8 @@
 `include "eth_mac_base_test.sv"
 
 //TODO: Move this into its own file - Possibly make a folder that contains all sequences
-class eth_rd_only_seq extends uvm_sequence;
-    `uvm_object_utils(eth_rd_only_seq)
+class eth_rx_only_seq extends uvm_sequence;
+    `uvm_object_utils(eth_rx_only_seq)
     //Get handle to virtual sequencer
     `uvm_declare_p_sequencer(eth_mac_virtual_seqr)
     
@@ -42,11 +42,11 @@ class eth_rd_only_seq extends uvm_sequence;
         end
     endtask : post_body
     
-endclass : eth_rd_only_seq
+endclass : eth_rx_only_seq
 
 //Test case for sequence above
-class tc_eth_mac_rd_only extends eth_mac_base_test;
-    `uvm_component_utils(tc_eth_mac_rd_only)
+class tc_half_duplex_rx_random extends eth_mac_base_test;
+    `uvm_component_utils(tc_half_duplex_rx_random)
 
     function new(string name = "tc_rd_only", uvm_component parent);
         super.new(name, parent);
@@ -55,12 +55,17 @@ class tc_eth_mac_rd_only extends eth_mac_base_test;
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
 
-        cfg.enable_rx_monitor();
-        cfg.set_link_speed(cfg.MB_100_SPEED);
+        randcase
+            1 : cfg.set_link_speed(cfg.GBIT_SPEED);
+            1 : cfg.set_link_speed(cfg.MB_100_SPEED);
+            1 : cfg.set_link_speed(cfg.MB_10_SPEED);
+        endcase
+
+        cfg.enable_rx_monitor();        
        
         //Set wr_only as the default sequence to run 
         uvm_config_db#(uvm_object_wrapper)::set(this, "eth_mac_env.v_seqr.main_phase", "default_sequence", 
-                                                eth_rd_only_seq::type_id::get());                                                              
+                                                eth_rx_only_seq::type_id::get());                                                              
     endfunction : build_phase
     
     task main_phase(uvm_phase phase);
@@ -68,6 +73,6 @@ class tc_eth_mac_rd_only extends eth_mac_base_test;
         uvm_top.print_topology();
     endtask : main_phase    
 
-endclass : tc_eth_mac_rd_only
+endclass : tc_half_duplex_rx_random
 
 `endif // TC_RD_ONLY

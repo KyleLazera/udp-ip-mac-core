@@ -156,13 +156,15 @@ always @(*) begin
     //If the RGMII is NOT ready to recieve data - pause the FSM operation
     if(!rgmii_mac_tx_rdy) begin
         tx_data_next = tx_data_reg;
-        mii_sdr_next = mii_sdr;    
+        mii_sdr_next = mii_sdr;  
+        rgmii_dv_next = rgmii_dv_reg;  
     end 
     //If the mii Select Signal is high and mii_sdr is raised, do not bring new data in
     //rather shift it for the SDR    
     else if(mii_select && mii_sdr) begin
         tx_data_next = {4'b0, tx_data_reg[7:4]};
         mii_sdr_next = 1'b0;
+        rgmii_dv_next = rgmii_dv_reg;
     end
     //If neither of the above options are met, proceed with the FSM
     else begin
@@ -181,12 +183,13 @@ always @(*) begin
                 end
             end
             PREAMBLE : begin
-                rgmii_dv_next = 1'b1;
-                //Set the s_axis_trdy flag high here, so we have incoming data when we enter the PACKET State
+                rgmii_dv_next = 1'b1;                
                 if(byte_ctr == 3'd6) begin                  
                     tx_data_next = ETH_HDR;
                     byte_ctr_next = byte_ctr + 1;
-                    axis_rdy_next = 1'b1;
+                    // Only set the s_axis_trdy flag high if we are in gbit mode, (mii_select is low)
+                    // else we will miss the first byte of data
+                    axis_rdy_next = ~mii_select; 
                 end
                 //If all 7 bytes of the Header have been sent, transmit the SFD  
                 else if(byte_ctr == 3'd7) begin
@@ -219,6 +222,7 @@ always @(*) begin
                 //TODO: Possibly deal with error flag here for RGMII
                 if(s_tx_axis_tlast || !s_tx_axis_tvalid) begin
                     if(pckt_size > (MIN_FRAME_WIDTH - 1)) begin
+                        axis_rdy_next = 1'b0;
                         byte_ctr_next = 3'd3;
                         state_next = FCS;                        
                     end else begin

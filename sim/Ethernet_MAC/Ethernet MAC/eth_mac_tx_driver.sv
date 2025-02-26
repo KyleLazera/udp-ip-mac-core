@@ -6,6 +6,8 @@
 class eth_mac_tx_driver extends uvm_driver#(eth_mac_item);
 `uvm_component_utils(eth_mac_tx_driver)
 
+eth_mac_cfg cfg;
+
 virtual eth_mac_wr_if wr_if;
 uvm_analysis_port#(eth_mac_item) tx_drv_scb_port;
 string TAG = "eth_mac_wr_drv";
@@ -41,10 +43,13 @@ virtual task main_phase(uvm_phase phase);
         tx_item_copy.copy(tx_item);
 
         //Drive original data to the DUT
-        wr_if.tx_fifo_drive_data(tx_item.tx_data);
+        wr_if.tx_fifo_drive_data(tx_item.tx_data, cfg.link_speed);
 
         //Pass copied data through eth_mac to encapsulate
-        eth_mac_base.encapsulate_data(tx_item_copy.tx_data);        
+        eth_mac_base.encapsulate_data(tx_item_copy.tx_data);
+
+        //foreach(tx_item_copy.tx_data[i])
+            //`uvm_info("tx_drv", $sformatf("%0h", tx_item_copy.tx_data[i]), UVM_MEDIUM)        
         
         //Send encapsulated data to scb as reference
         tx_drv_scb_port.write(tx_item_copy);
