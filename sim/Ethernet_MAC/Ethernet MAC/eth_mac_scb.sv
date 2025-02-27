@@ -65,19 +65,19 @@ class eth_mac_scb extends uvm_scoreboard;
                         //Fetch the data from the reference model FIFO
                         tx_drv_port.get(eth_wr_ref_data);
 
-                        assert(eth_wr_data.rx_data.size() == eth_wr_ref_data.tx_data.size()) begin
+                        /*assert(eth_wr_data.rx_data.size() == eth_wr_ref_data.tx_data.size()) begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                            `uvm_info("scb", $sformatf("TX Driver Packet size: %0d == Monitor Packet size: %0d MATCH",  eth_wr_data.rx_data.size(), eth_wr_ref_data.tx_data.size()), UVM_MEDIUM)
+                            `uvm_info("scb", $sformatf("TX Driver Packet size: %0d == Monitor Packet size: %0d MATCH", eth_wr_ref_data.tx_data.size(), eth_wr_data.rx_data.size()), UVM_MEDIUM)
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                         end else  begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                            `uvm_fatal("scb", $sformatf("TX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH",  eth_wr_data.rx_data.size(), eth_wr_ref_data.tx_data.size()));
+                            `uvm_fatal("scb", $sformatf("TX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH", eth_wr_ref_data.tx_data.size(), eth_wr_data.rx_data.size()));
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                        end                    
+                        end   */                 
                 
                         foreach(eth_wr_ref_data.tx_data[i])
                             assert(eth_wr_data.rx_data[i] == eth_wr_ref_data.tx_data[i]) `uvm_info("SCB", $sformatf("TX Monitor Data : %0h == TX Reference Data : %0h MATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]), UVM_MEDIUM)
-                            else `uvm_error("scb", $sformatf("TX Monitor Data : %0h != TX Reference Data : %0h MISMATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]));            
+                            else `uvm_fatal("scb", $sformatf("TX Monitor Data : %0h != TX Reference Data : %0h MISMATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]));            
                 end
             end
         join

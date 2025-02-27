@@ -29,6 +29,9 @@ class eth_rd_wr_seq extends uvm_sequence;
 
         `uvm_info("RD_WR_SEQ", "Starting another iteration", UVM_MEDIUM);
 
+        //Set the link speed by recieving a packet first
+        `uvm_do_on(rx_seq, p_sequencer.rx_vseqr);
+
         //Drive data in full duplex mode 
         fork
             begin
@@ -37,7 +40,7 @@ class eth_rd_wr_seq extends uvm_sequence;
             end
             begin
                 repeat(10)
-                    `uvm_do_on(rx_seq, p_sequencer.tx_vseqr)
+                    `uvm_do_on(tx_seq, p_sequencer.tx_vseqr)
             end
         join
         
@@ -62,18 +65,20 @@ class tc_full_duplex_random extends eth_mac_base_test;
     endfunction : new
 
     virtual function void build_phase(uvm_phase phase);
+        int link_speed;
         super.build_phase(phase);
 
         cfg.enable_rx_monitor();
         cfg.enable_tx_monitor();
+        link_speed = $urandom_range(0, 2);
 
-        randcase           
+        case(link_speed)
+            0 : cfg.set_link_speed(cfg.GBIT_SPEED);
             1 : cfg.set_link_speed(cfg.MB_100_SPEED);
-            1 : cfg.set_link_speed(cfg.GBIT_SPEED);
-            1 : cfg.set_link_speed(cfg.MB_10_SPEED);
+            2 : cfg.set_link_speed(cfg.MB_10_SPEED);
         endcase
        
-        //Set wr_only as the default sequence to run 
+        //Set rd_wr sequence as the default sequence to run 
         uvm_config_db#(uvm_object_wrapper)::set(this, "eth_mac_env.v_seqr.main_phase", "default_sequence", 
                                                 eth_rd_wr_seq::type_id::get());                                                              
     endfunction : build_phase

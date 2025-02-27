@@ -36,7 +36,7 @@ class eth_tx_only_seq extends uvm_sequence;
         repeat(10) begin
             `uvm_info("TC_SEQ", "Starting another iteration", UVM_MEDIUM);
             `uvm_do_on(tx_seq, p_sequencer.tx_vseqr)
-        end
+        end  
         
         `uvm_info("WR_ONLY_SEQ", "Case Sequence is complete", UVM_MEDIUM);
     endtask : body
@@ -59,18 +59,20 @@ class tc_half_duplex_tx_random extends eth_mac_base_test;
     endfunction : new
 
     virtual function void build_phase(uvm_phase phase);
+        int link_speed;
         super.build_phase(phase);
         
         // Disable RX monitor for this test case
         cfg.disable_rx_monitor();  
         cfg.enable_tx_monitor(); 
+        link_speed = $urandom_range(0, 2);
 
-        randcase
-            1 : cfg.set_link_speed(cfg.GBIT_SPEED);
+        case(link_speed)
+            0 : cfg.set_link_speed(cfg.GBIT_SPEED);
             1 : cfg.set_link_speed(cfg.MB_100_SPEED);
-            1 : cfg.set_link_speed(cfg.MB_10_SPEED);
-        endcase             
-       
+            2 : cfg.set_link_speed(cfg.MB_10_SPEED);
+        endcase          
+
         //Set wr_only as the default sequence to run 
         uvm_config_db#(uvm_object_wrapper)::set(this, "eth_mac_env.v_seqr.main_phase", "default_sequence", 
                                                 eth_tx_only_seq::type_id::get());                                                              

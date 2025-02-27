@@ -3,7 +3,7 @@ set project_path "../Network Stack/Processorless_Network/Processorless_Network.x
 open_project $project_path
 
 #Define teh testcases to run
-set testcases {"tc_eth_mac_rd_only" "tc_eth_mac_wr_only"}
+set testcases {"tc_full_duplex_random" "tc_half_duplex_tx_random" "tc_half_duplex_rx_random"}
 
 # Get project name 
 set proj_name [get_projects]
@@ -18,13 +18,18 @@ set_property top ethernet_mac_top_tb [get_filesets $sim_set]
 foreach test $testcases {
     puts "Running UVM Test: $test"
 
-    set_property -name {XSIM.MORE_OPTIONS} -value {UVM_TESTNAME=$test} -objects $sim_set
+    # Reset simulation to ensure a fresh start
+    reset_simulation    
+
+    set_property -name {xsim.simulate.xsim.more_options} -value "-testplusarg UVM_TESTNAME=$test" -objects [get_filesets eth_mac_rgmii]
 
     # Remove old log files
     file delete -force xsim.log simulate.log    
 
     # Run the simulation in batch mode 
     launch_simulation -simset $sim_set 
+
+    run -all
 }
 
 close_project

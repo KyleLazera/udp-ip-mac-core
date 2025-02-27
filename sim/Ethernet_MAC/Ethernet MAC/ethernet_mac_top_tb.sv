@@ -72,7 +72,9 @@ initial begin
 
     //run_test("tc_half_duplex_rx_random");
     //run_test("tc_half_duplex_tx_random");
-    run_test("tc_full_duplex_random");
+    //run_test("tc_full_duplex_random");
+    //run_test("tc_half_duplex_tx_1gbit");
+    run_test();
 end
 
 

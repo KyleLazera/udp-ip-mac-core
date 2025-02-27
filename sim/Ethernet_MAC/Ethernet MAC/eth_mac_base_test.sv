@@ -49,10 +49,12 @@ class eth_mac_base_test extends uvm_test;
         
         if (err_num == 0) begin
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
+           `uvm_info("base_test", $sformatf("TEST WITH LINK SPEED: %0d", cfg.link_speed), UVM_MEDIUM)
            `uvm_info("base_test", "TESTCASE PASSED", UVM_MEDIUM)
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
         end else begin
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
+           `uvm_info("base_test", $sformatf("TEST WITH LINK SPEED: %0d", cfg.link_speed), UVM_MEDIUM)
            `uvm_info("base_test", "TESTCASE FAILED", UVM_MEDIUM)
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
         end

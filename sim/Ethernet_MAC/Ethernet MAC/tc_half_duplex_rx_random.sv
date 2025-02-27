@@ -53,15 +53,17 @@ class tc_half_duplex_rx_random extends eth_mac_base_test;
     endfunction : new
 
     virtual function void build_phase(uvm_phase phase);
+        int link_speed;
         super.build_phase(phase);
 
-        randcase
-            1 : cfg.set_link_speed(cfg.GBIT_SPEED);
-            1 : cfg.set_link_speed(cfg.MB_100_SPEED);
-            1 : cfg.set_link_speed(cfg.MB_10_SPEED);
-        endcase
+        cfg.enable_rx_monitor();  
+        link_speed = $urandom_range(0, 2);
 
-        cfg.enable_rx_monitor();        
+        case(link_speed)
+            0 : cfg.set_link_speed(cfg.GBIT_SPEED);
+            1 : cfg.set_link_speed(cfg.MB_100_SPEED);
+            2 : cfg.set_link_speed(cfg.MB_10_SPEED);
+        endcase                  
        
         //Set wr_only as the default sequence to run 
         uvm_config_db#(uvm_object_wrapper)::set(this, "eth_mac_env.v_seqr.main_phase", "default_sequence", 

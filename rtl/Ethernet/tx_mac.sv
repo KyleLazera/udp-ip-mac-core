@@ -221,8 +221,9 @@ always @(*) begin
                 //If the last beat has arrived OR there is no more valid data in the FIFO
                 //TODO: Possibly deal with error flag here for RGMII
                 if(s_tx_axis_tlast || !s_tx_axis_tvalid) begin
+                    axis_rdy_next = 1'b0;
                     if(pckt_size > (MIN_FRAME_WIDTH - 1)) begin
-                        axis_rdy_next = 1'b0;
+                        //axis_rdy_next = 1'b0;
                         byte_ctr_next = 3'd3;
                         state_next = FCS;                        
                     end else begin
