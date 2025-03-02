@@ -28,7 +28,10 @@ class case0_sequence extends uvm_sequence;
     
     virtual task body();
         wr_sequence     wr_seq;
-        rd_sequence     rd_seq;   
+        rd_sequence     rd_seq;  
+
+        repeat(10)
+            `uvm_do_on(wr_seq, p_sequencer.v_wr_seqr) 
            
         repeat(10000) begin
             `uvm_do_on(wr_seq, p_sequencer.v_wr_seqr)

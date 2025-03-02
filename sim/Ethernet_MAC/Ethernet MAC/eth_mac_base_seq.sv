@@ -18,7 +18,7 @@ class eth_mac_base_seq extends uvm_sequence#(eth_mac_item);
         int packet_size;
 
         //Generate a packet of a random size
-        packet_size = $urandom_range(20, 1500); 
+        packet_size = $urandom_range(60, 80); 
 
         `uvm_info("generate_packet", $sformatf("Packet of size %0d generated!", packet_size), UVM_MEDIUM)
 

@@ -65,9 +65,9 @@ module tb_top;
         uvm_config_db#(virtual rd_if)::set(null, "uvm_test_top.fifo_env.rd_fifo.drv", "rd_if", rd_if);
         uvm_config_db#(virtual rd_if)::set(null, "uvm_test_top.fifo_env.rd_fifo.mon", "rd_if", rd_if);
                 
-        //run_test("fifo_case0");
+        run_test("fifo_case0");
         //run_test("fifo_case1");
-        run_test("fifo_case2");
+        //run_test("fifo_case2");
     end
    
 

@@ -1,3 +1,8 @@
+# Simple regression script to run through all teh UVM testcases with different seed values. This can be invoked by calling
+# vivado -mode batch -source scripts/run_regression.tcl
+
+#todo: Add logging after all tests have run indicating whether the tests passed
+
 # Set project path - Change to relative
 set project_path "../Network Stack/Processorless_Network/Processorless_Network.xpr"
 open_project $project_path
@@ -21,7 +26,11 @@ foreach test $testcases {
     # Reset simulation to ensure a fresh start
     reset_simulation    
 
-    set_property -name {xsim.simulate.xsim.more_options} -value "-testplusarg UVM_TESTNAME=$test" -objects [get_filesets eth_mac_rgmii]
+    # Generate a random seed for each test
+    set random_seed [expr {int(rand() * 10000)}] 
+
+    #Pass the testcase to run as an argument to UVM & pass a randomized seed
+    set_property -name {xsim.simulate.xsim.more_options} -value "-testplusarg UVM_TESTNAME=$test -sv_seed $random_seed" -objects [get_filesets eth_mac_rgmii]
 
     # Remove old log files
     file delete -force xsim.log simulate.log    

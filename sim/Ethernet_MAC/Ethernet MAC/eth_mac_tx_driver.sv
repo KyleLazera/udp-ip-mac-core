@@ -33,7 +33,7 @@ virtual task main_phase(uvm_phase phase);
     /* Instantiate instace of eth_mac for simulation/reference */
     eth_mac_base = eth_mac::type_id::create("eth_mac_base");      
 
-    @(wr_if.clk_125);
+    @(wr_if.clk_100);
 
     forever begin
         tx_item_copy = eth_mac_item::type_id::create("tx_item_copy");
@@ -43,13 +43,13 @@ virtual task main_phase(uvm_phase phase);
         tx_item_copy.copy(tx_item);
 
         //Drive original data to the DUT
-        wr_if.tx_fifo_drive_data(tx_item.tx_data, cfg.link_speed);
+        wr_if.tx_fifo_drive_data(tx_item.tx_data);
+
+        //foreach(tx_item.tx_data[i])
+            //`uvm_info("tx_drv", $sformatf("%0h", tx_item.tx_data[i]), UVM_MEDIUM)           
 
         //Pass copied data through eth_mac to encapsulate
-        eth_mac_base.encapsulate_data(tx_item_copy.tx_data);
-
-        //foreach(tx_item_copy.tx_data[i])
-            //`uvm_info("tx_drv", $sformatf("%0h", tx_item_copy.tx_data[i]), UVM_MEDIUM)        
+        eth_mac_base.encapsulate_data(tx_item_copy.tx_data);     
         
         //Send encapsulated data to scb as reference
         tx_drv_scb_port.write(tx_item_copy);

@@ -35,6 +35,7 @@ module ethernet_mac
     output wire s_tx_axis_trdy,                                 //Indicates to FIFO that it can read data (used to set rd_en for FIFIO)
 
     /* RX FIFO Interface */
+    output wire rgmii_rxc,                                      //RX clock from rgmii used to drive data to rx fifo
     output wire [FIFO_DATA_WIDTH-1:0] m_rx_axis_tdata,          //Data to transmit to asynch FIFO
     output wire m_rx_axis_tvalid,                               //Signal indicating module has data to transmit
     output wire m_rx_axis_tuser,                                //Used to indicate an error to the FIFO
@@ -211,6 +212,6 @@ rx_mac_module
     .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy)                 
 ); 
 
-
+assign rgmii_rxc = rgmii_mac_rx_clk;
 
 endmodule

@@ -9,6 +9,7 @@ import uvm_pkg::*;         // Import all UVM classes
 `include "eth_mac_tx_agent.sv"
 `include "eth_mac_virtual_seqr.sv"
 `include "eth_mac_tx_seq.sv"
+`include "eth_mac_rx_seq.sv"
 `include "eth_mac_tx_seqr.sv"
 `include "eth_mac_scb.sv"
 `include "eth_mac_cfg.sv"

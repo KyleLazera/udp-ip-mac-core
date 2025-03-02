@@ -15,8 +15,9 @@ import uvm_pkg::*;         // Import all UVM classes
 class eth_mac_env extends uvm_env;
     `uvm_component_utils(eth_mac_env)
 
-    /* Configuration varibales */
-    bit rx_enable = 0;
+    /* Events */
+    uvm_event tx_scb_complete;
+    uvm_event rx_scb_complete;
 
     /* Declare Agents & Components */
     eth_mac_tx_agent        tx_agent;
@@ -54,6 +55,11 @@ class eth_mac_env extends uvm_env;
         tx_mon_scb = new("tx_mon_scb");
         rx_mon_scb = new("rx_mon_scb");
         rx_drv_scb = new("rx_drv_scb");
+
+        /* Create Events */
+        tx_scb_complete = new("tx_scb_complete");
+        rx_scb_complete = new("rx_scb_complete");
+
     endfunction : build_phase
 
     virtual function void connect_phase(uvm_phase phase);
@@ -79,6 +85,10 @@ class eth_mac_env extends uvm_env;
 
         rx_agent.rx_mon_a_port.connect(rx_drv_scb.analysis_export);
         eth_scb.rx_mon_port.connect(rx_drv_scb.blocking_get_export);
+
+        //Connect events in scoreboard
+        eth_scb.tx_scb_complete = tx_scb_complete;
+        eth_scb.rx_scb_complete = rx_scb_complete;
 
         //Connect virtual sequencers
         v_seqr.tx_vseqr = tx_agent.tx_seqr;

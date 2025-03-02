@@ -189,7 +189,7 @@ always @(*) begin
                     byte_ctr_next = byte_ctr + 1;
                     // Only set the s_axis_trdy flag high if we are in gbit mode, (mii_select is low)
                     // else we will miss the first byte of data
-                    axis_rdy_next = ~mii_select; 
+                    //axis_rdy_next = ~mii_select; 
                 end
                 //If all 7 bytes of the Header have been sent, transmit the SFD  
                 else if(byte_ctr == 3'd7) begin
@@ -197,7 +197,7 @@ always @(*) begin
                     mii_sdr_next = 1'b1;
                     byte_ctr_next = 3'd0;
                     pckt_size_next = 6'd0;
-                    axis_rdy_next = 1'b1;     
+                    axis_rdy_next = ~mii_select; //todo: changed to 0    
                     state_next = PACKET;
                 end else begin
                     tx_data_next = ETH_HDR;
@@ -220,8 +220,8 @@ always @(*) begin
                 
                 //If the last beat has arrived OR there is no more valid data in the FIFO
                 //TODO: Possibly deal with error flag here for RGMII
-                if(s_tx_axis_tlast || !s_tx_axis_tvalid) begin
-                    axis_rdy_next = 1'b0;
+                if(s_tx_axis_tlast /*|| !s_tx_axis_tvalid*/) begin
+                    axis_rdy_next = mii_select;
                     if(pckt_size > (MIN_FRAME_WIDTH - 1)) begin
                         //axis_rdy_next = 1'b0;
                         byte_ctr_next = 3'd3;

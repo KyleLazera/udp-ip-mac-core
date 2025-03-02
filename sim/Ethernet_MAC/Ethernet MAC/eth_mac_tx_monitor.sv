@@ -35,7 +35,7 @@ virtual task main_phase(uvm_phase phase);
         `uvm_info("tx_monitor", "tx_monitor enabled", UVM_MEDIUM)      
 
     forever begin        
-        @(wr_if.clk_125);      
+        @(wr_if.clk_100);      
         
         if(wr_if.reset_n) begin 
             eth_mac_item real_data = eth_mac_item::type_id::create("real_data");
@@ -43,6 +43,7 @@ virtual task main_phase(uvm_phase phase);
             
             //Read data from the RGMII end of DUT         
             wr_if.read_rgmii_data(real_data.rx_data, cfg.link_speed);           
+            
             `uvm_info("tx_monitor", $sformatf("tx monitor size: %0d", real_data.rx_data.size()), UVM_MEDIUM)           
             //Copy the sampled data into the copied item
             copied_data.copy(real_data);

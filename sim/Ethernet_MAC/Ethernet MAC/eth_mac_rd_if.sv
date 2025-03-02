@@ -8,14 +8,12 @@
 
 interface eth_mac_rd_if
 (
-    input bit clk_125, 
-    input bit clk90_125, 
     input bit clk_100,
     input bit reset_n
 );
     /* Parameters */
     localparam RGMII_DATA_WIDTH = 4;
-    localparam FIFO_DATA_WIDTH = 8;
+    localparam AXI_DATA_WIDTH = 8;
     
     /* DUT Signals */
     //RGMII Write Signals
@@ -23,9 +21,8 @@ interface eth_mac_rd_if
     bit [RGMII_DATA_WIDTH-1:0] rgmii_phy_rxd;            
     bit rgmii_phy_rxctl;                                 
     //RX FIFO Signals 
-    bit [FIFO_DATA_WIDTH-1:0] m_rx_axis_tdata;          
-    bit m_rx_axis_tvalid;                               
-    bit m_rx_axis_tuser;                                
+    bit [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata;          
+    bit m_rx_axis_tvalid;                                                              
     bit m_rx_axis_tlast;                                
     bit s_rx_axis_trdy;                                    
 
@@ -72,18 +69,22 @@ interface eth_mac_rd_if
     endtask : generate_clock
 
     task read_rx_fifo(ref bit [7:0] rx_fifo[$]);
+        
+        //Wait for the rx fifo to have data/not be empty
+        if(!m_rx_axis_tvalid)
+            @(m_rx_axis_tvalid);
+        
+        //Set the read enable 
         s_rx_axis_trdy <= 1'b1;
-        @(m_rx_axis_tvalid);   
+
         while(!m_rx_axis_tlast) begin                 
             #1;
             if(m_rx_axis_tvalid) begin       
                 rx_fifo.push_back(m_rx_axis_tdata);                
             end
-            @(posedge rgmii_phy_rxc);
+            @(posedge clk_100);
         end
 
-        //Wait for tvalid signal to go low
-        @(negedge m_rx_axis_tvalid);
     endtask : read_rx_fifo
 
 endinterface : eth_mac_rd_if

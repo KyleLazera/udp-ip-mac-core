@@ -5,6 +5,11 @@ class eth_mac_scb extends uvm_scoreboard;
     `uvm_component_utils(eth_mac_scb)
 
     eth_mac_cfg cfg;
+    int num_iterations;
+
+    /* Events */
+    uvm_event tx_scb_complete;
+    uvm_event rx_scb_complete;
 
     // Port to connect to tx agent 
     uvm_blocking_get_port#(eth_mac_item) tx_mon_port;
@@ -26,8 +31,8 @@ class eth_mac_scb extends uvm_scoreboard;
         rx_mon_port = new("rx_mon_port", this);
     endfunction : build_phase
 
-    //todo: Change the conditional to a fork to have 2 processes so we can run read/writes simultaneously
     virtual task main_phase(uvm_phase phase);
+        int tx_packets_rec = 0, rx_packets_rec = 0;        
         eth_mac_item eth_wr_data, eth_wr_ref_data;
         eth_mac_item rx_rgmii, rx_fifo;
         super.main_phase(phase);
@@ -46,6 +51,7 @@ class eth_mac_scb extends uvm_scoreboard;
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                             `uvm_info("scb", $sformatf("RX Driver Packet size: %0d == Monitor Packet size: %0d MATCH", rx_rgmii.tx_data.size(), rx_fifo.rx_data.size()), UVM_MEDIUM)
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
+                            rx_packets_rec++;
                         end else  begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                             `uvm_fatal("scb", $sformatf("RX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH", rx_rgmii.tx_data.size(), rx_fifo.rx_data.size()));
@@ -55,6 +61,10 @@ class eth_mac_scb extends uvm_scoreboard;
                         foreach(rx_fifo.rx_data[i])
                             assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i]) `uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
                             else `uvm_error("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));
+
+                        if(rx_packets_rec == num_iterations)
+                            rx_scb_complete.trigger();
+
                 end
             end
             /* TX scoreboard */
@@ -65,19 +75,23 @@ class eth_mac_scb extends uvm_scoreboard;
                         //Fetch the data from the reference model FIFO
                         tx_drv_port.get(eth_wr_ref_data);
 
-                        /*assert(eth_wr_data.rx_data.size() == eth_wr_ref_data.tx_data.size()) begin
+                        assert(eth_wr_data.rx_data.size() == eth_wr_ref_data.tx_data.size()) begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                             `uvm_info("scb", $sformatf("TX Driver Packet size: %0d == Monitor Packet size: %0d MATCH", eth_wr_ref_data.tx_data.size(), eth_wr_data.rx_data.size()), UVM_MEDIUM)
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
+                            tx_packets_rec++;
                         end else  begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
                             `uvm_fatal("scb", $sformatf("TX Driver Packet size: %0d != Monitor Packet size: %0d MISMATCH", eth_wr_ref_data.tx_data.size(), eth_wr_data.rx_data.size()));
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-                        end   */                 
+                        end                
                 
                         foreach(eth_wr_ref_data.tx_data[i])
                             assert(eth_wr_data.rx_data[i] == eth_wr_ref_data.tx_data[i]) `uvm_info("SCB", $sformatf("TX Monitor Data : %0h == TX Reference Data : %0h MATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]), UVM_MEDIUM)
                             else `uvm_fatal("scb", $sformatf("TX Monitor Data : %0h != TX Reference Data : %0h MISMATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]));            
+                
+                        if(tx_packets_rec == num_iterations)
+                            tx_scb_complete.trigger();
                 end
             end
         join
