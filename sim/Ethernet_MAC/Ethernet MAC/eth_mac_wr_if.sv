@@ -6,6 +6,8 @@
  * the output signals on the RGMII signals 
  */
 
+ //todo: Make sure the tvalid signal is only dropped after it has been sampled - this means s_trdy should be high when it is dropped 
+
 interface eth_mac_wr_if
 (
     input bit clk_100,                                  //100MHz clock input to tx FIFO
@@ -38,31 +40,54 @@ interface eth_mac_wr_if
     /* BFM Tasks */
     
     //This simulates a FIFO driving data into the module
-    task tx_fifo_drive_data(bit [7:0] ref_fifo[$]);
+    /*task tx_fifo_drive_data(bit [7:0] ref_fifo[$]);
         int fifo_size = ref_fifo.size();
 
-        //Make sure the FIFO is not full before writing data
-        if(!tx_fifo_cb.s_tx_axis_trdy)
-            @(posedge s_tx_axis_trdy);
+        @(tx_fifo_cb);
+
+        //Indicate to the FIFO there is data to transmit
+        tx_fifo_cb.m_tx_axis_tvalid <= 1'b1;
 
         //Drive the data out of the FIFO
-        while (fifo_size > 0) begin                             
-            @(tx_fifo_cb);
-            //If the FIFO is not full set the tvalid (wr_en) and send data
+        while (fifo_size > 0) begin                                                      
+            
             if (tx_fifo_cb.s_tx_axis_trdy) begin  
-                tx_fifo_cb.m_tx_axis_tvalid <= tx_fifo_cb.s_tx_axis_trdy;
                 tx_fifo_cb.m_tx_axis_tlast <= (fifo_size == 1);                                             
                 tx_fifo_cb.m_tx_axis_tdata <= ref_fifo.pop_back();                
                 fifo_size--;
-            end                    
-            //If the FIFO is full, lower the tvalid and do not send data
-            else 
-                tx_fifo_cb.m_tx_axis_tvalid <= 0;
-                 
+            end   
+            @(tx_fifo_cb);                                
+        end 
+            
+            
+        tx_fifo_cb.m_tx_axis_tvalid <= 0;
+        @(tx_fifo_cb);    
+
+    endtask : tx_fifo_drive_data*/
+
+    task tx_fifo_drive_data(bit [7:0] ref_fifo[$], int last_packet);
+        int fifo_size = ref_fifo.size();
+
+        //Drive the data out of the FIFO
+        while (fifo_size > 0) begin                                                      
+            
+            if (s_tx_axis_trdy) begin  
+                //Indicate to the FIFO there is data to transmit
+                m_tx_axis_tvalid <= 1'b1;
+                m_tx_axis_tlast <= (fifo_size == 1);                                             
+                m_tx_axis_tdata <= ref_fifo.pop_back();                
+                fifo_size--;
+            end   
+            @(posedge clk_100);                                
         end 
 
-        @(tx_fifo_cb);
-        tx_fifo_cb.m_tx_axis_tvalid <= 0;
+        if(last_packet) begin 
+            while(!s_tx_axis_trdy)
+                @(posedge clk_100);         
+            
+            m_tx_axis_tvalid <= 1'b0;
+            @(posedge clk_100);  
+        end
 
     endtask : tx_fifo_drive_data
 

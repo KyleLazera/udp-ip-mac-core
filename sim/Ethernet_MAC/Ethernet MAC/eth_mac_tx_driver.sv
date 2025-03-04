@@ -28,6 +28,7 @@ endfunction : build_phase
 virtual task main_phase(uvm_phase phase);
     eth_mac_item tx_item, tx_item_copy;
     eth_mac eth_mac_base;
+    int num_packets_sent = 1;
     super.main_phase(phase);  
     
     /* Instantiate instace of eth_mac for simulation/reference */
@@ -43,7 +44,7 @@ virtual task main_phase(uvm_phase phase);
         tx_item_copy.copy(tx_item);
 
         //Drive original data to the DUT
-        wr_if.tx_fifo_drive_data(tx_item.tx_data);
+        wr_if.tx_fifo_drive_data(tx_item.tx_data, (num_packets_sent == cfg.tx_packets));
 
         //foreach(tx_item.tx_data[i])
             //`uvm_info("tx_drv", $sformatf("%0h", tx_item.tx_data[i]), UVM_MEDIUM)           
@@ -58,6 +59,8 @@ virtual task main_phase(uvm_phase phase);
         //Signal seqr for more data    
         seq_item_port.item_done();
         
+        if(num_packets_sent != cfg.tx_packets)
+            num_packets_sent++;
     end 
 endtask : main_phase
 

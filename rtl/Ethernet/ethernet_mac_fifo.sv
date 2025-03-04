@@ -10,7 +10,7 @@ module ethernet_mac_fifo
     parameter RGMII_DATA_WIDTH = 4   // Data width for RGMII data line 
 )
 (
-    input wire i_clk,                                           //System clock to read data from rx and tx FIFO's
+    input wire i_clk,                                           //System clock to read data from rx and tx FIFO's - 100MHz
     input wire clk_125,                                         //Used to drive the tx MAC and RGMII interface 
     input wire clk90_125,                                       //Used to transmit signals on RGMII 
     input wire i_reset_n,                                       //Active low synchronous reset
@@ -24,10 +24,10 @@ module ethernet_mac_fifo
     output wire rgmii_phy_txctl,                                //Outgoing control signal (dv ^ er)    
 
     /* Tx FIFO - AXI interface*/
-    input wire [AXI_DATA_WIDTH-1:0] m_tx_axis_tdata,           //Tx word to send via ethernet  
-    input wire m_tx_axis_tvalid,                                //Behaves as a write enable signal into the ethernet mac
+    input wire [AXI_DATA_WIDTH-1:0] m_tx_axis_tdata,            //Tx word to send via ethernet  
+    input wire m_tx_axis_tvalid,                                //Write enable signal into the tx FIFO
     input wire m_tx_axis_tlast,                                 //Indicates the final byte within a packet
-    output wire s_tx_axis_trdy,                                 //Indicates the tx FIFO is not almost full/has space to write data
+    output wire s_tx_axis_trdy,                                 //Indicates the tx FIFO is not almost full/has space to store data
 
     /* Rx FIFO - AXI Interface*/
     output wire [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata,           //Rx data receieved from ethernet MAC   
@@ -50,7 +50,7 @@ wire tx_fifo_not_empty;
 wire [FIFO_DATA_WIDTH-1:0] tx_fifo_data_out;
 wire tx_fifo_rd_en;
 
-assign tx_fifo_not_full = ~tx_fifo_almost_full; //| ~tx_fifo_full 
+assign tx_fifo_not_full = ~tx_fifo_full; //~tx_fifo_almost_full;  // ~tx_fifo_full 
 assign tx_fifo_not_empty = ~tx_fifo_empty; //& ~tx_fifo_almost_empty
 
 /* RX FIFO */
@@ -113,11 +113,11 @@ fifo#(
     .DATA_WIDTH(FIFO_DATA_WIDTH),
     .FIFO_DEPTH(FIFO_DEPTH)
 ) tx_fifo (
-    .clk_wr(i_clk),
+    .clk_wr(i_clk), 
     .clk_rd(clk_125),
     .reset_n(i_reset_n),
     .data_in({m_tx_axis_tdata, m_tx_axis_tlast}),
-    .write_en(m_tx_axis_tvalid),
+    .write_en(m_tx_axis_tvalid & s_tx_axis_trdy),
     .data_out(tx_fifo_data_out),
     .read_en(tx_fifo_rd_en),
     .empty(tx_fifo_empty),
