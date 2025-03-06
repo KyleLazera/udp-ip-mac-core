@@ -5,7 +5,7 @@
 module ethernet_mac_fifo
 #(
     parameter FIFO_DATA_WIDTH = 9,   // Data width of each word in the FIFO
-    parameter FIFO_DEPTH = 256,      // Depth of tx and rx FIFO's
+    parameter FIFO_DEPTH = 4500,      // Depth of tx and rx FIFO's
     parameter AXI_DATA_WIDTH = 8,    // Data width of teh axi data lines
     parameter RGMII_DATA_WIDTH = 4   // Data width for RGMII data line 
 )
@@ -98,7 +98,7 @@ always @(posedge clk_125) begin
         if(!pkt_boundary_resync[2] & pkt_boundary_resync[1])
             pckt_cntr <= pckt_cntr + 1;
         //tlast detection from read FIFO domain
-        else if(tx_fifo_data_out[0])
+        else if(tx_fifo_data_out[0]& tx_fifo_rd_en)
             pckt_cntr <= pckt_cntr - 1;
         else
             pckt_cntr <= pckt_cntr;

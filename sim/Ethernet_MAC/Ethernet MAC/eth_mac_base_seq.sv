@@ -9,20 +9,36 @@
 class eth_mac_base_seq extends uvm_sequence#(eth_mac_item);
     `uvm_object_utils(eth_mac_base_seq)
 
+    /* Parameters */
+    localparam SMALL_PACKETS = 2'b00;
+    localparam LARGE_PACKETS = 2'b01;
+    localparam SMALL_AND_LARGE_PACKETS = 2'b10;
+
+    /* Variables */
+    bit [1:0] packet_size = 2'b10;
+
     function new(string name = "eth_mac_base_seq");
-        super.new(name);
+        super.new(name);         
     endfunction : new
+
+    function void set_packet_size(bit [1:0] size);
+        packet_size = size;
+    endfunction : set_packet_size
 
     function void generate_packet(ref bit[7:0] tx_data[$]);
         bit[7:0] data_byte;
-        int packet_size;
+        int pckt_size;
 
         //Generate a packet of a random size
-        packet_size = $urandom_range(60, 80); 
+        case(packet_size)
+            2'b00 : pckt_size = $urandom_range(10, 59);
+            2'b01 : pckt_size = $urandom_range(60, 1500);
+            2'b10 : pckt_size = $urandom_range(10, 1500); 
+        endcase
 
-        `uvm_info("generate_packet", $sformatf("Packet of size %0d generated!", packet_size), UVM_MEDIUM)
+        `uvm_info("generate_packet", $sformatf("Packet of size %0d generated!", pckt_size), UVM_MEDIUM)
 
-        repeat(packet_size) begin
+        repeat(pckt_size) begin
             data_byte = $urandom_range(0, 255);
             tx_data.push_back(data_byte);
         end

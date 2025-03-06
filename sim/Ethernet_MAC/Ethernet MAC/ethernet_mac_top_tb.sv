@@ -24,7 +24,7 @@ eth_mac_rd_if eth_rd_if (clk_100, reset_n); //read interface
 //DUT
 ethernet_mac_fifo#(
     .FIFO_DATA_WIDTH(9),
-    .FIFO_DEPTH(256),
+    .FIFO_DEPTH(4096),
     .AXI_DATA_WIDTH(8),
     .RGMII_DATA_WIDTH(4)
 ) eth_mac_fifo_0 (

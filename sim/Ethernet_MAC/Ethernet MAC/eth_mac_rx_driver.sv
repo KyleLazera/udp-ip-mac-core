@@ -33,7 +33,7 @@ virtual task main_phase(uvm_phase phase);
     /* Instantiate instace of eth_mac for simulation */
     eth_mac_base = eth_mac::type_id::create("eth_mac_base");
 
-    //Start the rxc on the RGMII line
+    //Start the rxc on the RGMII line - Used for autonegotiation
     fork
         rd_if.generate_clock(cfg.link_speed); 
     join_none

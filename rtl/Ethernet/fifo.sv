@@ -39,7 +39,18 @@ module fifo
 );
 
 /* Local Params */
-localparam ADDR_WIDTH = $clog2(FIFO_DEPTH);
+//localparam ADDR_WIDTH = $clog2(FIFO_DEPTH);
+localparam ADDR_WIDTH = logb2(FIFO_DEPTH);
+
+function integer logb2(input integer depth);
+    integer int_depth;
+
+    begin
+        int_depth = (depth > 1) ? depth - 1 : depth;
+        for(logb2 = 0; int_depth > 0; logb2 = logb2 + 1)
+            int_depth = int_depth >> 1;
+    end
+endfunction : logb2
 
 /* Signals / Registers */
 wire fifo_full, fifo_empty;

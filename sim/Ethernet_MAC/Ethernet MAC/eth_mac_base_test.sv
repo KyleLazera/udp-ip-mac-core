@@ -43,19 +43,27 @@ class eth_mac_base_test extends uvm_test;
         uvm_report_server   server;
         //Variable to track number of errors
         int err_num;
+        string link_speed_str;
         super.report_phase(phase);
         
         server = get_report_server();
         err_num = server.get_severity_count(UVM_ERROR);
+
+        case(cfg.link_speed)
+            2'b00: link_speed_str = "GBIT_SPEED";
+            2'b01: link_speed_str = "MB_100_SPEED";
+            2'b10: link_speed_str = "MB_10_SPEED";
+            default: link_speed_str = "UNKNOWN";
+        endcase        
         
         if (err_num == 0) begin
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
-           `uvm_info("base_test", $sformatf("TEST WITH LINK SPEED: %0d", cfg.link_speed), UVM_MEDIUM)
+           `uvm_info("base_test", $sformatf("TEST WITH LINK SPEED: %s", link_speed_str), UVM_MEDIUM)
            `uvm_info("base_test", "TESTCASE PASSED", UVM_MEDIUM)
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
         end else begin
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
-           `uvm_info("base_test", $sformatf("TEST WITH LINK SPEED: %0d", cfg.link_speed), UVM_MEDIUM)
+           `uvm_info("base_test", $sformatf("TEST WITH LINK SPEED: %s", link_speed_str), UVM_MEDIUM)
            `uvm_info("base_test", "TESTCASE FAILED", UVM_MEDIUM)
            `uvm_info("base_test", "//////////////////////////////////////////////////////////////", UVM_MEDIUM)
         end

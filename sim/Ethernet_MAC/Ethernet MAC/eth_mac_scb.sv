@@ -59,7 +59,7 @@ class eth_mac_scb extends uvm_scoreboard;
                         end
                 
                         foreach(rx_fifo.rx_data[i])
-                            assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i]) `uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
+                            assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i])// `uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
                             else `uvm_error("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));
 
                         if(rx_packets_rec == num_iterations)
@@ -87,7 +87,7 @@ class eth_mac_scb extends uvm_scoreboard;
                         end               
                 
                         foreach(eth_wr_ref_data.tx_data[i])
-                            assert(eth_wr_data.rx_data[i] == eth_wr_ref_data.tx_data[i]) `uvm_info("SCB", $sformatf("TX Monitor Data : %0h == TX Reference Data : %0h MATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]), UVM_MEDIUM)
+                            assert(eth_wr_data.rx_data[i] == eth_wr_ref_data.tx_data[i]) //`uvm_info("SCB", $sformatf("TX Monitor Data : %0h == TX Reference Data : %0h MATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]), UVM_MEDIUM)
                             else `uvm_fatal("scb", $sformatf("TX Monitor Data : %0h != TX Reference Data : %0h MISMATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]));            
                 
                         if(tx_packets_rec == num_iterations)

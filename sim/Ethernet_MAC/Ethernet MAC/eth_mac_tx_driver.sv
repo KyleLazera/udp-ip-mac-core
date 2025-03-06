@@ -44,10 +44,7 @@ virtual task main_phase(uvm_phase phase);
         tx_item_copy.copy(tx_item);
 
         //Drive original data to the DUT
-        wr_if.tx_fifo_drive_data(tx_item.tx_data, (num_packets_sent == cfg.tx_packets));
-
-        //foreach(tx_item.tx_data[i])
-            //`uvm_info("tx_drv", $sformatf("%0h", tx_item.tx_data[i]), UVM_MEDIUM)           
+        wr_if.tx_fifo_drive_data(tx_item.tx_data, (num_packets_sent == cfg.tx_burst_size));        
 
         //Pass copied data through eth_mac to encapsulate
         eth_mac_base.encapsulate_data(tx_item_copy.tx_data);     
@@ -59,7 +56,7 @@ virtual task main_phase(uvm_phase phase);
         //Signal seqr for more data    
         seq_item_port.item_done();
         
-        if(num_packets_sent != cfg.tx_packets)
+        if(num_packets_sent != cfg.tx_burst_size)
             num_packets_sent++;
     end 
 endtask : main_phase
