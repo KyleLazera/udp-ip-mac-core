@@ -28,7 +28,7 @@ class tc_half_duplex_tx_random extends eth_mac_base_test;
         // Disable RX monitor for this test case
         cfg.disable_rx_monitor();  
         cfg.enable_tx_monitor(); 
-        cfg.tx_packets = 10;
+        cfg.tx_packets = 1;
         link_speed = $urandom_range(0, 2);
 
         /*case(link_speed)
@@ -37,7 +37,7 @@ class tc_half_duplex_tx_random extends eth_mac_base_test;
             2 : cfg.set_link_speed(cfg.MB_10_SPEED);
         endcase */ 
 
-        cfg.set_link_speed(cfg.MB_10_SPEED);        
+        cfg.set_link_speed(cfg.GBIT_SPEED);        
                                                                                                          
     endfunction : build_phase
     

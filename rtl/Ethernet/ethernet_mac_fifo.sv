@@ -50,8 +50,8 @@ wire tx_fifo_not_empty;
 wire [FIFO_DATA_WIDTH-1:0] tx_fifo_data_out;
 wire tx_fifo_rd_en;
 
-assign tx_fifo_not_full = ~tx_fifo_full; //~tx_fifo_almost_full;  // ~tx_fifo_full 
-assign tx_fifo_not_empty = ~tx_fifo_empty; //& ~tx_fifo_almost_empty
+assign tx_fifo_not_full = ~tx_fifo_full; //~tx_fifo_almost_full; 
+assign tx_fifo_not_empty = ~tx_fifo_empty; //~tx_fifo_almost_empty; 
 
 /* RX FIFO */
 wire rx_clk;
@@ -76,6 +76,40 @@ Output Logic
 assign s_tx_axis_trdy = tx_fifo_not_full;
 assign m_rx_axis_tvalid = rx_fifo_not_empty;
 
+/*********************************************************************************
+Handshaking Logic - Ensures 1Gb/s throughput by preventing the TX FIFO from emptying 
+mid-packet. The TX MAC reads data at 125MHz, while the system writes at 100MHz. To 
+prevent the MAC from catching up and starving the FIFO, additional handshaking logic 
+ensures the TX MAC only starts reading when a full packet is available.
+************************************************************************************/
+
+reg [8:0] pckt_cntr = 9'b0;
+reg [2:0] pkt_boundary_resync = 3'b0;
+wire pkt_boundary;          //tlast from write fifo domain 
+
+// Only identify a true tlast when tvalid and trdy are also high 
+assign pkt_boundary = m_tx_axis_tlast & m_tx_axis_tvalid & s_tx_axis_trdy;
+
+always @(posedge clk_125) begin
+    if(!i_reset_n)
+        pckt_cntr <= 1'b0;
+    else begin
+        //Rising edge detection of packet boundary signal (tlast from write tx fifo domain)
+        if(!pkt_boundary_resync[2] & pkt_boundary_resync[1])
+            pckt_cntr <= pckt_cntr + 1;
+        //tlast detection from read FIFO domain
+        else if(tx_fifo_data_out[0])
+            pckt_cntr <= pckt_cntr - 1;
+        else
+            pckt_cntr <= pckt_cntr;
+    end
+end
+
+/* Double flop synchronizer for tlast from write side of FIFO */
+always @(posedge clk_125) begin
+    pkt_boundary_resync <= {pkt_boundary_resync[1:0], pkt_boundary};
+end
+
 /****************************************************************
 Module Instantiations 
 *****************************************************************/
@@ -97,7 +131,7 @@ tri_speed_eth_mac (
     .rgmii_phy_txctl(rgmii_phy_txctl),
     //TX FIFO - AXI Interface
     .s_tx_axis_tdata(tx_fifo_data_out[FIFO_DATA_WIDTH-1:1]),
-    .s_tx_axis_tvalid(tx_fifo_not_empty),
+    .s_tx_axis_tvalid(pckt_cntr > 0), //tx_fifo_not_empty
     .s_tx_axis_tlast(tx_fifo_data_out[0]),
     .s_tx_axis_trdy(tx_fifo_rd_en),
     //RX FIFIO - AXI Interface
@@ -119,7 +153,7 @@ fifo#(
     .data_in({m_tx_axis_tdata, m_tx_axis_tlast}),
     .write_en(m_tx_axis_tvalid & s_tx_axis_trdy),
     .data_out(tx_fifo_data_out),
-    .read_en(tx_fifo_rd_en),
+    .read_en(tx_fifo_rd_en & tx_fifo_not_empty),
     .empty(tx_fifo_empty),
     .almost_empty(tx_fifo_almost_empty),
     .full(tx_fifo_full),

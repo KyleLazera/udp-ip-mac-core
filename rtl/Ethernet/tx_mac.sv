@@ -220,7 +220,7 @@ always @(*) begin
                 
                 //If the last beat has arrived OR there is no more valid data in the FIFO
                 //TODO: Possibly deal with error flag here for RGMII
-                if(s_tx_axis_tlast /*|| !s_tx_axis_tvalid*/) begin
+                if(s_tx_axis_tlast) begin
                     axis_rdy_next = mii_select;
                     if(pckt_size > (MIN_FRAME_WIDTH - 1)) begin
                         //axis_rdy_next = 1'b0;
@@ -283,5 +283,4 @@ assign rgmii_mac_tx_data = tx_data_reg;
 assign s_tx_axis_trdy = axis_rdy_reg;
 assign rgmii_mac_tx_dv = rgmii_dv_reg;
 assign rgmii_mac_tx_er = rgmii_er_reg;
-
 endmodule
