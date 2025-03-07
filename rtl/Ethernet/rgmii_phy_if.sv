@@ -49,14 +49,15 @@ reg [3:0] rgmii_rxd_rising_edge;
 reg [3:0] rgmii_rxd_falling_edge;
 reg [3:0] rxd_lower_nibble = 3'b0;
 reg [3:0] rx_dv, rx_er;
+reg dv_lower_nibble;                //used to capture the data valid for the first nibble sent
 reg [1:0] rxc_cntr;                 //Used to count the number of rxc positive edge - this is needed for single data rate
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Counts the number of clock edges from the rgmii receieved clock. This is important for 10/100mbps 
 // where data transmission occurs at single data rate. For single data rate, we sample a nibble of data
-// on each clock edge. The first clock edge sends the upper data nibble (most significant bits) and the second 
+// on each rising clock edge. The first clock edge sends the upper data nibble (most significant bits) and the second 
 // rising edge sends the lower nibble (least significant bits). Therefore, for each transaction in SDR mode, 
-// we need to know when 2 clock edge have occured to create out byte of data.
+// we need to know when 2 clock edge have occured to create our byte of data.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 always @(posedge rgmii_mac_rx_clk) begin
@@ -68,9 +69,11 @@ always @(posedge rgmii_mac_rx_clk) begin
 end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Logic to drive the correct data depending on the link speed/throughput - when throughput is 10/100mbps, 
-// we cannot use the IDDR output data because the RGMII will recieve a new nibble of data on each rising
-// edge as opposed to each rising and falling edge. 
+// Logic to sample the correct data depending on the link speed/throughput - when throughput is 10/100mbps, 
+// we cannot use the IDDR to sample the data because the RGMII will recieve a new nibble of data on each rising
+// edge as opposed to each rising and falling edge. This means we would be sampling each byte of data twice
+// (Once on the Rising edge and once on teh falling edge). By implementing a counter, we can ensure that 2 
+// rising clock edges have passed before "sampling" the packet and passing it to the rx mac.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 always @(posedge rgmii_mac_rx_clk) begin
@@ -80,12 +83,14 @@ always @(posedge rgmii_mac_rx_clk) begin
         rx_er <= rgmii_rx_er;
     end else begin
 
-        if(rxc_cntr == 2'b01) 
+        if(rxc_cntr == 2'b01) begin
             rxd_lower_nibble <= rgmii_rxd_rising_edge;
-    
+            dv_lower_nibble <= rgmii_rx_dv;
+        end
+
         if(rxc_cntr == 2'b10) begin
             rgmii_mac_rx_data <= {rgmii_rxd_rising_edge, rxd_lower_nibble};
-            rx_dv <= rgmii_rx_dv;
+            rx_dv <= rgmii_rx_dv & dv_lower_nibble;
             rx_er <= rgmii_rx_er;        
         end    
     end

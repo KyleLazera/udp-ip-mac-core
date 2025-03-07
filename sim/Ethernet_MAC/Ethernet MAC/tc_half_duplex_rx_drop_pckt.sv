@@ -31,7 +31,7 @@ class tc_half_duplex_rx_drop_pckt extends eth_mac_base_test;
             2 : cfg.set_link_speed(cfg.MB_10_SPEED);
         endcase   */
 
-        cfg.set_link_speed(cfg.GBIT_SPEED);               
+        cfg.set_link_speed(cfg.MB_10_SPEED);               
                                                                     
     endfunction : build_phase
     
@@ -49,7 +49,13 @@ class tc_half_duplex_rx_drop_pckt extends eth_mac_base_test;
         env.eth_scb.num_iterations = num_packets;
 
         //Send multiple tx packets on the rgmii interface
-        repeat(num_packets) begin            
+        for(int i = 0; i < num_packets; i++) begin
+
+            // Make sure teh final iteration sends a good packet, this will prevent the monitor
+            // from stalling because it does not identify a bad packet
+            if((i+1) == num_packets)
+                cfg.disable_rx_bad_pckt();
+
             rx_seq.start(env.rx_agent.rx_seqr);            
         end
 
