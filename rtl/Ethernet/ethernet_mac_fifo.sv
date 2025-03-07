@@ -58,6 +58,7 @@ wire rx_clk;
 wire [AXI_DATA_WIDTH-1:0] rx_mac_data;
 wire rx_mac_last;
 wire rx_mac_data_valid;
+wire rx_mac_tuser_error;
 
 wire rx_fifo_full;
 wire rx_fifo_almost_full;
@@ -74,7 +75,8 @@ Output Logic
 *****************************************************************/
 
 assign s_tx_axis_trdy = tx_fifo_not_full;
-assign m_rx_axis_tvalid = rx_fifo_not_empty;
+//assign m_rx_axis_tvalid = rx_fifo_not_empty;
+assign m_rx_axis_tvalid = (rx_pckt_cntr > 0);
 
 /*********************************************************************************
 Handshaking Logic - Ensures 1Gb/s throughput by preventing the TX FIFO from emptying 
@@ -110,6 +112,38 @@ always @(posedge clk_125) begin
     pkt_boundary_resync <= {pkt_boundary_resync[1:0], pkt_boundary};
 end
 
+
+/// RX FIFO Handshaking ///
+
+reg [8:0] rx_pckt_cntr = 9'b0;
+reg [2:0] rx_pkt_boundary_resync = 3'b0;
+reg [1:0] rx_tuser_resync = 2'b0;
+wire rx_pkt_boundary; 
+
+// Only identify a true tlast when tvalid and trdy are also high 
+assign rx_pkt_boundary = rx_mac_last & rx_mac_data_valid & rx_fifo_not_full;
+
+always @(posedge i_clk) begin
+    if(!i_reset_n)
+        rx_pckt_cntr <= 1'b0;
+    else begin
+        
+        if(!rx_pkt_boundary_resync[2] & rx_pkt_boundary_resync[1] & !rx_tuser_resync)
+            rx_pckt_cntr <= rx_pckt_cntr + 1;
+        
+        else if(m_rx_axis_tlast & s_rx_axis_trdy & m_rx_axis_tvalid)
+            rx_pckt_cntr <= rx_pckt_cntr - 1;
+        else
+            rx_pckt_cntr <= rx_pckt_cntr;
+    end
+end
+
+/* Double flop synchronizer for tlast from write side of FIFO */
+always @(posedge i_clk) begin
+    rx_pkt_boundary_resync <= {rx_pkt_boundary_resync[1:0], rx_pkt_boundary};
+    rx_tuser_resync <= {rx_tuser_resync[0], rx_mac_tuser_error};
+end
+
 /****************************************************************
 Module Instantiations 
 *****************************************************************/
@@ -138,7 +172,7 @@ tri_speed_eth_mac (
     .rgmii_rxc(rx_clk),
     .m_rx_axis_tdata(rx_mac_data),
     .m_rx_axis_tvalid(rx_mac_data_valid),
-    .m_rx_axis_tuser(),
+    .m_rx_axis_tuser(rx_mac_tuser_error),
     .m_rx_axis_tlast(rx_mac_last),
     .s_rx_axis_trdy(rx_fifo_not_full)
     );
@@ -158,7 +192,10 @@ fifo#(
     .empty(tx_fifo_empty),
     .almost_empty(tx_fifo_almost_empty),
     .full(tx_fifo_full),
-    .almost_full(tx_fifo_almost_full)
+    .almost_full(tx_fifo_almost_full),
+    //Not needed for tx MAC
+    .drop_pckt(),
+    .latch_addr()
 );
 
 /* RX FIFO */
@@ -172,11 +209,13 @@ fifo#(
     .data_in({rx_mac_data, rx_mac_last}),
     .write_en(rx_mac_data_valid & rx_fifo_not_full),
     .data_out({m_rx_axis_tdata, m_rx_axis_tlast}),
-    .read_en(s_rx_axis_trdy),
+    .read_en(s_rx_axis_trdy & m_rx_axis_tvalid),
     .empty(rx_fifo_empty),
     .almost_empty(rx_fifo_almost_empty),
     .full(rx_fifo_full),
-    .almost_full(rx_fifo_almost_full)
+    .almost_full(rx_fifo_almost_full),
+    .drop_pckt(rx_mac_tuser_error),  //todo: Make this this is a driven signal
+    .latch_addr(rx_mac_last & !rx_mac_tuser_error)
 );
 
 endmodule : ethernet_mac_fifo

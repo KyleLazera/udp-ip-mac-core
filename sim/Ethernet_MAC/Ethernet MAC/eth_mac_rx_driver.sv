@@ -28,6 +28,8 @@ endfunction : build_phase
 virtual task main_phase(uvm_phase phase);
     eth_mac_item tx_item, tx_item_copy;
     eth_mac eth_mac_base;
+    bit crc_er = 1'b0;
+    bit bad_pckt;
     super.main_phase(phase);    
 
     /* Instantiate instace of eth_mac for simulation */
@@ -44,6 +46,14 @@ virtual task main_phase(uvm_phase phase);
     #1000;
 
     forever begin
+        
+        bad_pckt = 1'b0;
+
+        //todo: implement crc error in teh encapsulate packet class
+        if(cfg.rx_bad_pckt) begin
+            //Randomize these values with a distribution
+            crc_er = ($urandom_range(1, 100) == 1);
+        end
 
         tx_item_copy = eth_mac_item::type_id::create("tx_item_copy");
         //Fetch sequence item to write
@@ -57,14 +67,21 @@ virtual task main_phase(uvm_phase phase);
         else
             tx_item_copy.tx_data = {<<8{tx_item_copy.tx_data}};
 
-        //Send copied data to the scoreboard
-        drv_scb_port.write(tx_item_copy);
-
         //Encapsulate data before sending on RGMII
         eth_mac_base.encapsulate_data(tx_item.tx_data); 
 
         //Drive data on the RGMII signals to the MAC
-        rd_if.rgmii_drive_data(tx_item.tx_data, cfg.link_speed);       
+        rd_if.rgmii_drive_data(tx_item.tx_data, cfg.link_speed, cfg.rx_bad_pckt, bad_pckt);   
+
+        //If it is a bad packet, append a 0x00 to teh front of teh queue and if it is not a bad packet
+        // append 0xff
+        if(bad_pckt) begin
+            tx_item_copy.tx_data.push_front(8'h00);
+        end else
+            tx_item_copy.tx_data.push_front(8'hff);
+
+        //Send copied data to the scoreboard
+        drv_scb_port.write(tx_item_copy);           
 
         //Signal seqr for more data    
         seq_item_port.item_done();

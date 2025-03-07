@@ -26,18 +26,27 @@ interface eth_mac_rd_if
     bit m_rx_axis_tlast;                                
     bit s_rx_axis_trdy;                                    
 
-    task rgmii_drive_data(bit[7:0] rx_data[$], bit [1:0] link_speed);
+    task rgmii_drive_data(bit[7:0] rx_data[$], bit [1:0] link_speed, bit data_err, output bit bad_pckt);
+        int data_not_valid = 1'b0;
+        bad_pckt = 1'b0;
+        
         while(rx_data.size() != 0) begin
             bit[7:0] data_byte = rx_data.pop_front();
+            data_not_valid = $urandom_range(1, 1000);
             @(posedge rgmii_phy_rxc);
             rgmii_phy_rxd <= data_byte[3:0];
-            rgmii_phy_rxctl <= 1'b1;
+            //rgmii_phy_rxctl <= 1'b1;
 
-            if(link_speed == 2'b00)
+            rgmii_phy_rxctl <= (data_err) ? (data_not_valid != 1) : 1'b1;
+            if(data_err & data_not_valid == 1)
+                bad_pckt = 1'b1;
+
+            if(link_speed == 2'b00) begin
                 @(negedge rgmii_phy_rxc);
-            else
-                @(posedge rgmii_phy_rxc);
-            
+            end else begin
+                @(posedge rgmii_phy_rxc);            
+            end
+
             rgmii_phy_rxd <= data_byte[7:4];
             rgmii_phy_rxctl <= 1'b1;
         end

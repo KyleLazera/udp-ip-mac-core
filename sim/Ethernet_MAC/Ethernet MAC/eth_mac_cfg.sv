@@ -13,6 +13,7 @@ class eth_mac_cfg extends uvm_object;
     local bit tx_enable = 0;
     bit [1:0] link_speed = GBIT_SPEED;
     int tx_burst_size = 0;
+    bit rx_bad_pckt = 1'b0;
 
     function new(string name = "eth_mac_cfg");
         super.new(name);
@@ -38,6 +39,10 @@ class eth_mac_cfg extends uvm_object;
     function void set_link_speed(bit [1:0] i_link_speed);
         link_speed = i_link_speed;
     endfunction : set_link_speed
+
+    function void enable_rx_bad_pckt();
+        rx_bad_pckt = 1'b1;
+    endfunction : enable_rx_bad_pckt
 
     /* Getter functions */
     function bit get_rx_enable();

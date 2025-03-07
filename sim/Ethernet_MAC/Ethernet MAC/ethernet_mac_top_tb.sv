@@ -6,6 +6,7 @@ import uvm_pkg::*;         // Import all UVM classes
 `include "tc_half_duplex_tx_random.sv"
 `include "tc_half_duplex_rx_random.sv"
 `include "tc_full_duplex_random.sv"
+`include "tc_half_duplex_rx_drop_pckt.sv"
 `include "eth_mac_wr_if.sv"
 `include "eth_mac_rd_if.sv"
 
@@ -79,6 +80,7 @@ initial begin
     uvm_config_db#(virtual eth_mac_rd_if)::set(null, "uvm_test_top.eth_mac_env.rx_agent.rx_monitor", "eth_mac_rd_if", eth_rd_if);    
 
     run_test("tc_half_duplex_rx_random");
+    //run_test("tc_half_duplex_rx_drop_pckt");
 end
 
 

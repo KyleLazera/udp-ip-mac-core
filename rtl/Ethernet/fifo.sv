@@ -35,7 +35,11 @@ module fifo
     output wire empty,
     output wire almost_empty,
     output wire full,
-    output wire almost_full
+    output wire almost_full,
+
+    /* FIFO Bad Packet signals */
+    input wire drop_pckt,                          //indicates a bad packet was identified and needs to be dropped
+    input wire latch_addr                          //Latches the current write address    
 );
 
 /* Local Params */
@@ -67,7 +71,8 @@ fifo_mem #(.DATA_WIDTH(DATA_WIDTH), .MEM_DEPTH(FIFO_DEPTH)) fifo_bram
          
 //FIFO Write Pointer Comparator Instantiation
 fifo_wr_ptr #(.ADDR_WIDTH(ADDR_WIDTH), .ALMOST_FULL_DIFF(50)) wr_ptr (.clk(clk_wr), .reset_n(reset_n), .write(write_en),
-             .full(fifo_full), .rd_ptr(rd_ptr_grey), .w_addr(wr_addr), .w_ptr(wr_ptr_bin), .almost_full(almost_full));
+             .full(fifo_full), .rd_ptr(rd_ptr_grey), .w_addr(wr_addr), .w_ptr(wr_ptr_bin), .almost_full(almost_full), 
+             .drop_pckt(drop_pckt), .latch_addr(latch_addr));
 
 //FIFO Read Pointer Comparator Instantiation          
 fifo_rd_ptr #(.ADDR_WIDTH(ADDR_WIDTH), .ALMOST_EMPTY_DIFF(50)) rd_ptr (.clk(clk_rd), .reset_n(reset_n), .read(read_en), .empty(fifo_empty), 

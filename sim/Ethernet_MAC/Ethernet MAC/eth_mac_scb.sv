@@ -7,6 +7,11 @@ class eth_mac_scb extends uvm_scoreboard;
     eth_mac_cfg cfg;
     int num_iterations;
 
+    eth_mac_item eth_wr_data, eth_wr_ref_data;
+    eth_mac_item rx_rgmii, rx_fifo;  
+
+    int tx_packets_rec = 0, rx_packets_rec = 0;   
+
     /* Events */
     uvm_event tx_scb_complete;
     uvm_event rx_scb_complete;
@@ -31,10 +36,21 @@ class eth_mac_scb extends uvm_scoreboard;
         rx_mon_port = new("rx_mon_port", this);
     endfunction : build_phase
 
-    virtual task main_phase(uvm_phase phase);
-        int tx_packets_rec = 0, rx_packets_rec = 0;        
-        eth_mac_item eth_wr_data, eth_wr_ref_data;
-        eth_mac_item rx_rgmii, rx_fifo;
+    task check_bad_pckt(ref bit[7:0] packet[$]);
+        if(packet.pop_front() == 8'h00) begin
+            rx_packets_rec++;
+
+            `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
+            `uvm_info("scb", "RX Bad Packet Dropped", UVM_MEDIUM)
+            `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
+
+            rx_drv_port.get(rx_rgmii); 
+            check_bad_pckt(rx_rgmii.tx_data);                  
+
+        end   
+    endtask : check_bad_pckt
+
+    virtual task main_phase(uvm_phase phase);   
         super.main_phase(phase);
 
         fork
@@ -44,7 +60,9 @@ class eth_mac_scb extends uvm_scoreboard;
                         `uvm_info("scb", "rx monitor enabled", UVM_MEDIUM)
 
                         rx_mon_port.get(rx_fifo);
-                        rx_drv_port.get(rx_rgmii);
+                        rx_drv_port.get(rx_rgmii);    
+
+                        check_bad_pckt(rx_rgmii.tx_data);                  
 
                         //Make sure the reference model data size and the monitor data size are equivelent
                         assert(rx_fifo.rx_data.size() == rx_rgmii.tx_data.size()) begin
@@ -60,10 +78,10 @@ class eth_mac_scb extends uvm_scoreboard;
                 
                         foreach(rx_fifo.rx_data[i])
                             assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i])// `uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
-                            else `uvm_fatal("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));
+                            else `uvm_fatal("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));                                        
 
                         if(rx_packets_rec == num_iterations)
-                            rx_scb_complete.trigger();
+                            rx_scb_complete.trigger();                        
 
                 end
             end
