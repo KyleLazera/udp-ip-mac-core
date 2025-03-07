@@ -3,7 +3,12 @@
 
 `include "eth_mac_base_test.sv"
 
-//Test case for sequence above
+///////////////////////////////////////////////////////////////////////////////////////////
+// This testcase is used to test the operation of the ethernet MAC specifically in the 
+// instance where the user will only be transmitting data. The link speed is randomized
+// in this testcase as well as the number of packets transmitted.
+///////////////////////////////////////////////////////////////////////////////////////////
+
 class tc_half_duplex_tx_random extends eth_mac_base_test;
     `uvm_component_utils(tc_half_duplex_tx_random)
 

@@ -60,7 +60,7 @@ class eth_mac_scb extends uvm_scoreboard;
                 
                         foreach(rx_fifo.rx_data[i])
                             assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i])// `uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
-                            else `uvm_error("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));
+                            else `uvm_fatal("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));
 
                         if(rx_packets_rec == num_iterations)
                             rx_scb_complete.trigger();

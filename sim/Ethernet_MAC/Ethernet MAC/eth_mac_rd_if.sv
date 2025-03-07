@@ -70,20 +70,30 @@ interface eth_mac_rd_if
 
     task read_rx_fifo(ref bit [7:0] rx_fifo[$]);
         
-        //Wait for the rx fifo to have data/not be empty
-        if(!m_rx_axis_tvalid)
-            @(m_rx_axis_tvalid);
-        
-        //Set the read enable 
+        //Indicate to the rx FIFO that we are ready to recieve data 
         s_rx_axis_trdy <= 1'b1;
 
-        while(!m_rx_axis_tlast) begin                 
+        //Sample data until we reach teh last byte within a packet
+        while(1) begin                 
             #1;
-            if(m_rx_axis_tvalid) begin       
-                rx_fifo.push_back(m_rx_axis_tdata);                
-            end
+            //only sample the data if the FIFO indicates it is not empty 
+            if(m_rx_axis_tvalid & m_rx_axis_tlast) begin       
+                rx_fifo.push_back(m_rx_axis_tdata);   
+                break;             
+            end else if(m_rx_axis_tvalid)
+                rx_fifo.push_back(m_rx_axis_tdata);
+
             @(posedge clk_100);
         end
+
+        @(posedge clk_100);
+
+        //Lower the trdy flag to halt the FIFO temporarily - this is meant to simulate
+        // processing time
+        s_rx_axis_trdy <= 1'b0;
+
+        repeat(2)
+            @(posedge clk_100);
 
     endtask : read_rx_fifo
 

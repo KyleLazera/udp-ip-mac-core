@@ -36,6 +36,8 @@ class eth_mac_base_seq extends uvm_sequence#(eth_mac_item);
             2'b10 : pckt_size = $urandom_range(10, 1500); 
         endcase
 
+        pckt_size = $urandom_range(10, 1500);
+
         `uvm_info("generate_packet", $sformatf("Packet of size %0d generated!", pckt_size), UVM_MEDIUM)
 
         repeat(pckt_size) begin

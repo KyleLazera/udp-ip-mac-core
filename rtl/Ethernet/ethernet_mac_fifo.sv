@@ -55,7 +55,7 @@ assign tx_fifo_not_empty = ~tx_fifo_empty; //~tx_fifo_almost_empty;
 
 /* RX FIFO */
 wire rx_clk;
-wire rx_mac_data;
+wire [AXI_DATA_WIDTH-1:0] rx_mac_data;
 wire rx_mac_last;
 wire rx_mac_data_valid;
 
@@ -66,8 +66,8 @@ wire rx_fifo_almost_empty;
 wire rx_fifo_not_full;
 wire rx_fifo_not_empty;
 
-assign rx_fifo_not_full = ~rx_fifo_full & ~rx_fifo_almost_full;
-assign rx_fifo_not_empty = ~rx_fifo_empty & ~rx_fifo_almost_empty;
+assign rx_fifo_not_full = ~rx_fifo_full;// & ~rx_fifo_almost_full;
+assign rx_fifo_not_empty = ~rx_fifo_empty; //& ~rx_fifo_almost_empty;
 
 /****************************************************************
 Output Logic
@@ -131,7 +131,7 @@ tri_speed_eth_mac (
     .rgmii_phy_txctl(rgmii_phy_txctl),
     //TX FIFO - AXI Interface
     .s_tx_axis_tdata(tx_fifo_data_out[FIFO_DATA_WIDTH-1:1]),
-    .s_tx_axis_tvalid(pckt_cntr > 0), //tx_fifo_not_empty
+    .s_tx_axis_tvalid(pckt_cntr > 0),
     .s_tx_axis_tlast(tx_fifo_data_out[0]),
     .s_tx_axis_trdy(tx_fifo_rd_en),
     //RX FIFIO - AXI Interface
@@ -143,6 +143,7 @@ tri_speed_eth_mac (
     .s_rx_axis_trdy(rx_fifo_not_full)
     );
 
+/* Tx FIFO */
 fifo#(
     .DATA_WIDTH(FIFO_DATA_WIDTH),
     .FIFO_DEPTH(FIFO_DEPTH)
@@ -160,6 +161,7 @@ fifo#(
     .almost_full(tx_fifo_almost_full)
 );
 
+/* RX FIFO */
 fifo#(
     .DATA_WIDTH(FIFO_DATA_WIDTH),
     .FIFO_DEPTH(FIFO_DEPTH)
@@ -168,7 +170,7 @@ fifo#(
     .clk_rd(i_clk),
     .reset_n(i_reset_n),
     .data_in({rx_mac_data, rx_mac_last}),
-    .write_en(rx_mac_data_valid),
+    .write_en(rx_mac_data_valid & rx_fifo_not_full),
     .data_out({m_rx_axis_tdata, m_rx_axis_tlast}),
     .read_en(s_rx_axis_trdy),
     .empty(rx_fifo_empty),

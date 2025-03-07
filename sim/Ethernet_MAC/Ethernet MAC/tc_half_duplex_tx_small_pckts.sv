@@ -3,10 +3,6 @@
 
 `include "eth_mac_base_test.sv"
 
-
-//todo: randomize the number of packets generated and sent to the driver
-
-//Test case for sequence above
 class tc_half_duplex_tx_small_pckts extends eth_mac_base_test;
     `uvm_component_utils(tc_half_duplex_tx_small_pckts)
 
