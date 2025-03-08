@@ -5,7 +5,7 @@ class eth_mac_scb extends uvm_scoreboard;
     `uvm_component_utils(eth_mac_scb)
 
     eth_mac_cfg cfg;
-    int num_iterations;
+    int num_tx_iterations, num_rx_iterations;
 
     eth_mac_item eth_wr_data, eth_wr_ref_data;
     eth_mac_item rx_rgmii, rx_fifo;  
@@ -80,9 +80,9 @@ class eth_mac_scb extends uvm_scoreboard;
                             assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i]) //`uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
                             else `uvm_fatal("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));                                        
 
-                        `uvm_info("scb", $sformatf("%0d out of %0d Packets Recieved", rx_packets_rec, num_iterations), UVM_MEDIUM)  
+                        `uvm_info("scb", $sformatf("%0d out of %0d Packets Recieved", rx_packets_rec, num_rx_iterations), UVM_MEDIUM)  
 
-                        if(rx_packets_rec == num_iterations) begin                              
+                        if(rx_packets_rec == num_rx_iterations) begin                              
                             rx_scb_complete.trigger();                                        
                         end                                
 
@@ -111,7 +111,9 @@ class eth_mac_scb extends uvm_scoreboard;
                             assert(eth_wr_data.rx_data[i] == eth_wr_ref_data.tx_data[i]) //`uvm_info("SCB", $sformatf("TX Monitor Data : %0h == TX Reference Data : %0h MATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]), UVM_MEDIUM)
                             else `uvm_fatal("scb", $sformatf("TX Monitor Data : %0h != TX Reference Data : %0h MISMATCH", eth_wr_data.rx_data[i], eth_wr_ref_data.tx_data[i]));            
                 
-                        if(tx_packets_rec == num_iterations)
+                        `uvm_info("scb", $sformatf("%0d out of %0d Packets Recieved", tx_packets_rec, num_tx_iterations), UVM_MEDIUM)  
+
+                        if(tx_packets_rec == num_tx_iterations)
                             tx_scb_complete.trigger();
                 end
             end

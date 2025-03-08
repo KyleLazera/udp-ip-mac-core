@@ -230,9 +230,9 @@ fifo#(
     .almost_empty(tx_fifo_almost_empty),
     .full(tx_fifo_full),
     .almost_full(tx_fifo_almost_full),
-    //Not needed for tx MAC
-    .drop_pckt(),
-    .latch_addr()
+    //Not needed for tx MAC - tie down to 0
+    .drop_pckt(1'b0),
+    .latch_addr(1'b0)
 );
 
 /* RX FIFO */

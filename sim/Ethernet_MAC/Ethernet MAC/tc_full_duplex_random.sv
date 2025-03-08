@@ -1,64 +1,14 @@
-`ifndef TC_RD_WR
-`define TC_RD_WR
+`ifndef TC_FULL_DUPLEX
+`define TC_FULL_DUPLEX
 
 `include "eth_mac_base_test.sv"
-
-class eth_rd_wr_seq extends uvm_sequence;
-    `uvm_object_utils(eth_rd_wr_seq)
-    //Get handle to virtual sequencer
-    `uvm_declare_p_sequencer(eth_mac_virtual_seqr)
-    
-    uvm_phase   start_phase;
-    
-    function new(string name = "rd_wr_seq");
-        super.new(name);
-    endfunction : new
-       
-    virtual task pre_body();        
-        start_phase = this.get_starting_phase();
-        
-        if(start_phase != null) begin
-            start_phase.raise_objection(this);
-            `uvm_info("RD_WR_SEQ", "Objection raised", UVM_MEDIUM);
-        end
-    endtask : pre_body
-    
-    virtual task body();
-        eth_mac_rx_seq     rx_seq;   
-        eth_mac_tx_seq     tx_seq;   
-
-        `uvm_info("RD_WR_SEQ", "Starting another iteration", UVM_MEDIUM);
-
-        //Set the link speed by recieving a packet first
-        `uvm_do_on(rx_seq, p_sequencer.rx_vseqr);
-
-        //Drive data in full duplex mode 
-        fork
-            begin
-                repeat(10)
-                    `uvm_do_on(rx_seq, p_sequencer.rx_vseqr)
-            end
-            begin
-                repeat(10)
-                    `uvm_do_on(tx_seq, p_sequencer.tx_vseqr)
-            end
-        join
-        
-        `uvm_info("RD_WR_SEQ", "Case Sequence is complete", UVM_MEDIUM);
-    endtask : body
-    
-    virtual task post_body();
-        if(start_phase != null) begin 
-            `uvm_info("RD_WR_SEQ", "dropping objection", UVM_MEDIUM)
-            start_phase.drop_objection(this);
-        end
-    endtask : post_body
-    
-endclass : eth_rd_wr_seq
 
 //Test case for sequence above
 class tc_full_duplex_random extends eth_mac_base_test;
     `uvm_component_utils(tc_full_duplex_random)
+
+    eth_mac_tx_seq tx_seq;
+    eth_mac_rx_seq rx_seq;     
 
     function new(string name = "tx_rd_wr", uvm_component parent);
         super.new(name, parent);
@@ -68,8 +18,13 @@ class tc_full_duplex_random extends eth_mac_base_test;
         int link_speed;
         super.build_phase(phase);
 
+        //Instantiate sequences
+        rx_seq = eth_mac_rx_seq::type_id::create("rx_seq");  
+        tx_seq = eth_mac_tx_seq::type_id::create("tx_seq");         
+
         cfg.enable_rx_monitor();
         cfg.enable_tx_monitor();
+        cfg.enable_rx_bad_pckt();
         link_speed = $urandom_range(0, 2);
 
         case(link_speed)
@@ -77,17 +32,59 @@ class tc_full_duplex_random extends eth_mac_base_test;
             1 : cfg.set_link_speed(cfg.MB_100_SPEED);
             2 : cfg.set_link_speed(cfg.MB_10_SPEED);
         endcase
-       
-        //Set rd_wr sequence as the default sequence to run 
-        uvm_config_db#(uvm_object_wrapper)::set(this, "eth_mac_env.v_seqr.main_phase", "default_sequence", 
-                                                eth_rd_wr_seq::type_id::get());                                                              
+
+        cfg.set_link_speed(cfg.MB_100_SPEED);
+                                                                 
     endfunction : build_phase
     
     task main_phase(uvm_phase phase);
+        int num_tx_packets, num_rx_packets;
         super.main_phase(phase);
         uvm_top.print_topology();
+
+        phase.raise_objection(this);
+
+        //Send an rx_packet first to set the rgmii link speed - this is needed because we do not have an MDIO interface        
+        rx_seq.start(env.rx_agent.rx_seqr);
+
+        //Randomize number of packets to send
+        num_tx_packets = $urandom_range(10, 100);   
+        num_rx_packets = $urandom_range(10, 100);        
+
+        //Set the total number of iterations for the scb - because we transmit an rx packet early, increment
+        // the total number of rx packets that will be recieved so the scb takes it into account
+        env.eth_scb.num_tx_iterations = num_tx_packets;
+        env.eth_scb.num_rx_iterations = num_rx_packets + 1;
+
+        //Drive data in full duplex mode 
+        fork
+            begin
+                repeat(num_tx_packets)
+                    tx_seq.start(env.tx_agent.tx_seqr);
+            end
+            begin
+                //Send multiple rx packets on the rgmii interface
+                for(int i = 0; i < num_rx_packets; i++) begin
+
+                        // Make sure teh final iteration sends a good packet, this will prevent the monitor
+                        // from stalling while waiting for the final packet
+                        if((i+1) == num_rx_packets)
+                            cfg.disable_rx_bad_pckt();
+
+                        rx_seq.start(env.rx_agent.rx_seqr);                            
+                end
+            end
+        join        
+
+        // Wait for scb to indicate it has receieved all packets before ending test      
+        env.tx_scb_complete.wait_on();
+        env.rx_scb_complete.wait_on();
+
+        phase.drop_objection(this);    
+
     endtask : main_phase    
 
 endclass : tc_full_duplex_random
 
-`endif //TC_RD_WR
+
+`endif //TC_FULL_DUPLEX
