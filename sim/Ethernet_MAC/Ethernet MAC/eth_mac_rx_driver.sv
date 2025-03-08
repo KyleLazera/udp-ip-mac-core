@@ -45,11 +45,9 @@ virtual task main_phase(uvm_phase phase);
 
     #1000;
 
-    forever begin
-        
+    forever begin        
         bad_pckt = 1'b0;
 
-        //todo: implement crc error in teh encapsulate packet class
         if(cfg.rx_bad_pckt) begin
             //Randomize these values with a distribution
             crc_er = ($urandom_range(1, 100) == 1);
@@ -69,6 +67,15 @@ virtual task main_phase(uvm_phase phase);
 
         //Encapsulate data before sending on RGMII
         eth_mac_base.encapsulate_data(tx_item.tx_data); 
+
+        //Append a bad CRC Value to end of the Packet if we have teh configuration set to bad packet
+        if(cfg.rx_bad_pckt & crc_er) begin
+            bit [7:0] bad_crc_byte = $urandom_range(0, 255);
+            `uvm_info("rx_driver", "Bad CRC Appended", UVM_MEDIUM)            
+            tx_item.tx_data.pop_back();
+            tx_item.tx_data.push_back(bad_crc_byte);
+            bad_pckt = 1'b1;
+        end
 
         //Drive data on the RGMII signals to the MAC
         rd_if.rgmii_drive_data(tx_item.tx_data, cfg.link_speed, cfg.rx_bad_pckt, bad_pckt);   

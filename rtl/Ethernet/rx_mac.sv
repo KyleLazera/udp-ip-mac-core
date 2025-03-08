@@ -94,11 +94,11 @@ reg [DATA_WIDTH-1:0] rgmii_rdx_2;
 reg [DATA_WIDTH-1:0] rgmii_rdx_3;
 reg [DATA_WIDTH-1:0] rgmii_rdx_4;
 //Shift regiters to store data valid and error signals from rgmii
-reg [DATA_WIDTH-1:0] rgmii_dv_0, rgmii_er_0;
-reg [DATA_WIDTH-1:0] rgmii_dv_1, rgmii_er_1;
-reg [DATA_WIDTH-1:0] rgmii_dv_2, rgmii_er_2;
-reg [DATA_WIDTH-1:0] rgmii_dv_3, rgmii_er_3;
-reg [DATA_WIDTH-1:0] rgmii_dv_4, rgmii_er_4;
+reg rgmii_dv_0, rgmii_er_0;
+reg rgmii_dv_1, rgmii_er_1;
+reg rgmii_dv_2, rgmii_er_2;
+reg rgmii_dv_3, rgmii_er_3;
+reg rgmii_dv_4, rgmii_er_4;
 
 //Intermediary signals
 reg [2:0] hdr_cnt = 4'b0;
@@ -183,13 +183,17 @@ always @(posedge clk) begin
     end
 end
 
-/* Block used to count the total number of header frames */
+////////////////////////////////////////////////////////////////////////////////
+// Block used to count the total number of header frames. This is important to make
+// sure a transaction only starts upon the reception of a start condition:
+// 7 bytes of 8'h55 and 1 start frame delimiter of 8'd5 along with the data valid signal
+////////////////////////////////////////////////////////////////////////////////
 always @(posedge clk) begin
     if(!reset_n)
         hdr_cnt <= 3'b0;
     else begin
         if(rgmii_mac_rx_rdy) begin
-            if(rgmii_rdx_4 == ETH_HDR)
+            if(rgmii_rdx_4 == ETH_HDR & rgmii_dv_4 == 1'b1)
                 hdr_cnt <= hdr_cnt + 1;
             else
                 hdr_cnt <= 3'b0;
@@ -234,8 +238,8 @@ always @(*) begin
            axis_data_next = rgmii_rdx_4; 
            
            //If we have valid data, but there is an error, or if teh FIFO indicates it is not ready mid-transaction
-           // raise tuser & do not sample remaining packet
-           if(rgmii_dv_4 && rgmii_er_4 || (s_rx_axis_trdy == 1'b0)) begin
+           // raise tuser & do not sample remaining packets
+           if(!rgmii_dv_4 && rgmii_er_4 || (s_rx_axis_trdy == 1'b0)) begin
               axis_user_next = 1'b1; 
               state_next = BAD_PCKT;
            end                      

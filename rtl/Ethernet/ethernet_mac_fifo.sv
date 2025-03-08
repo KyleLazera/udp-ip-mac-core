@@ -89,6 +89,12 @@ reg [8:0] pckt_cntr = 9'b0;
 reg [2:0] pkt_boundary_resync = 3'b0;
 wire pkt_boundary;          //tlast from write fifo domain 
 
+wire increment_tx_cntr;
+wire decrement_tx_cntr;
+
+assign increment_tx_cntr = !pkt_boundary_resync[2] & pkt_boundary_resync[1];
+assign decrement_tx_cntr = tx_fifo_data_out[0]& tx_fifo_rd_en;
+
 // Only identify a true tlast when tvalid and trdy are also high 
 assign pkt_boundary = m_tx_axis_tlast & m_tx_axis_tvalid & s_tx_axis_trdy;
 
@@ -97,13 +103,12 @@ always @(posedge clk_125) begin
         pckt_cntr <= 1'b0;
     else begin
         //Rising edge detection of packet boundary signal (tlast from write tx fifo domain)
-        if(!pkt_boundary_resync[2] & pkt_boundary_resync[1])
+        if(increment_tx_cntr & !decrement_tx_cntr)
             pckt_cntr <= pckt_cntr + 1;
         //tlast detection from read FIFO domain
-        else if(tx_fifo_data_out[0]& tx_fifo_rd_en)
+        else if(decrement_tx_cntr & !increment_tx_cntr)
             pckt_cntr <= pckt_cntr - 1;
-        else
-            pckt_cntr <= pckt_cntr;
+
     end
 end
 
@@ -112,13 +117,19 @@ always @(posedge clk_125) begin
     pkt_boundary_resync <= {pkt_boundary_resync[1:0], pkt_boundary};
 end
 
-
 /// RX FIFO Handshaking ///
 
 reg [8:0] rx_pckt_cntr = 9'b0;
 reg [2:0] rx_pkt_boundary_resync = 3'b0;
 reg [1:0] rx_tuser_resync = 2'b0;
 wire rx_pkt_boundary; 
+
+wire increment_rx_cntr;
+wire decrement_rx_cntr;
+
+//assign increment_rx_cntr = !rx_pkt_boundary_resync[2] & rx_pkt_boundary_resync[1] & !rx_tuser_resync;
+assign increment_rx_cntr = tlast_pulse_crossed & !tuser_pulse_crossed;
+assign decrement_rx_cntr = m_rx_axis_tlast & s_rx_axis_trdy & m_rx_axis_tvalid;
 
 // Only identify a true tlast when tvalid and trdy are also high 
 assign rx_pkt_boundary = rx_mac_last & rx_mac_data_valid & rx_fifo_not_full;
@@ -128,15 +139,41 @@ always @(posedge i_clk) begin
         rx_pckt_cntr <= 1'b0;
     else begin
         
-        if(!rx_pkt_boundary_resync[2] & rx_pkt_boundary_resync[1] & !rx_tuser_resync)
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // It is important to specify that the counter will only be incremented when the increment signal is true
+        // and the decrement signal is false. Similarly, the same is when decrementing teh counter. The reason
+        // for this is there may be a scenario where the increment conditiona and decrement condition are true 
+        // at the same time. In this case, the counter should not change value (1 - 1 = 0), therefore, by 
+        // checking both conditions we avoid this scenario.
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        if(increment_rx_cntr & !decrement_rx_cntr)
             rx_pckt_cntr <= rx_pckt_cntr + 1;
         
-        else if(m_rx_axis_tlast & s_rx_axis_trdy & m_rx_axis_tvalid)
+        else if(decrement_rx_cntr & !increment_rx_cntr)
             rx_pckt_cntr <= rx_pckt_cntr - 1;
-        else
-            rx_pckt_cntr <= rx_pckt_cntr;
+        
     end
 end
+
+wire tlast_pulse_crossed;
+wire tuser_pulse_crossed;
+
+cdc_pulse_stretch rx_tlast_pulse_detection
+(
+    .i_src_clk(clk_125),
+    .i_dst_clk(i_clk),
+    .i_pulse(rx_pkt_boundary),
+    .o_pulse(tlast_pulse_crossed)
+);
+
+cdc_pulse_stretch rx_tuser_pulse_detection
+(
+    .i_src_clk(clk_125),
+    .i_dst_clk(i_clk),
+    .i_pulse(rx_mac_tuser_error),
+    .o_pulse(tuser_pulse_crossed)
+);
 
 /* Double flop synchronizer for tlast from write side of FIFO */
 always @(posedge i_clk) begin
