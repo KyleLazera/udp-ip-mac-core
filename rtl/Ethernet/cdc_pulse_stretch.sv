@@ -1,5 +1,23 @@
 `timescale 1ns / 1ps
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+// This module is used to cross a pulse from a faster clock domain (125MHz) into
+// a slower clock domain (100MHz). Because the pulse is originally occuring in
+// the 125MHz clock domain, there is a risk that it could be missed by the 
+// recieveing clock domain (100MHz) if only a series of synchronizer FF's are used.
+// To avoid this the pulse is stretched, and this newly stretched pulse is passed
+// through the synchronizer FF's. 
+// To lower the strecthed pulse, once a pulse has been generated in the destination domain,
+// the original stretched pulse is then passed back into the source clock domain. Once
+// the source clock domain identifies the stretched pulse being passed back, it triggers the 
+// stretche dpulse to be lowered.
+//
+// Note: Because the stretched pulse has to be passed from the source domain and then
+// back to the destination domain, pulses cannot occur within 6-7 clock cycles of one another
+// or else they will be missed.
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+
 module cdc_pulse_stretch
 (
     input wire i_src_clk,                 //Source Clock Domain
@@ -9,8 +27,12 @@ module cdc_pulse_stretch
     output reg o_pulse                   //Equivelent output pulse
 );
 
-/* Retime the pulse - This is needed for 10/100 mbps link speeds where the pulse
-will be very long. Used to capyture only the rising edge of the pulse */
+/* 
+ * Retime the pulse - This is needed specifically for when the link speed is 10/100mbps.
+ * In this scenario, the pulses will be much larger than dst domain clock pulse, therefore, rather
+ * than passing the entire pulse through, we only detect the rising edge of the pulse.
+ */
+
 reg pulse_rt;
 wire pulse_rising_edge;
 
@@ -20,32 +42,40 @@ end
 
 assign pulse_rising_edge = !pulse_rt & i_pulse;
 
-reg i_pulse_stretch = 1'b0;
+reg pulse_stretch = 1'b0;
 
 always @(posedge i_src_clk) begin
+    //When an edge is detected, stretch the pulse
     if(pulse_rising_edge)
-        i_pulse_stretch <= 1'b1;
-    //Falling edge detection of the feedback signal
-    else if(feedback_pulse_stretched[1] & !feedback_pulse_stretched[2])
-        i_pulse_stretch <= 1'b0;
+        pulse_stretch <= 1'b1;
+    //Once the feedback pulse has been passed into the original source domain,
+    // lower the stretched pulse
+    else if(feedback_pulse)
+        pulse_stretch <= 1'b0;
 end
 
-/* Synchonrize the stretched pulse with the destination clock domain  & generate a pulse*/
-reg [2:0] pulse_stretched_resync = 3'b0;
-wire pulse_stretched;
+// Cross the stretched pulse into the destination domain
 
-always @(posedge i_dst_clk) begin
-    pulse_stretched_resync <= {pulse_stretched_resync[1:0], i_pulse_stretch};
-    o_pulse <= !pulse_stretched_resync[2] & pulse_stretched_resync[1];
-end
+wire pulse_stretched_sync;
+reg pulse_stretched_pipeline_1;
 
-assign pulse_stretched = pulse_stretched_resync[2];
+cdc_signal_sync #(.PIPELINE(1)) stretched_pulse_sync(
+    .i_dst_clk(i_dst_clk),
+    .i_signal(pulse_stretch),
+    .o_signal_sync(pulse_stretched_sync),
+    .o_pulse_sync(o_pulse)
+);
 
-/* Re-synchronize the stretched pulse back into the source domain for feedback */
-reg [2:0] feedback_pulse_stretched = 3'b0;
+//Cross the stretched pulse back into the source domain as a feedback signal
 
-always @(posedge i_src_clk) begin
-    feedback_pulse_stretched <= {feedback_pulse_stretched[1:0], pulse_stretched};
-end
+wire feedback_pulse;
+
+cdc_signal_sync #(.PIPELINE(1)) feedback_sync(
+    .i_dst_clk(i_src_clk),
+    .i_signal(pulse_stretched_sync),
+    .o_signal_sync(/*Not Needed*/),
+    .o_pulse_sync(feedback_pulse)
+);
+
 
 endmodule

@@ -23,12 +23,7 @@ eth_mac_wr_if eth_wr_if (clk_100, reset_n); //write vif
 eth_mac_rd_if eth_rd_if (clk_100, reset_n); //read interface
 
 //DUT
-ethernet_mac_fifo#(
-    .FIFO_DATA_WIDTH(9),
-    .FIFO_DEPTH(8192),
-    .AXI_DATA_WIDTH(8),
-    .RGMII_DATA_WIDTH(4)
-) eth_mac_fifo_0 (
+ethernet_mac_fifo eth_mac_fifo_0 (
     .i_clk(clk_100),
     .clk_125(clk_125),
     .clk90_125(clk90_125),
@@ -40,10 +35,10 @@ ethernet_mac_fifo#(
     .rgmii_phy_txd(eth_wr_if.rgmii_phy_txd), 
     .rgmii_phy_txctl(eth_wr_if.rgmii_phy_txctl),
     /* Tx Data */
-    .m_tx_axis_tdata(eth_wr_if.m_tx_axis_tdata),
-    .m_tx_axis_tvalid(eth_wr_if.m_tx_axis_tvalid),
-    .m_tx_axis_tlast(eth_wr_if.m_tx_axis_tlast),
-    .s_tx_axis_trdy(eth_wr_if.s_tx_axis_trdy),
+    .s_tx_axis_tdata(eth_wr_if.m_tx_axis_tdata),
+    .s_tx_axis_tvalid(eth_wr_if.m_tx_axis_tvalid),
+    .s_tx_axis_tlast(eth_wr_if.m_tx_axis_tlast),
+    .m_tx_axis_trdy(eth_wr_if.s_tx_axis_trdy),
     /* RX Signals */
     .m_rx_axis_tdata(eth_rd_if.m_rx_axis_tdata),
     .m_rx_axis_tvalid(eth_rd_if.m_rx_axis_tvalid),
@@ -82,6 +77,7 @@ initial begin
     //run_test("tc_half_duplex_rx_random");
     //run_test("tc_half_duplex_rx_drop_pckt");
     run_test("tc_full_duplex_random");
+    //run_test("tc_half_duplex_tx_random");
 end
 
 

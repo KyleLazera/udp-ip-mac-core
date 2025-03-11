@@ -5,10 +5,24 @@
 
 # Set project path - Change to relative
 set project_path "../Network Stack/Processorless_Network/Processorless_Network.xpr"
+set tc_path      "../sim/Ethernet_MAC/Ethernet MAC"
 open_project $project_path
 
-#Define teh testcases to run
-set testcases {"tc_full_duplex_random" "tc_half_duplex_tx_random" "tc_half_duplex_rx_random"}
+#Search the Ethernet MAC directory for all files with prefix tc_*
+set tc_files [glob "$tc_path/tc_*"]
+
+set testcases []
+
+#Iterate through each testcase and append it to the testcases list above
+foreach tc $tc_files {
+    set tc_name [file tail $tc]
+
+    #remove .sv extension
+    set testcase [file rootname $tc_name]
+    lappend testcases $testcase
+}
+
+puts $testcases
 
 # Get project name 
 set proj_name [get_projects]

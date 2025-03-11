@@ -7,9 +7,10 @@
 */
 module fifo_mem
 #(
-    DATA_WIDTH = 8,
-    MEM_DEPTH = 64,
-    ADDR_BITS = $clog2(MEM_DEPTH)
+    parameter FWFT = 1,
+    parameter DATA_WIDTH = 8,
+    parameter MEM_DEPTH = 64,
+    parameter ADDR_BITS = $clog2(MEM_DEPTH)
 )
 (
     input wire i_wr_clk,                                        //Clock for the write domain
@@ -27,16 +28,44 @@ module fifo_mem
     input wire [ADDR_BITS-1:0] i_wr_addr, i_rd_addr
 );
 
-/* Register Declarations */
+/* Output BRAM reg used to improve timing budget */
+reg [DATA_WIDTH-1:0] data_reg_pipeline;
+
+/* Inferred BRAM Declaration */
 reg [DATA_WIDTH-1:0] dual_port_ram [0:MEM_DEPTH-1];
 
 /* Synchronous Logic to write into Block RAM */
 always@(posedge i_wr_clk) begin
     if(i_wr_en && !i_full) 
-        dual_port_ram[i_wr_addr] <= i_wr_data;
+        dual_port_ram[i_wr_addr] <= i_wr_data;    
 end
 
+/////////////////////////////////////////////////////////////////////
+// An extra FF is added on the read end of the FIFO to improve the timing
+// budget. This FF should be inferred into the BRAM, and adds an extra 
+// clock cycle delay of reading data out of the FIFO.
+////////////////////////////////////////////////////////////////////////
+
+generate 
+    //If first word fall through is enabled, have teh output data always present 
+    // on the data out line 
+    if(FWFT == 1) begin
+        always @(posedge i_rd_clk) begin
+            data_reg_pipeline <= dual_port_ram[i_rd_addr];
+        end
+    //If FWFT is disabled, the user must drive rd_en high to pop the first word
+    // off the FIFO
+    end else 
+        always @(posedge i_rd_clk) begin
+            if(i_rd_en)
+                data_reg_pipeline <= dual_port_ram[i_rd_addr];
+        end    
+
+endgenerate
+
+
 //First work Fall through read of RAM
-assign o_rd_data = dual_port_ram[i_rd_addr];
+//assign o_rd_data = dual_port_ram[i_rd_addr];
+assign o_rd_data = data_reg_pipeline;
 
 endmodule

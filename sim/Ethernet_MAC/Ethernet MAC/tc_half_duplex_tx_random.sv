@@ -39,7 +39,7 @@ class tc_half_duplex_tx_random extends eth_mac_base_test;
             2 : cfg.set_link_speed(cfg.MB_10_SPEED);
         endcase       
 
-        cfg.set_link_speed(cfg.MB_100_SPEED);
+        cfg.set_link_speed(cfg.MB_10_SPEED);
                                                                                                          
     endfunction : build_phase
     

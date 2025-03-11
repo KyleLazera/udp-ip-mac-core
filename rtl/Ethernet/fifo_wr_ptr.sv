@@ -1,6 +1,5 @@
 `timescale 1ns / 1ps
 
-
 module fifo_wr_ptr
 #(
     parameter ADDR_WIDTH,

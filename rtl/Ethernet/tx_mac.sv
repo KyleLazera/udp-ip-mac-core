@@ -11,16 +11,9 @@
  *  ----------------------------------------------------------------------------------------------------
 */
 
-/*
- * TODO: 
- * 1) Handle the rgmii_mac_tx_er signals
- * 2) IFG length for different link throughputs (10/100/1000 Mbps)
-*/
-
 module tx_mac
 #(
-    parameter DATA_WIDTH = 8,
-    parameter IFG_SIZE = 12
+    parameter DATA_WIDTH = 8
 ) 
 (
     input wire clk, 
@@ -43,7 +36,8 @@ module tx_mac
     output wire rgmii_mac_tx_er,                            //Indicates there is an error in the data
     
     /* Configurations */
-    input wire mii_select                                   //Configures data rate (Double Data Rate (DDR) or Single Data Rate (SDR))        
+    input wire mii_select,                                  //Configures data rate (Double Data Rate (DDR) or Single Data Rate (SDR))    
+    input wire [1:0] link_speed                             //Indicates link speed - used for IFG calculation
 );
 
 /* Local Parameters */
@@ -71,7 +65,7 @@ reg [2:0] byte_ctr, byte_ctr_next;                              //Counts the num
 reg [7:0] pckt_size, pckt_size_next;                            //Counts size of payload in bytes (Ensure they payload is between 46 - 1500 bytes) 
 reg mii_sdr, mii_sdr_next;                                      //Indicates the next data transfer needs to shift byte by 4 (for SDR in MII mode)
 reg axis_rdy_reg, axis_rdy_next;                                //Implements a FF between the outgoing s_tx_axis_rdy signal and FIFO  
-reg [3:0] ifg_ctr, ifg_ctr_next;
+
 
 
 /* CRC32 Interface Signals */
@@ -92,6 +86,34 @@ crc_module(.clk(clk),
            .o_crc_state(crc_next),
            .crc_out(crc_data_out)
            );
+
+/* IFG Logic */
+reg [10:0] ifg_ctr, ifg_ctr_next;                               //Counter to count up-to teh inter frame gap
+reg [10:0] ifg;                                                 //inter frame gap value that will be used for comparison
+
+////////////////////////////////////////////////////////////////////////////////
+// According to the IEEE 802.3, the inter-frame gap must constitute 96
+// bit times. For 10mbps link and a clock freq of 2.5MHz, this corresponds 
+// to 9.6us (9600ns), for 100mbps with a clock freq of 25MHz this corresponds 
+// to .96us (960ns) and for 1gbps with a clock freq of 125MHz this corresponds
+// to 96ns.
+// Because the tx mac always operates at 125MHz, the ifg to count up to can
+// simply be adjusted based on teh link speed.
+////////////////////////////////////////////////////////////////////////////////
+
+always@(posedge clk) begin
+    if(reset_n)
+        ifg <= 11'd12;
+    else begin
+        case(link_speed) 
+            2'b00: ifg <= 11'd1200;
+            2'b01: ifg <= 11'd120;
+            2'b10: ifg <= 11'd12;
+            default: ifg <= 11'd12;
+        endcase
+    end
+end
+
 
 /* Sequential Logic */
 always @(posedge clk) begin
@@ -178,7 +200,6 @@ always @(*) begin
                     byte_ctr_next = 3'b0;
                     mii_sdr_next = 1'b0;
                     pckt_size_next = 6'b0;
-                    //rgmii_dv_next = 1'b1;
                     state_next = PREAMBLE;
                 end
             end
@@ -187,9 +208,7 @@ always @(*) begin
                 if(byte_ctr == 3'd6) begin                  
                     tx_data_next = ETH_HDR;
                     byte_ctr_next = byte_ctr + 1;
-                    // Only set the s_axis_trdy flag high if we are in gbit mode, (mii_select is low)
-                    // else we will miss the first byte of data
-                    //axis_rdy_next = ~mii_select; 
+                    axis_rdy_next = ~mii_select;
                 end
                 //If all 7 bytes of the Header have been sent, transmit the SFD  
                 else if(byte_ctr == 3'd7) begin
@@ -197,7 +216,7 @@ always @(*) begin
                     mii_sdr_next = 1'b1;
                     byte_ctr_next = 3'd0;
                     pckt_size_next = 6'd0;
-                    axis_rdy_next = ~mii_select; //todo: changed to 0    
+                    axis_rdy_next = ~mii_select;   
                     state_next = PACKET;
                 end else begin
                     tx_data_next = ETH_HDR;
@@ -208,7 +227,7 @@ always @(*) begin
             PACKET : begin
                 rgmii_dv_next = 1'b1;
                 crc_en_next = 1'b1;
-                crc_in_data_next = s_tx_axis_tdata;
+                crc_in_data_next = s_tx_axis_tdata; 
                 axis_rdy_next = 1'b1;
                 tx_data_next = s_tx_axis_tdata;
                 mii_sdr_next = 1'b1;
@@ -219,11 +238,9 @@ always @(*) begin
                     pckt_size_next = pckt_size + 1;
                 
                 //If the last beat has arrived OR there is no more valid data in the FIFO
-                //TODO: Possibly deal with error flag here for RGMII
                 if(s_tx_axis_tlast) begin
                     axis_rdy_next = mii_select;
                     if(pckt_size > (MIN_FRAME_WIDTH - 1)) begin
-                        //axis_rdy_next = 1'b0;
                         byte_ctr_next = 3'd3;
                         state_next = FCS;                        
                     end else begin
@@ -260,7 +277,7 @@ always @(*) begin
                 //Ensure all 32 bits (4 bytes) of the CRC are transmitted
                 if(byte_ctr == 0) begin                    
                     state_next = IFG;
-                    ifg_ctr_next = 4'd0;
+                    ifg_ctr_next = 11'd0;
                 end else
                     byte_ctr_next = byte_ctr - 1;
             end
@@ -269,7 +286,7 @@ always @(*) begin
             IFG : begin
                 mii_sdr_next = 1;
             
-                if(ifg_ctr > IFG_SIZE ) 
+                if(ifg_ctr > ifg) 
                     state_next = IDLE;
                 else
                     ifg_ctr_next = ifg_ctr + 1;

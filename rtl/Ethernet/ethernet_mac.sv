@@ -1,13 +1,8 @@
 `timescale 1ns / 1ps
 
 /* 
- * This module connects teh tx mac, rx mac and rgmii interface and adds custom logic used to determine the link speed of
+ * This module connects the tx mac, rx mac and rgmii interface and adds custom logic used to determine the link speed of
  * the ethernet line.
-*/
-
-/* 
- * todo: Add an MDIO interface in this section. The MDIO will be used to read the link speed from the PHY 
- * to avoid the need of custom logic.
 */
 
 module ethernet_mac
@@ -40,7 +35,10 @@ module ethernet_mac
     output wire m_rx_axis_tvalid,                               //Signal indicating module has data to transmit
     output wire m_rx_axis_tuser,                                //Used to indicate an error to the FIFO
     output wire m_rx_axis_tlast,                                //Indicates last byte within a packet
-    input wire s_rx_axis_trdy                                   //FIFO indicating it is ready for data (not full/empty)
+    input wire s_rx_axis_trdy,                                  //FIFO indicating it is ready for data (not full/empty)
+
+    /* Control Signals(s) */
+    output wire mii_mode                                        //Indicates whether we are operating in mii (10/100 mbps) or 1gbps
 
 );
 
@@ -159,8 +157,7 @@ rgmii_phy_if rgmii_phy
 //TX MAC
 tx_mac 
 #(
-    .DATA_WIDTH(8),
-    .IFG_SIZE(12)
+    .DATA_WIDTH(8)
 ) tx_mac_module
 (
     .clk(clk_125),                                 
@@ -183,7 +180,8 @@ tx_mac
     .rgmii_mac_tx_er(mac_rgmii_tx_er),                    
                                                 
     // Control signals(s)                            
-    .mii_select(mii_sel)                           
+    .mii_select(mii_sel),
+    .link_speed(link_speed)                          
 );
 
 //RX MAC
@@ -213,5 +211,6 @@ rx_mac_module
 ); 
 
 assign rgmii_rxc = rgmii_mac_rx_clk;
+assign mii_mode = mii_sel;
 
 endmodule

@@ -16,6 +16,9 @@
 
 module fifo
 #(
+    parameter FWFT = 1,                 //Determines whether the FIFO operates in First Word Fall Through mode (FWFT = 1)
+                                        // or if the rd_en signal must be driven to pop teh first byte of data (FWFT = 0)
+
     parameter DATA_WIDTH = 8,
     parameter FIFO_DEPTH = 256
 )

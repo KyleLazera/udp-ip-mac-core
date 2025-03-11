@@ -89,7 +89,7 @@ always @(*) begin
         
         //Calculate Table index based on i_byte
         table_index = i_byte_rev ^ i_crc_state[31:24];
-        //XOR output of LUT with teh current CRC state
+        //XOR output of LUT with the current CRC state
         crc_next = {i_crc_state[24:0], 8'h0} ^ crc_table[table_index];          
     end 
 end

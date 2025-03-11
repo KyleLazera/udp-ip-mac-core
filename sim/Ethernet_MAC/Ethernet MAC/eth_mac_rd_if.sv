@@ -78,7 +78,8 @@ interface eth_mac_rd_if
     endtask : generate_clock
 
     task read_rx_fifo(ref bit [7:0] rx_fifo[$]);
-        
+        bit first_byte = 1'b1;
+
         //Indicate to the rx FIFO that we are ready to recieve data 
         s_rx_axis_trdy <= 1'b1;
 
@@ -87,10 +88,17 @@ interface eth_mac_rd_if
             #1;
             //only sample the data if the FIFO indicates it is not empty 
             if(m_rx_axis_tvalid & m_rx_axis_tlast) begin       
-                rx_fifo.push_back(m_rx_axis_tdata);   
+                rx_fifo.push_back(m_rx_axis_tdata); 
+                s_rx_axis_trdy <= 1'b0;  
                 break;             
-            end else if(m_rx_axis_tvalid)
+            end else if(m_rx_axis_tvalid) begin
+                if(first_byte) begin
+                    $display("First Byte");
+                    @(posedge clk_100);
+                    first_byte = 1'b0;
+                end
                 rx_fifo.push_back(m_rx_axis_tdata);
+            end 
 
             @(posedge clk_100);
         end
@@ -103,6 +111,8 @@ interface eth_mac_rd_if
 
         repeat(2)
             @(posedge clk_100);
+
+        first_byte = 1'b1;
 
     endtask : read_rx_fifo
 
