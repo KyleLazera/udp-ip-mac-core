@@ -239,16 +239,17 @@ always @(*) begin
            
            //If we have valid data, but there is an error, or if teh FIFO indicates it is not ready mid-transaction
            // raise tuser & do not sample remaining packets
-           if(!rgmii_dv_4 && rgmii_er_4 || (s_rx_axis_trdy == 1'b0)) begin
+           if(!rgmii_mac_rx_dv && rgmii_mac_rx_er || (s_rx_axis_trdy == 1'b0)) begin
               axis_user_next = 1'b1; 
               state_next = BAD_PCKT;
            end                      
            //If we do not have valid data from RGMII - transmission complete
            else if(rgmii_mac_rx_dv == 1'b0) begin
-               axis_last_next = 1'b1;  
+               axis_last_next = 1'b1;
+               crc_en_next = 1'b0;  
            
                //If CRC is incorrect, raise tuser flag to indicate this error
-               if(crc_data_out != {rgmii_rdx_0, rgmii_rdx_1, rgmii_rdx_2, rgmii_rdx_3})
+               if((crc_data_out != {rgmii_rdx_0, rgmii_rdx_1, rgmii_rdx_2, rgmii_rdx_3}) && crc_en)
                    axis_user_next = 1'b1;                    
                   
                state_next = IDLE;                                                    

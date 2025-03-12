@@ -192,6 +192,7 @@ cdc_pulse_stretch rx_tuser_pulse_detection
     .o_pulse(tuser_pulse_crossed)
 );
 
+
 /****************************************************************
 Ethernet MAC Instantiation
 *****************************************************************/

@@ -82,7 +82,6 @@ end
 
 /* Intermediary Logic */
 always @(*) begin   
-    if(crc_en) begin
         //Reverse the input byte
         for(int i = 0; i < 8; i++) 
             i_byte_rev[i] = i_byte[(DATA_WIDTH-1)-i];  
@@ -91,10 +90,9 @@ always @(*) begin
         table_index = i_byte_rev ^ i_crc_state[31:24];
         //XOR output of LUT with the current CRC state
         crc_next = {i_crc_state[24:0], 8'h0} ^ crc_table[table_index];          
-    end 
 end
 
-/* Invert and Reverse the CRC State - output used only when EOF is set */
+/* Invert and Reverse the CRC State  */
 generate 
     genvar j;
     //Invert the output CRC value

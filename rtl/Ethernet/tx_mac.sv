@@ -239,8 +239,9 @@ always @(*) begin
                 
                 //If the last beat has arrived OR there is no more valid data in the FIFO
                 if(s_tx_axis_tlast) begin
-                    axis_rdy_next = mii_select;
+                    axis_rdy_next = mii_select;                    
                     if(pckt_size > (MIN_FRAME_WIDTH - 1)) begin
+                        crc_en_next = 1'b0;
                         byte_ctr_next = 3'd3;
                         state_next = FCS;                        
                     end else begin
@@ -259,6 +260,7 @@ always @(*) begin
                 //Once 59 bytes has been transmitted, shift to the FCS. The 60th byte will be transmitted
                 //on the clock edge that triggers the state change    
                 if(pckt_size > (MIN_FRAME_WIDTH-1)) begin                   
+                    crc_en_next = 1'b0;
                     byte_ctr_next = 3'd3;
                     state_next = FCS;
                 end 
