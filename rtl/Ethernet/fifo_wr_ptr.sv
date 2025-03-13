@@ -31,7 +31,7 @@ reg [ADDR_WIDTH:0] rd_ptr_bin;                     //Holds binary version of rd_
 reg [ADDR_WIDTH:0] wr_ptr_almost_full;             //Used to calculate the binary value for almsot full
 reg full_next, almost_full_next;
 
-reg [ADDR_WIDTH:0] temp_wr_ptr;
+reg [ADDR_WIDTH:0] temp_wr_ptr = {ADDR_WIDTH{1'b0}};
 
 /* Combinational Logic */
 
@@ -74,12 +74,14 @@ end
 
 //Used to latch the current write address
 always @(posedge clk) begin
-    if(!reset_n)
+    /*if(!reset_n)
         temp_wr_ptr <= {ADDR_WIDTH{1'b0}};
     else if(latch_addr)
         temp_wr_ptr <= wr_ptr_bin + 1'b1;
     else
-       temp_wr_ptr <= temp_wr_ptr; 
+       temp_wr_ptr <= temp_wr_ptr;*/
+    if(latch_addr) 
+        temp_wr_ptr <= wr_ptr_bin + 1'b1;
 end
 
 /* Output Logic */

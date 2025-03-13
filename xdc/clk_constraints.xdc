@@ -1,6 +1,18 @@
-#Generate the 100MHz and 125MHz clocks that will feed into the ethernet MAC
-create_clock -period 10.0 -name i_clk [get_ports i_clk]
-create_clock -period 8.0 -name clk_125 [get_ports clk_125]
-create_clock -period 8.0 -name clk90_125 -waveform {2.000 6.000} [get_ports clk90_125]
+#----------------------------------------------------------------------------
+# This module is used to generate the clocks used in the design. There are 2 
+# primary clocks: 100MHz System Clock and the recieved clock from the RGMII.
+# The recieved clock freq can differ from 2.5MHz to 25MHz to 125MHz depending
+# on the link speed, but it has been constrained to 125MHz.
+# Additionally, the tx clock that is forwaded out via the ODDR is also contrained
+# to 125MHz with the source clock being the 90 degree shifted 125MHz signal.
+#--------------------------------------------------------------------------------
 create_clock -period 8.0 -name rgmii_phy_rxc [get_ports rgmii_phy_rxc]
+create_clock -period 10.0 -name i_clk [get_ports i_clk]
+
+#Forwarded Clock
+create_generated_clock -name rgmii_phy_txc -source [get_pins clk_mmcm_inst/CLKOUT1] -divide_by 1 [get_ports rgmii_phy_txc]
+
+
+
+
 

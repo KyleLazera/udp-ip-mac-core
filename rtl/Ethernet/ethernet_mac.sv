@@ -106,6 +106,29 @@ end
 assign link_speed = link_speed_reg;
 assign mii_sel = (link_speed != 2'b10);
 
+////////////////////////////////////////////////////////////////////////
+// The link speed value (driven in the 125MHz clock domain) is used
+// to drive data into the rx MAC (operating in the rxc domain), therefore, 
+// to avoid a possibly metastable signal being passed, we have to resynchronize
+// the link speed value into teh rxc domain.
+/////////////////////////////////////////////////////////////////////////////
+
+wire [1:0] link_speed_rxc_sync;
+
+cdc_signal_sync#(.PIPELINE(0)) link_speed_sync_0(
+    .i_dst_clk(rgmii_phy_rxc),
+    .i_signal(link_speed[0]),
+    .o_signal_sync(link_speed_rxc_sync[0]),
+    .o_pulse_sync()
+);
+
+cdc_signal_sync#(.PIPELINE(0)) link_speed_sync_1(
+    .i_dst_clk(rgmii_phy_rxc),
+    .i_signal(link_speed[1]),
+    .o_signal_sync(link_speed_rxc_sync[1]),
+    .o_pulse_sync()
+);
+
 /**********************************************************
  * Module Instantiations & Intermediary Signals 
 ***********************************************************/
@@ -151,7 +174,7 @@ rgmii_phy_if rgmii_phy
     .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy),             
    
     // Control Signal(s)
-    .link_speed(link_speed)              
+    .link_speed(link_speed_rxc_sync)  //link_speed            
 );
 
 //TX MAC

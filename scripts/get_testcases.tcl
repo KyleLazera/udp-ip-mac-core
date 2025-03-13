@@ -1,5 +1,5 @@
 
-proc find_testecase{folder_path}{
+proc find_testecases{folder_path}{
 
     #Search the Ethernet MAC directory for all files with prefix tc_*
     set tc_files [glob "$folder_path/tc_*"]

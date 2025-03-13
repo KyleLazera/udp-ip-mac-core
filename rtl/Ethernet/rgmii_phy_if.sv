@@ -71,9 +71,9 @@ end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Logic to sample the correct data depending on the link speed/throughput - when throughput is 10/100mbps, 
 // we cannot use the IDDR to sample the data because the RGMII will recieve a new nibble of data on each rising
-// edge as opposed to each rising and falling edge. This means we would be sampling each byte of data twice
-// (Once on the Rising edge and once on teh falling edge). By implementing a counter, we can ensure that 2 
-// rising clock edges have passed before "sampling" the packet and passing it to the rx mac.
+// edge as opposed to each rising and falling edge. This means we would be sampling each nibble of data twice
+// (Once on the Rising edge and once on the falling edge). By implementing a counter, we can ensure that 2 
+// rising clock edges have passed before "sampling" the byte and passing it to the rx mac.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 always @(posedge rgmii_mac_rx_clk) begin
@@ -101,7 +101,7 @@ input_buffers #(.DATA_WIDTH(5))
 i_buff(.clk(rgmii_phy_rxc),
        .d_in({rgmii_phy_rxd, rgmii_phy_rxctl}),         //Input signals from PHY
        .o_clk(rgmii_mac_rx_clk),                        //Output clock for MAC - passed through BUFR   
-       .q1({rgmii_rxd_rising_edge, rgmii_rx_dv}),      //Rising edge data
+       .q1({rgmii_rxd_rising_edge, rgmii_rx_dv}),       //Rising edge data
        .q2({rgmii_rxd_falling_edge, rgmii_rx_er}));     //Falling edge data        
 
 //The rxctl signal provides 2 values: on rising edge, it provides data valid and on falling edge 

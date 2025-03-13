@@ -6,12 +6,12 @@
 # when being passed from one clock domain to another.
 # ----------------------------------------------------------------------------------------------
 
-set tLowPd 1.5
+set tLowPd 1.8
 
 set cdc_w2r_cell_0 [get_cells -hierarchical -filter {NAME =~ *wr_ptr_0_reg*}]
 set cdc_r2w_cell_0 [get_cells -hierarchical -filter {NAME =~ *rd_ptr_0_reg*}]
 
-#Set the max delay for teh first synchronizers to 1.5ns 
+#Set the max delay for the first synchronizers to 1.8ns 
 set_max_delay -datapath_only -from [all_clocks] -to [get_pins -filter {REF_PIN_NAME == D} -of $cdc_w2r_cell_0] $tLowPd
 set_max_delay -datapath_only -from [all_clocks] -to [get_pins -filter {REF_PIN_NAME == D} -of $cdc_r2w_cell_0] $tLowPd
 
