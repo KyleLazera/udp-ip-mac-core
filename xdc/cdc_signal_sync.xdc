@@ -6,7 +6,7 @@
 # ---------------------------------------------------------------------------
 
 set tPd 20
-set tLowDelayPd 1.5
+set tLowDelayPd 1.8
 
 set cdc_double_sync_cells [get_cells -hierarchical -filter {NAME =~ *cdc_signal_sync_reg_reg[0]*}]
 

@@ -11,6 +11,8 @@ create_clock -period 10.0 -name i_clk [get_ports i_clk]
 
 #Forwarded Clock
 create_generated_clock -name rgmii_phy_txc -source [get_pins clk_mmcm_inst/CLKOUT1] -divide_by 1 [get_ports rgmii_phy_txc]
+#Virtual clock used by external PHY
+create_clock -name virt_rgmii_phy_rxc -period 8
 
 
 

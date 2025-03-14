@@ -74,14 +74,14 @@ end
 
 //Used to latch the current write address
 always @(posedge clk) begin
-    /*if(!reset_n)
+    if(!reset_n)
         temp_wr_ptr <= {ADDR_WIDTH{1'b0}};
     else if(latch_addr)
         temp_wr_ptr <= wr_ptr_bin + 1'b1;
     else
-       temp_wr_ptr <= temp_wr_ptr;*/
-    if(latch_addr) 
-        temp_wr_ptr <= wr_ptr_bin + 1'b1;
+       temp_wr_ptr <= temp_wr_ptr;
+    /*if(latch_addr) 
+        temp_wr_ptr <= wr_ptr_bin + 1'b1;*/
 end
 
 /* Output Logic */
