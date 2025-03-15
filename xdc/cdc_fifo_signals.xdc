@@ -15,5 +15,5 @@ set cdc_r2w_cell_0 [get_cells -hierarchical -filter {NAME =~ *rd_ptr_0_reg*}]
 set_max_delay -datapath_only -from [all_clocks] -to [get_pins -filter {REF_PIN_NAME == D} -of $cdc_w2r_cell_0] $tLowPd
 set_max_delay -datapath_only -from [all_clocks] -to [get_pins -filter {REF_PIN_NAME == D} -of $cdc_r2w_cell_0] $tLowPd
 
-set_max_delay -datapath_only -from [get_pins -filter {REF_PIN_NAME == C} -of $cdc_w2r_cell_0] -to [get_pins -filter {REF_PIN_NAME == D} -of [get_cells -hierarchical -filter {NAME =~ *wr_ptr_1_reg*}]] $tLowPd
-set_max_delay -datapath_only -from [get_pins -filter {REF_PIN_NAME == C} -of $cdc_r2w_cell_0] -to [get_pins -filter {REF_PIN_NAME == D} -of [get_cells -hierarchical -filter {NAME =~ *rd_ptr_1_reg*}]] $tLowPd
+set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of $cdc_w2r_cell_0] -to [get_pins -filter {REF_PIN_NAME == D} -of [get_cells -hierarchical -filter {NAME =~ *wr_ptr_1_reg*}]] $tLowPd
+set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of $cdc_r2w_cell_0] -to [get_pins -filter {REF_PIN_NAME == D} -of [get_cells -hierarchical -filter {NAME =~ *rd_ptr_1_reg*}]] $tLowPd

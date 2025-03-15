@@ -29,18 +29,6 @@ BUFIO BUFIO_inst (
  .O(clk_io)         // 1-bit output: Clock output (connect to I/O clock loads)
 );
 
-/*/Instantiate BUFR to connect input clock with with MAC 
-BUFR #(
- .BUFR_DIVIDE("BYPASS"), 
- .SIM_DEVICE("7SERIES") 
-)
-BUFR_inst (
- .O(o_clk),         // 1-bit output: Clock output port
- .CE(1'b1),         // 1-bit input: Active high, clock enable (Divided modes only)
- .CLR(1'b0),        // 1-bit input: Active high, asynchronous clear (Divided modes only)
- .I(i_clk)          // 1-bit input: Clock buffer input driven by an IBUF, MMCM or local interconnect
-);*/
-
 // Drives the recieved clock into the rx MAC
 BUFG
 clk_bufg_inst (

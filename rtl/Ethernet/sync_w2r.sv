@@ -17,7 +17,7 @@ module sync_w2r
 );
 
 /* Signals/Registers */
-reg [ADDR_WIDTH:0] wr_ptr_0, wr_ptr_1;
+(* async_reg="true", keep="true" *) reg [ADDR_WIDTH:0] wr_ptr_0, wr_ptr_1;
 
 /* Sequential Logic */
 always @(posedge clk) begin

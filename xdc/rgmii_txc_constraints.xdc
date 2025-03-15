@@ -14,5 +14,5 @@
 set_multicycle_path 3 -setup -from [get_clocks mmcm_clk_125] -to [get_clocks mmcm_clk90_125]
 set_multicycle_path 2 -hold -from [get_clocks mmcm_clk_125] -to [get_clocks mmcm_clk90_125]
 
-set_max_delay -datapath_only -from [get_pins -filter {REF_PIN_NAME == C} -of [get_cells -hierarchical -filter {NAME =~ *rgmii_txc_2_reg*}]] -to [get_pins -filter {REF_PIN_NAME == D2} -of [get_cells -hierarchical -filter {NAME =~ *clk_oddr*genblk1[0].ODDR_inst*}]] 2.0
-set_max_delay -datapath_only -from [get_pins -filter {REF_PIN_NAME == C} -of [get_cells -hierarchical -filter {NAME =~ *rgmii_txc_1_reg*}]] -to [get_pins -filter {REF_PIN_NAME == D1} -of [get_cells -hierarchical -filter {NAME =~ *clk_oddr*genblk1[0].ODDR_inst*}]] 2.0
+#set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of [get_cells -hierarchical -filter {NAME =~ *rgmii_txc_2_reg*}]] -to [get_pins -filter {REF_PIN_NAME == D2} -of [get_cells -hierarchical -filter {NAME =~ *clk_oddr*genblk1[0].ODDR_inst*}]] 2.0
+#set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of [get_cells -hierarchical -filter {NAME =~ *rgmii_txc_1_reg*}]] -to [get_pins -filter {REF_PIN_NAME == D1} -of [get_cells -hierarchical -filter {NAME =~ *clk_oddr*genblk1[0].ODDR_inst*}]] 2.0

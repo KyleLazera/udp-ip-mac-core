@@ -17,7 +17,7 @@ module sync_r2w
 );
 
 /* Signals/Registers */
-reg [ADDR_WIDTH:0] rd_ptr_0, rd_ptr_1;
+(* async_reg="true", keep="true" *) reg [ADDR_WIDTH:0] rd_ptr_0, rd_ptr_1;
 
 /* Sequential Logic */
 always @(posedge clk) begin

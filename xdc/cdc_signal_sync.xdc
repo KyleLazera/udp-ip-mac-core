@@ -14,4 +14,4 @@ set_max_delay -datapath_only -from [all_clocks] -to [get_pins -filter {REF_PIN_N
 
 set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of $cdc_double_sync_cells] -to [get_pins -filter {REF_PIN_NAME == D} -of [get_cells -hierarchical -filter {NAME =~ *cdc_signal_sync_reg_reg[1]*}]] $tLowDelayPd
 
-set_max_delay -datapath_only -from [all_inputs] -to [get_pins -filter {REF_PIN_NAME == D} -of $cdc_double_sync_cells] 10
+set_max_delay -from [all_inputs] -to [get_pins -filter {REF_PIN_NAME == D} -of $cdc_double_sync_cells] 10 

@@ -240,7 +240,7 @@ wire data_feedback_last;
 wire data_feedback_tx_rdy;
 
 
-ethernet_mac_fifo (
+ethernet_mac_fifo ethernet_mac(
     .i_clk(i_clk),
     .clk_125(clk_125),
     .clk90_125(clk90_125),

@@ -90,7 +90,7 @@ assign m_rx_axis_tvalid = (rx_pckt_cntr > 0);
 
 reg [8:0] tx_pckt_cntr = 9'b0;
 reg [2:0] tx_pkt_boundary_resync = 3'b0;
-wire tx_pkt_boundary;          //tlast from write fifo domain 
+reg tx_pkt_boundary;          //tlast from write fifo domain 
 
 wire increment_tx_cntr;
 wire decrement_tx_cntr;
@@ -98,7 +98,9 @@ wire decrement_tx_cntr;
 assign decrement_tx_cntr = tx_fifo_data_out[0] & tx_mac_trdy;
 
 // Only identify a true tlast when tvalid and trdy are also high 
-assign tx_pkt_boundary = s_tx_axis_tlast & s_tx_axis_tvalid & m_tx_axis_trdy;
+// Register this value because it will be passed through a Double Flop Synchronizer
+always @(posedge i_clk)
+    tx_pkt_boundary <= s_tx_axis_tlast & s_tx_axis_tvalid & m_tx_axis_trdy;
 
 always @(posedge clk_125) begin
     if(!i_reset_n)
@@ -133,7 +135,7 @@ cdc_signal_sync #(.PIPELINE(1)) tx_pckt_boundry_sync (
 reg [8:0] rx_pckt_cntr = 9'b0;
 reg [2:0] rx_pkt_boundary_resync = 3'b0;
 reg [1:0] rx_tuser_resync = 2'b0;
-wire rx_pkt_boundary; 
+reg rx_pkt_boundary; 
 
 wire increment_rx_cntr;
 wire decrement_rx_cntr;
@@ -142,7 +144,9 @@ assign increment_rx_cntr = tlast_pulse_crossed & !tuser_pulse_crossed;
 assign decrement_rx_cntr = m_rx_axis_tlast & m_rx_axis_tvalid; //& s_rx_axis_trdy
 
 // Only identify a true tlast when tvalid and trdy are also high 
-assign rx_pkt_boundary = rx_mac_last & rx_mac_data_valid & rx_fifo_not_full;
+// Register the input to avoid combinational logic before double synchronziers
+always @(posedge rx_clk)
+    rx_pkt_boundary <= rx_mac_last & rx_mac_data_valid & rx_fifo_not_full;
 
 always @(posedge i_clk) begin
     if(!i_reset_n)
@@ -168,8 +172,8 @@ end
 
 ///////////////////////////////////////////////////////////////////////////////////
 // To succesfully use the tlast and tuser signals from the rx mac, they must be 
-// crossed from the 125MHz domain into the 100MHz clock domain. The following module
-// instantiations implement the cdc logic to cross a pulse along with feedback from
+// crossed from the rx_clk domain into the 100MHz clock domain. The following module
+// instantiations implement the CDC logic to cross a pulse along with feedback from
 // a faster domain into a slower domain.
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -178,7 +182,7 @@ wire tuser_pulse_crossed;
 
 cdc_pulse_stretch rx_tlast_pulse_detection
 (
-    .i_src_clk(clk_125),
+    .i_src_clk(rx_clk),
     .i_dst_clk(i_clk),
     .i_pulse(rx_pkt_boundary),
     .o_pulse(tlast_pulse_crossed)
@@ -186,7 +190,7 @@ cdc_pulse_stretch rx_tlast_pulse_detection
 
 cdc_pulse_stretch rx_tuser_pulse_detection
 (
-    .i_src_clk(clk_125),
+    .i_src_clk(rx_clk),
     .i_dst_clk(i_clk),
     .i_pulse(rx_mac_tuser_error),
     .o_pulse(tuser_pulse_crossed)
@@ -217,7 +221,7 @@ tri_speed_eth_mac (
     .s_tx_axis_tvalid(tx_pckt_cntr > 0),
     .s_tx_axis_tlast(tx_fifo_data_out[0]),
     .s_tx_axis_trdy(tx_mac_trdy),
-    //RX FIFIO - AXI Interface
+    //RX FIFO - AXI Interface
     .rgmii_rxc(rx_clk),
     .m_rx_axis_tdata(rx_mac_data),
     .m_rx_axis_tvalid(rx_mac_data_valid),
