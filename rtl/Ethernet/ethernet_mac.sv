@@ -48,37 +48,69 @@ module ethernet_mac
 *****************************************************************/
 
 reg [2:0] rgmii_rxc_cntr = 4'h0;
-reg [2:0] rgmii_rxc_rt = 4'h0;                  
+                  
 reg [1:0] rxc_edge_cntr = 1'b0;
 reg [6:0] rxc_ref_cntr = 7'h0;
 reg [1:0] link_speed_reg = 2'b10;
+
+(* keep ="true"  *)reg mii_sel_reg = 1'b0;
 wire [1:0] link_speed;
 wire mii_sel;
 
-/* Logic to re-time the rgmii recieved clock */
-always @(posedge rgmii_phy_rxc) begin  
+/* This logic counts the number of positive edges from the rx clock */
+always @(posedge rgmii_mac_rx_clk) begin  
     rgmii_rxc_cntr <= rgmii_rxc_cntr + 1;                     
 end
 
-/* Logic to determine the link speed */
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// To determine the clock frequency of the recieved clock and therefore the link speed,
+// I used a reference counter (125MHz) to determine the rxc period. This would work normally for
+// 10/100 mbps since thir respective clock frequencies are 2.5 & 25MHz, however, at 1gbps, the 
+// reference counter and rxc edge counter would have the same frequency. To solve this issue, 
+// I only use the 3rd bit in the rising edge counter to stretch the clock period by a factor of 3.
+// This means that with a 125MHz reference clock, I can count exactly how long each period is
+// and determine the link speed.
+// Example:
+//                       _____       _____       _____       _____       _____       _____       _____
+// RXC :           _____|     |_____|     |_____|     |_____|     |_____|     |_____|     |_____|     |
+// 
+//Counter:       000  001         010         011         100          101         110        111    000
+//                                                          __________________________________________ 
+//Counter[2]:      ________________________________________|                                          |_______
+//
+// As can be seen above, each period is now stretched, meaning teh 125MHz reference counter can count 
+// each period accuratley.
+// To compare the rising edge counter value with teh reference clock, the value first needs 
+// to be passed into the 125MHz clock domain.
+/////////////////////////////////////////////////////////////////////////////////////////////////
+wire rgmii_rxc_edge;
+
+cdc_signal_sync#(.PIPELINE(1), .BOTH_EDGES(1)) rgmii_rxc_cntr_sync (
+    .i_dst_clk(clk_125),
+    .i_signal(rgmii_rxc_cntr[2]),
+    .o_signal_sync(),
+    .o_pulse_sync(rgmii_rxc_edge)
+);
+
+/* Reference Counter Logic */
 always @(posedge clk_125) begin
     if(!reset_n) begin
         rxc_ref_cntr <= 7'h0; 
         link_speed_reg <= 2'b10;   
+        mii_sel_reg <= 1'b0;
         rxc_edge_cntr <= 3'h0;   
     end else begin
         rxc_ref_cntr <= rxc_ref_cntr + 1;
 
-        rgmii_rxc_rt <= {rgmii_rxc_rt[1:0], rgmii_rxc_cntr[2]};
-
         //Count the number of falling and rising edges of re-timed rxc
-        if(rgmii_rxc_rt[1] ^ rgmii_rxc_rt[0])
+        if(rgmii_rxc_edge)
             rxc_edge_cntr <= rxc_edge_cntr + 1;
 
         //If the reference counter reached its maximum value - this indicates 2.5MHz clock speed
         if(&rxc_ref_cntr == 1) begin
             rxc_edge_cntr <= 3'h0;
             link_speed_reg <= 2'b00;
+            mii_sel_reg <= 1'b1;
         end
 
         /*If we have found 3 edges on the re-timed rxc - this indicates a full period has been completed
@@ -92,11 +124,15 @@ always @(posedge clk_125) begin
             rxc_edge_cntr <= 3'h0;                        
 
             //25MHz Clock Speed - If reference clock is greater than 48
-            if(rxc_ref_cntr[5:4]) 
+            if(rxc_ref_cntr[5:4]) begin
                 link_speed_reg <= 2'b01;
+                mii_sel_reg <= 1'b1;
+            end
             //125 MHz Clock Speed
-            else  
+            else begin
                 link_speed_reg <= 2'b10;
+                mii_sel_reg <= 1'b0;
+            end
 
         end
     end
@@ -108,24 +144,21 @@ assign mii_sel = (link_speed != 2'b10);
 
 ////////////////////////////////////////////////////////////////////////
 // The link speed value (driven in the 125MHz clock domain) is used
-// to drive data into the rx MAC (operating in the rxc domain), therefore, 
-// to avoid a possibly metastable signal being passed, we have to resynchronize
-// the link speed value into teh rxc domain.
+// to drive data in both the rxc domain and the 125MHz clock domain.
+// Both link speed signals need to be synchronized/passed in at teh same time.
+// Since one signal is passed through double flops for CDC, the other signal
+// is simply re-timed wuthin a shift register. This is only necessary for the
+// 1gbps instance, therefore the rxc would also be operating at 125MHz.
+// See the RGMII module for more.
 /////////////////////////////////////////////////////////////////////////////
 
 wire [1:0] link_speed_rxc_sync;
+wire rx_mii_select;
 
-cdc_signal_sync#(.PIPELINE(0)) link_speed_sync_0(
-    .i_dst_clk(rgmii_phy_rxc),
-    .i_signal(link_speed[0]),
-    .o_signal_sync(link_speed_rxc_sync[0]),
-    .o_pulse_sync()
-);
-
-cdc_signal_sync#(.PIPELINE(0)) link_speed_sync_1(
-    .i_dst_clk(rgmii_phy_rxc),
-    .i_signal(link_speed[1]),
-    .o_signal_sync(link_speed_rxc_sync[1]),
+cdc_signal_sync#(.PIPELINE(0)) mii_select_sync (
+    .i_dst_clk(rgmii_mac_rx_clk),
+    .i_signal(mii_sel_reg),
+    .o_signal_sync(rx_mii_select),
     .o_pulse_sync()
 );
 
@@ -174,7 +207,8 @@ rgmii_phy_if rgmii_phy
     .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy),             
    
     // Control Signal(s)
-    .link_speed(link_speed_rxc_sync)  //link_speed            
+    .link_speed(link_speed),
+    .mii_select(rx_mii_select)         
 );
 
 //TX MAC

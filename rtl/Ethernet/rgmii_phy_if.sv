@@ -9,10 +9,6 @@
  * This also transmits data out most significant bit first, which is based on the ethernet rgmii standard.
 */
 
-/*
- * todo: Add logic to sample 10/100 mbps using IDDR flip flops
-*/
-
 module rgmii_phy_if
 (
     input wire clk_125,                       //125MHz MAC Domain Clock 
@@ -39,7 +35,8 @@ module rgmii_phy_if
     output wire rgmii_mac_rx_rdy,             //This is used for SDR to ensure the rx mac is taking in teh correct data
    
    /* Control Signal(s) */
-    input wire [1:0] link_speed               //Indicates the speed of the rxc (used to dictate speed of txc) 
+    input wire [1:0] link_speed,
+    input wire mii_select
 );
 
 /*** PHY RX (Data reception) ***/
@@ -77,7 +74,7 @@ end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 always @(posedge rgmii_mac_rx_clk) begin
-    if(link_speed == 2'b10) begin
+    if(mii_select == 1'b0) begin 
         rgmii_mac_rx_data <= {rgmii_rxd_falling_edge, rgmii_rxd_rising_edge};
         rx_dv <= rgmii_rx_dv;
         rx_er <= rgmii_rx_er;
@@ -96,6 +93,7 @@ always @(posedge rgmii_mac_rx_clk) begin
     end
 end
 
+
 //Input buffers for the PHY signals through IDDR
 input_buffers #(.DATA_WIDTH(5)) 
 i_buff(.clk(rgmii_phy_rxc),
@@ -108,7 +106,8 @@ i_buff(.clk(rgmii_phy_rxc),
 //it produces the XOR with dava valid and error flag - this is from the RGMII standard
 assign rgmii_mac_rx_dv = rx_dv;
 assign rgmii_mac_rx_er = rx_er ^ rx_dv;
-assign rgmii_mac_rx_rdy = (link_speed == 2'b10) ? 1'b1 : (rxc_cntr == 2'b10); 
+//assign rgmii_mac_rx_rdy = (link_speed == 2'b10) ? 1'b1 : (rxc_cntr == 2'b10); 
+assign rgmii_mac_rx_rdy = (mii_select == 1'b0) ? 1'b1 : (rxc_cntr == 2'b10);
 
 /*** PHY TX (Data Transmission) ***/
 
@@ -134,7 +133,7 @@ always @(posedge clk_125) begin
         rgmii_txc_1 <= rgmii_txc_2;
     
         //10Mbps - clock speed of 2.5MHz
-        if(link_speed == 2'b00) begin
+        if(link_speed == 2'b00) begin 
             counter_reg <= counter_reg + 1;
             rgmii_tx_data_rdy <= 1'b0;
             //If 200ns has passed - rising edge of clock (2.5MHz - 400ns period)
@@ -151,7 +150,7 @@ always @(posedge clk_125) begin
             end         
         end 
         //100Mbps - clock speed of 25MHz 
-        else if(link_speed == 2'b01) begin
+        else if(link_speed == 2'b01) begin 
             counter_reg <= counter_reg + 1;
             rgmii_tx_data_rdy <= 1'b0;
             
