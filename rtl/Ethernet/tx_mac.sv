@@ -79,8 +79,7 @@ wire [31:0] crc_data_out;                                       //Ouput from the
 
 /* CRC32 Module Instantiation */
 crc32 #(.DATA_WIDTH(8)) 
-crc_module(.clk(clk),
-           .i_byte(crc_data_in),
+crc_module(.i_byte(crc_data_in),
            .i_crc_state(crc_state),
            .crc_en(crc_en),
            .o_crc_state(crc_next),

@@ -48,11 +48,18 @@ module ethernet_mac
 *****************************************************************/
 
 reg [2:0] rgmii_rxc_cntr = 4'h0;
-                  
+wire rgmii_mac_rx_clk;                  
 reg [1:0] rxc_edge_cntr = 1'b0;
 reg [6:0] rxc_ref_cntr = 7'h0;
 reg [1:0] link_speed_reg = 2'b10;
 
+///////////////////////////////////////////////////////////////////////////////////////
+// Vivado was optimizing this register out, however, it is necessary for CDC. Specifically,
+// This register is driven by the 125MHz clock domain, and is then passed back into the recieved 
+// clock domain and passed to the RGMII. In the RGMII, this signal is used to drive data to the
+// rx MAC. The reaosn the link_speed reg can tbe used for this is because this value is passed 
+// into the tx MAC which needs to run at 125MHz. This would cause a CDC problem.
+///////////////////////////////////////////////////////////////////////////////////////////
 (* keep ="true"  *)reg mii_sel_reg = 1'b0;
 wire [1:0] link_speed;
 wire mii_sel;
@@ -174,7 +181,6 @@ wire [FIFO_DATA_WIDTH-1:0] mac_rgmii_tx_data;
 wire mac_rgmii_tx_dv;
 wire mac_rgmii_tx_er;
 wire rgmii_mac_tx_rdy;
-wire rgmii_mac_rx_clk;
 wire [FIFO_DATA_WIDTH-1:0] rgmii_mac_rx_data;
 wire rgmii_mac_rx_dv;
 wire rgmii_mac_rx_er;

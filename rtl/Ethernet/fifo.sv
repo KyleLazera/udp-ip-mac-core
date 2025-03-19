@@ -46,7 +46,6 @@ module fifo
 );
 
 /* Local Params */
-//localparam ADDR_WIDTH = $clog2(FIFO_DEPTH);
 localparam ADDR_WIDTH = logb2(FIFO_DEPTH);
 
 function integer logb2(input integer depth);

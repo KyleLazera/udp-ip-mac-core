@@ -2,8 +2,8 @@
 
 module fifo_wr_ptr
 #(
-    parameter ADDR_WIDTH,
-    parameter ALMOST_FULL_DIFF    
+    parameter ADDR_WIDTH = 8,
+    parameter ALMOST_FULL_DIFF = 50   
 )
 (
     input wire clk,
@@ -35,7 +35,7 @@ reg [ADDR_WIDTH:0] temp_wr_ptr = {ADDR_WIDTH{1'b0}};
 
 /* Combinational Logic */
 
-//Conversion grey code to binary
+//Convert the incoming grey coded read pointer to binary to compute the almost full flag
 always @(*) begin
     rd_ptr_bin[ADDR_WIDTH] = rd_ptr[ADDR_WIDTH];
     
@@ -43,11 +43,11 @@ always @(*) begin
         rd_ptr_bin[i] = rd_ptr_bin[i+1] ^ rd_ptr[i];
 end
 
-//Caluclate next wr_ptr and convert to grey code
+//Caluclate next wr_ptr and convert to grey code so it can be sent to the read clock domain for comparison
 assign wr_ptr_bin_next = wr_ptr_bin + (write & !full);                              
 assign wr_ptr_grey = (wr_ptr_bin_next >> 1) ^ wr_ptr_bin_next;                      
 
-//Caluclate binary value that would indicate FIFO is almost full
+//Caluclate binary value of the address with the almost full threshold added
 assign wr_ptr_almost_full = wr_ptr_bin_next + ALMOST_FULL_DIFF;                                    
 
 //Full Flag Logic
@@ -72,7 +72,18 @@ always @(posedge clk) begin
     end
 end
 
-//Used to latch the current write address
+////////////////////////////////////////////////////////////////////////////////////////
+// This specific to the ethernet MAC. Since the MAC operates packet-wise, data should 
+// only be read from the FIFO when a full, valid packet has been written into the FIFO.
+// Specifically for the rx MAC side, there is a chance that the rx MAC writes majority 
+// of a packet into the FIFO, however, there is a bad CRC or some other signal indicating
+// a bad packet. This packet now needs to be dropped and we do not want to store this in 
+// the FIFO. The following logic addresses this issue:
+// Everytime a valid packet is written in (tlast without tuser being raised), the latch_addr
+// signal is set temporarily high and teh next write address is saved. This address will
+// be saved until the next valid packet (tlast & !tuser). If tuser goes high at any point,
+// drop packet is raised and the write address is reset back to the saved write address.
+///////////////////////////////////////////////////////////////////////////////////////////
 always @(posedge clk) begin
     if(!reset_n)
         temp_wr_ptr <= {ADDR_WIDTH{1'b0}};
@@ -80,8 +91,6 @@ always @(posedge clk) begin
         temp_wr_ptr <= wr_ptr_bin + 1'b1;
     else
        temp_wr_ptr <= temp_wr_ptr;
-    /*if(latch_addr) 
-        temp_wr_ptr <= wr_ptr_bin + 1'b1;*/
 end
 
 /* Output Logic */

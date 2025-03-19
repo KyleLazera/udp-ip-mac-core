@@ -54,7 +54,6 @@ module crc32
     parameter POLY = 32'h04C11DB7               // CRC32 polynomial
 )
 (
-    input wire clk,
     /* Input Signals */
     input wire [DATA_WIDTH-1:0] i_byte,         //Input Byte 
     input wire [CRC_WIDTH-1:0] i_crc_state,     //Input CRC State (this is initialized to 0xFFFFFFF or the output CRC State)

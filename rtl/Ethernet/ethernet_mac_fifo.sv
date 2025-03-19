@@ -3,6 +3,14 @@
 /* Top level module for ethernet mac that contains writable and readable FIFO's */
 
 module ethernet_mac_fifo
+#(
+    /* These Parameters are not meant to be adjusted */
+    parameter FIFO_DATA_WIDTH = 9,
+    parameter AXI_DATA_WIDTH = 8,
+    parameter RGMII_DATA_WIDTH = 4,
+    parameter RX_FIFO_DEPTH = 8192, 
+    parameter TX_FIFO_DEPTH = 4096    
+)
 (
     input wire i_clk,                                           //System clock to read data from rx and tx FIFO's - 100MHz
     input wire clk_125,                                         //Used to drive the tx MAC and RGMII interface 
@@ -29,12 +37,6 @@ module ethernet_mac_fifo
     output wire m_rx_axis_tlast,                                 //Indicates last beat of transaction (final byte in packet)
     input wire s_rx_axis_trdy                                    //Acts as a read enable signal to rx fifo   
 );
-
-localparam FIFO_DATA_WIDTH = 9;
-localparam AXI_DATA_WIDTH = 8;
-localparam RGMII_DATA_WIDTH = 4;
-localparam RX_FIFO_DEPTH = 8192;
-localparam TX_FIFO_DEPTH = 4096;
 
 /****************************************************************
 Intermediary Logic

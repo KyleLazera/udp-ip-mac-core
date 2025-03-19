@@ -45,7 +45,7 @@ wire rgmii_rx_dv, rgmii_rx_er;
 reg [3:0] rgmii_rxd_rising_edge;
 reg [3:0] rgmii_rxd_falling_edge;
 reg [3:0] rxd_lower_nibble = 3'b0;
-reg [3:0] rx_dv, rx_er;
+reg rx_dv, rx_er;
 reg dv_lower_nibble;                //used to capture the data valid for the first nibble sent
 reg [1:0] rxc_cntr;                 //Used to count the number of rxc positive edge - this is needed for single data rate
 

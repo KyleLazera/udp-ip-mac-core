@@ -32,7 +32,7 @@ module fifo_mem
 reg [DATA_WIDTH-1:0] data_reg_pipeline;
 
 /* Inferred BRAM Declaration */
-reg [DATA_WIDTH-1:0] dual_port_ram [0:MEM_DEPTH-1];
+(* ram_style="block" *) reg [DATA_WIDTH-1:0] dual_port_ram [0:MEM_DEPTH-1];
 
 /* Synchronous Logic to write into Block RAM */
 always@(posedge i_wr_clk) begin
@@ -63,9 +63,6 @@ generate
 
 endgenerate
 
-
-//First work Fall through read of RAM
-//assign o_rd_data = dual_port_ram[i_rd_addr];
 assign o_rd_data = data_reg_pipeline;
 
 endmodule

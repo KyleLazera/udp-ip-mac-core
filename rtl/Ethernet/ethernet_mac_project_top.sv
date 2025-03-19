@@ -235,7 +235,7 @@ if teh ethernet MAC can echo the data it recieves.
 *****************************************************************/
 
 wire data_feedback_rdy;
-wire data_feedback_payload;
+wire [7:0] data_feedback_payload;
 wire data_feedback_last;
 wire data_feedback_tx_rdy;
 

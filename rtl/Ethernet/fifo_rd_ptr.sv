@@ -3,8 +3,8 @@
 
 module fifo_rd_ptr
 #(
-    parameter ADDR_WIDTH,
-    parameter ALMOST_EMPTY_DIFF    
+    parameter ADDR_WIDTH = 8,
+    parameter ALMOST_EMPTY_DIFF = 50 
 )
 (
     input wire clk,
