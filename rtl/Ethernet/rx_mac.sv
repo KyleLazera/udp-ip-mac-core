@@ -57,17 +57,17 @@ typedef enum {IDLE,                                             //State that wai
               } state_type;                   
 
 /* Signal/Register Declarations */
-state_type state_reg, state_next;
+state_type state_reg;
 
 //AXI Stream Signals/registers
-reg axis_valid_reg, axis_valid_next;                            //FF that holds value of m_rx_axis_tvalid
-reg axis_user_reg, axis_user_next;                              //Holds the value of the user signal to the FIFO
-reg axis_last_reg, axis_last_next;                              //Holds the value of the m_rx_axis_tlast value
-reg [DATA_WIDTH-1:0] axis_data_reg, axis_data_next;             //Holds the data to be transmitted out to the FIFO
+reg axis_valid_reg;                                 //FF that holds value of m_rx_axis_tvalid
+reg axis_user_reg;                                  //Holds the value of the user signal to the FIFO
+reg axis_last_reg;                                  //Holds the value of the m_rx_axis_tlast value
+reg [DATA_WIDTH-1:0] axis_data_reg;                 //Holds the data to be transmitted out to the FIFO
 
 //CRC Registers
 reg [31:0] crc_state, crc_next;                                 //Holds the output state of the CRC32 module                                                                     
-reg crc_en_reg, crc_en_next;                                    //Register that holds crc_en state 
+reg crc_en_reg;                                                 //Register that holds crc_en state 
 reg sof;                                                        //Start of frame signal                              
 wire crc_en, crc_reset;                                         //CRC enable & reset   
 wire [31:0] crc_data_out;                                       //Ouput from the CRC32 module

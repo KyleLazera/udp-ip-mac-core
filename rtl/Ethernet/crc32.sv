@@ -4,19 +4,13 @@
  * and improve overall latency. This algorithm leverages the linearity of CRCs, relying on the equation:
  * CRC(A ^ B) = CRC(A) ^ CRC(B). 
  *
- * Notes on Latency:
+ * Notes:
  * The implementation utilizes a lookup table (LUT) containing precomputed CRC32 values for each byte,
  * ranging from 0 to 255. This LUT was populated using C code, which can be found in the Software directory.
- * Unlike the serial implementation, which processes the CRC32 calculation bit-by-bit (resulting in a latency
- * of 8 clock cycles per byte), this implementation is fully parallelized, enabling the CRC32 computation for
+ * Unlike the serial implementation, which processes the CRC32 calculation bit-by-bit (resulting in a throughput
+ * of 1 bit per clock cycle), this implementation is fully parallelized, enabling the CRC32 computation for
  * a byte to be completed in a single clock cycle. Therefore, calculating the CRC for 10 bytes takes only
- * 10 clock cycles, dramatically reducing latency.
- *
- * In the serial implementation, calculating the CRC32 for a byte takes 8x ns, where x is a clock cycle (bit-by-bit).
- * For example, calculating the CRC32 for 10 bytes in the serial implementation would take: 8(10) = 80 clock cycles
- * (each clock cycle is 8 ns, resulting in 640 ns). In contrast, this parallelized implementation takes only
- * 10 clock cycles (80 ns). This means, 8 bits can be process in 8 ns (1 period), leading to 1 bit per ns. This ensures
- * Gbit processing.
+ * 10 clock cycles, dramatically improving throughput of teh CRC computation and overall latency of the system.
  *
  * Algorithm:
  * 1. The input byte is inverted such that the most significant bit (MSB) becomes the least significant bit (LSB).
@@ -37,11 +31,6 @@
  *   for Gbit Ethernet applications.
  *
  * CRC Parameters:
- * - REFIN: Set to true, indicating that the input bits are reversed in the algorithm.
- * - REFOUT: Set to true, indicating that the final output bits are reversed.
- * - XOROUT: The final output value is XORed with 0xFFFFFFFF. In this module, it is implemented 
- *   simply by inverting the CRC state using the ~ operator.
- * - INIT: The CRC state is initialized to 0xFFFFFFFF, which is specified for Ethernet CRC32 calculations.
  * - POLY: The polynomial used is represented as:
  *     x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^10 + x^8 + x^7 + x^5 + x^4 + x^2 + x^1 + 1
  *   or 0x04C11DB7 in hexadecimal.

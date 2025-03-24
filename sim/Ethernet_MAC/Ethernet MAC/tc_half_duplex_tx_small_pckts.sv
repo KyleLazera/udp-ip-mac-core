@@ -32,7 +32,9 @@ class tc_half_duplex_tx_small_pckts extends eth_mac_base_test;
             0 : cfg.set_link_speed(cfg.GBIT_SPEED);
             1 : cfg.set_link_speed(cfg.MB_100_SPEED);
             2 : cfg.set_link_speed(cfg.MB_10_SPEED);
-        endcase        
+        endcase      
+
+        cfg.set_link_speed(cfg.MB_10_SPEED);
                                                                                                          
     endfunction : build_phase
     
