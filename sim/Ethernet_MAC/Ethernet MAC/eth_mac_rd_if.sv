@@ -83,20 +83,14 @@ interface eth_mac_rd_if
         //Indicate to the rx FIFO that we are ready to recieve data 
         s_rx_axis_trdy <= 1'b1;
 
-        //Sample data until we reach teh last byte within a packet
+        //Sample data until we reach the last byte within a packet
         while(1) begin                 
             #1;
             //only sample the data if the FIFO indicates it is not empty 
             if(m_rx_axis_tvalid & m_rx_axis_tlast) begin       
-                rx_fifo.push_back(m_rx_axis_tdata); 
-                s_rx_axis_trdy <= 1'b0;  
+                rx_fifo.push_back(m_rx_axis_tdata);  
                 break;             
             end else if(m_rx_axis_tvalid) begin
-                if(first_byte) begin
-                    $display("First Byte");
-                    @(posedge clk_100);
-                    first_byte = 1'b0;
-                end
                 rx_fifo.push_back(m_rx_axis_tdata);
             end 
 
@@ -106,7 +100,7 @@ interface eth_mac_rd_if
         @(posedge clk_100);
 
         //Lower the trdy flag to halt the FIFO temporarily - this is meant to simulate
-        // processing time
+        // processing time between each read
         s_rx_axis_trdy <= 1'b0;
 
         repeat(2)

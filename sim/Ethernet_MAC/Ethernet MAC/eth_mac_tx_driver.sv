@@ -43,6 +43,8 @@ virtual task main_phase(uvm_phase phase);
         //Copy data to encapsulate and send to the scoreboard for reference
         tx_item_copy.copy(tx_item);
 
+        `uvm_info("tx_driver", $sformatf("size of receievd data: %0d", tx_item_copy.tx_data.size()), UVM_MEDIUM)
+
         //Drive original data to the DUT
         wr_if.tx_fifo_drive_data(tx_item.tx_data, (num_packets_sent == cfg.tx_burst_size));        
 

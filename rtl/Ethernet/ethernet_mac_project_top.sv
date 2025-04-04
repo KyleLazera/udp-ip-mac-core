@@ -234,10 +234,22 @@ into the tx axi fifo signals. This is for a simple echo test, to see
 if teh ethernet MAC can echo the data it recieves.
 *****************************************************************/
 
-wire data_feedback_rdy;
-wire [7:0] data_feedback_payload;
-wire data_feedback_last;
-wire data_feedback_tx_rdy;
+reg [7:0] rx_data;
+reg rx_data_valid;
+reg rx_data_last;
+reg tx_fifo_rdy;
+
+reg data_feedback_rdy = 1'b0;
+reg [7:0] data_feedback_payload = 8'b0;
+reg data_feedback_last = 1'b0;
+reg data_feedback_tx_rdy = 1'b0;
+
+always @(posedge i_clk) begin
+    data_feedback_payload <= rx_data;
+    data_feedback_rdy <= rx_data_valid;
+    data_feedback_last <= rx_data_last;
+    data_feedback_tx_rdy <= tx_fifo_rdy;
+end
 
 
 ethernet_mac_fifo ethernet_mac(
@@ -255,16 +267,16 @@ ethernet_mac_fifo ethernet_mac(
     .rgmii_phy_txctl(rgmii_phy_txctl),
 
     /* TX FIFO AXI Interface */
-    .s_tx_axis_tdata(data_feedback_payload),            
-    .s_tx_axis_tvalid(data_feedback_rdy),                                
-    .s_tx_axis_tlast(data_feedback_last),                                
-    .m_tx_axis_trdy(data_feedback_tx_rdy),                                 
+    .s_tx_axis_tdata(),             
+    .s_tx_axis_tvalid(),                                 
+    .s_tx_axis_tlast(),                         
+    .m_tx_axis_trdy(),                                 
 
     /* Rx FIFO - AXI Interface*/
-    .m_rx_axis_tdata(data_feedback_payload),           
-    .m_rx_axis_tvalid(data_feedback_rdy),                                
-    .m_rx_axis_tlast(data_feedback_last),                                
-    .s_rx_axis_trdy(data_feedback_tx_rdy)                                              
+    .m_rx_axis_tdata(),           
+    .m_rx_axis_tvalid(),                                
+    .m_rx_axis_tlast(),                                
+    .s_rx_axis_trdy()                                              
 );
 
 

@@ -5,29 +5,27 @@
 
 set tx_oddr_cells [get_cells -hierarchical -filter {NAME =~ "*i_buff*genblk1[*].IDDR_inst"}]
 
-# RGMII PHY Had a max clock to data skew of 0.5
+# RGMII PHY Had a max clock to data skew of 0.5 & has min clock to data skew of -0.5
 set_input_delay -clock virt_rgmii_phy_rxc -max 0.5 [get_ports {rgmii_phy_rxd[*]}]
 set_input_delay -clock virt_rgmii_phy_rxc -max 0.5 [get_ports {rgmii_phy_rxd[*]}] -clock_fall -add_delay
-
-set_input_delay -clock virt_rgmii_phy_rxc -max 0.5 [get_ports rgmii_phy_rxctl]
-set_input_delay -clock virt_rgmii_phy_rxc -max 0.5 [get_ports rgmii_phy_rxctl] -clock_fall -add_delay
-
-#RGMII PHY has min clock to data skew of -0.5
 set_input_delay -clock virt_rgmii_phy_rxc -min -0.5 [get_ports {rgmii_phy_rxd[*]}]
 set_input_delay -clock virt_rgmii_phy_rxc -min -0.5  [get_ports {rgmii_phy_rxd[*]}] -clock_fall -add_delay
 
+set_input_delay -clock virt_rgmii_phy_rxc -max 0.5 [get_ports rgmii_phy_rxctl]
+set_input_delay -clock virt_rgmii_phy_rxc -max 0.5 [get_ports rgmii_phy_rxctl] -clock_fall -add_delay
 set_input_delay -clock virt_rgmii_phy_rxc -min -0.5 [get_ports rgmii_phy_rxctl]
 set_input_delay -clock virt_rgmii_phy_rxc -min -0.5 [get_ports rgmii_phy_rxctl] -clock_fall -add_delay
+
 
 #-------------------------------------------------------------------------------------------------------
 # When working with Double Data Rate special consideration has to be given to the relationship
 # between the launch and capture edge. Double Data Rate registers are seen as two registers:
 # 1 driven by the positive edge and another driven by a negative edge. Because the PHY drives data 
 # at DDR and teh MAC recieves data via a IDDR, there are essentially 4 paths the timing tool will see:
-# 1) Rising edge to rising edge 
-# 2) Rising edge to falling edge
-# 3) Falling edge to falling edge
-# 4) Falling edge to Rising edge 
+# 1) Rising launching edge to rising latching edge 
+# 2) Rising launching edge to falling latching edge
+# 3) Falling launching edge to falling latching edge
+# 4) Falling launching edge to Rising latching edge 
 # Because a 2ns delay is implemented via an IDELAY2 in the MAC, the data that is driven by the rising 
 # should be sampled by the next falling edge and vice versa. Therefore, we set the 1st and 3rd
 # paths (above) as false paths - tell the tool to ignore these.

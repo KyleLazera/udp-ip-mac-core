@@ -28,67 +28,34 @@ interface eth_mac_wr_if
     bit m_tx_axis_tlast;                                 //Indicates last beat of transaction (final byte in packet)
     bit s_tx_axis_trdy;                                  //Indicates the FIFO is not full and can receieve data
 
-
-
-    clocking tx_fifo_cb @(posedge clk_100);               
-        output m_tx_axis_tvalid;
-        output m_tx_axis_tlast;
-        output m_tx_axis_tdata;
-        input  s_tx_axis_trdy;
-    endclocking
-
     /* BFM Tasks */
     
-    //This simulates a FIFO driving data into the module
-    /*task tx_fifo_drive_data(bit [7:0] ref_fifo[$]);
+    task tx_fifo_drive_data(bit [7:0] ref_fifo[$], bit last_packet);
         int fifo_size = ref_fifo.size();
-
-        @(tx_fifo_cb);
-
-        //Indicate to the FIFO there is data to transmit
-        tx_fifo_cb.m_tx_axis_tvalid <= 1'b1;
-
-        //Drive the data out of the FIFO
-        while (fifo_size > 0) begin                                                      
-            
-            if (tx_fifo_cb.s_tx_axis_trdy) begin  
-                tx_fifo_cb.m_tx_axis_tlast <= (fifo_size == 1);                                             
-                tx_fifo_cb.m_tx_axis_tdata <= ref_fifo.pop_back();                
-                fifo_size--;
-            end   
-            @(tx_fifo_cb);                                
-        end 
-            
-            
-        tx_fifo_cb.m_tx_axis_tvalid <= 0;
-        @(tx_fifo_cb);    
-
-    endtask : tx_fifo_drive_data*/
-
-    task tx_fifo_drive_data(bit [7:0] ref_fifo[$], int last_packet);
-        int fifo_size = ref_fifo.size();
-
-        //Drive the data out of the FIFO
-        while (fifo_size > 0) begin                                                      
-            
-            if (s_tx_axis_trdy) begin  
-                //Indicate to the FIFO there is data to transmit
-                m_tx_axis_tvalid <= 1'b1;
-                m_tx_axis_tlast <= (fifo_size == 1);                                             
-                m_tx_axis_tdata <= ref_fifo.pop_back();                
-                fifo_size--;
-            end   
-            @(posedge clk_100);                                
-        end 
-
-        if(last_packet) begin 
-            while(!s_tx_axis_trdy)
-                @(posedge clk_100);         
-            
-            m_tx_axis_tvalid <= 1'b0;
-            @(posedge clk_100);  
+    
+        // Begin driving data
+        while (fifo_size > 0) begin
+            m_tx_axis_tvalid <= 1'b1;
+            m_tx_axis_tdata  <= ref_fifo.pop_back();
+            m_tx_axis_tlast  <= (fifo_size == 1);  // last signal on final byte
+    
+            // Wait for valid handshake
+            do @(posedge clk_100); while (!s_tx_axis_trdy);
+    
+            fifo_size--;
         end
-
+    
+        // After the final valid transfer
+        if (last_packet) begin
+            // Create a break in the stream (deassert valid)
+            m_tx_axis_tvalid <= 1'b0;
+            m_tx_axis_tlast  <= 1'b0;
+            m_tx_axis_tdata  <= 8'b0;
+            @(posedge clk_100);  // hold valid low for 1 cycle
+        end else begin
+            // Keep valid high to indicate stream is still active
+            m_tx_axis_tlast <= 1'b0;
+        end
     endtask : tx_fifo_drive_data
 
 

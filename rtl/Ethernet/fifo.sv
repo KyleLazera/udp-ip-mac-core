@@ -16,9 +16,9 @@
 
 module fifo
 #(
-    parameter FWFT = 1,                 //Determines whether the FIFO operates in First Word Fall Through mode (FWFT = 1)
+    parameter PIPELINE = 1,             //Determines whether there is an extra pipeline stage on teh read end of FIFO
                                         // or if the rd_en signal must be driven to pop teh first byte of data (FWFT = 0)
-
+    parameter FRAME_FIFO = 0,
     parameter DATA_WIDTH = 8,
     parameter FIFO_DEPTH = 256
 )
@@ -60,19 +60,19 @@ endfunction : logb2
 
 /* Signals / Registers */
 wire fifo_full, fifo_empty;
-reg [ADDR_WIDTH-1:0] wr_addr, rd_addr;
-reg [ADDR_WIDTH:0] wr_ptr_bin, wr_ptr_grey;
-reg [ADDR_WIDTH:0] rd_ptr_bin, rd_ptr_grey;
+reg [ADDR_WIDTH-1:0] wr_addr = '0, rd_addr = '0;
+reg [ADDR_WIDTH:0] wr_ptr_bin = '0, wr_ptr_grey = '0;
+reg [ADDR_WIDTH:0] rd_ptr_bin = '0, rd_ptr_grey = '0;
 
 /* Module Instantiations */
 
 //FIFO Block RAM Instantiation
-fifo_mem #(.DATA_WIDTH(DATA_WIDTH), .MEM_DEPTH(FIFO_DEPTH)) fifo_bram
+fifo_mem #(.PIPELINE(PIPELINE), .DATA_WIDTH(DATA_WIDTH), .MEM_DEPTH(FIFO_DEPTH)) fifo_bram
         (.i_wr_clk(clk_wr), .i_rd_clk(clk_rd), .i_wr_en(write_en), .i_rd_en(read_en),
-         .i_full(fifo_full), .i_wr_data(data_in), .o_rd_data(data_out), .i_wr_addr(wr_addr), .i_rd_addr(rd_addr));
+         .i_full(fifo_full), .i_empty(fifo_empty), .i_wr_data(data_in), .o_rd_data(data_out), .i_wr_addr(wr_addr), .i_rd_addr(rd_addr));
          
 //FIFO Write Pointer Comparator Instantiation
-fifo_wr_ptr #(.ADDR_WIDTH(ADDR_WIDTH), .ALMOST_FULL_DIFF(50)) wr_ptr (.clk(clk_wr), .reset_n(reset_n), .write(write_en),
+fifo_wr_ptr #(.ADDR_WIDTH(ADDR_WIDTH), .ALMOST_FULL_DIFF(50), .FRAME_FIFO(FRAME_FIFO)) wr_ptr (.clk(clk_wr), .reset_n(reset_n), .write(write_en),
              .full(fifo_full), .rd_ptr(rd_ptr_grey), .w_addr(wr_addr), .w_ptr(wr_ptr_bin), .almost_full(almost_full), 
              .drop_pckt(drop_pckt), .latch_addr(latch_addr));
 

@@ -12,17 +12,17 @@ module fifo_rd_ptr
     
     /* Control/Status Signals */
     input wire read,                               //Signal to indicate the FIFO is being read from
-    output reg empty,                               //Signal to indicate FIFO is empty
-    output reg almost_empty,                        //Signal indicating FIFO is almost empty
+    output reg empty = 1'b0,                               //Signal to indicate FIFO is empty
+    output reg almost_empty = 1'b0,                        //Signal indicating FIFO is almost empty
     
     /* Address Pointers */
     input wire [ADDR_WIDTH:0] w_ptr,               //Write pointer that is passed from write clock domain (arrived in grey code)
     output reg [ADDR_WIDTH-1:0] rd_addr,           //Read address that is used for the FIFO memory (In Binary)
-    output reg [ADDR_WIDTH:0] rd_ptr               //Read pointer that is passed to the write clock domain (In Grey Code)
+    output reg [ADDR_WIDTH:0] rd_ptr = 1'b0              //Read pointer that is passed to the write clock domain (In Grey Code)
 );
 
 /* Signals/Registers */
-reg [ADDR_WIDTH:0] rd_ptr_bin, rd_ptr_bin_next;    //Registers the value of the next read address (In Binary)
+reg [ADDR_WIDTH:0] rd_ptr_bin = '0, rd_ptr_bin_next;    //Registers the value of the next read address (In Binary)
 reg [ADDR_WIDTH:0] rd_ptr_grey;                    //Holds grey code version of read pointer
 reg [ADDR_WIDTH:0] wr_ptr_bin;                     //Holds the binary version of the write pointer passed from read clock domain
 reg [ADDR_WIDTH:0] rd_ptr_almost_empty;            //Calculate the almost empty value 

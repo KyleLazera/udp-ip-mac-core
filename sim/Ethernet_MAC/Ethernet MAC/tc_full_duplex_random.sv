@@ -25,15 +25,16 @@ class tc_full_duplex_random extends eth_mac_base_test;
         cfg.enable_rx_monitor();
         cfg.enable_tx_monitor();
         cfg.enable_rx_bad_pckt();
+        //cfg.tx_burst_size = 1; 
         link_speed = $urandom_range(0, 2);
 
-        case(link_speed)
+        /*case(link_speed)
             0 : cfg.set_link_speed(cfg.GBIT_SPEED);
             1 : cfg.set_link_speed(cfg.MB_100_SPEED);
             2 : cfg.set_link_speed(cfg.MB_10_SPEED);
-        endcase
+        endcase*/
 
-        cfg.set_link_speed(cfg.MB_10_SPEED);
+        cfg.set_link_speed(cfg.MB_100_SPEED);
                                                                  
     endfunction : build_phase
     
@@ -48,8 +49,8 @@ class tc_full_duplex_random extends eth_mac_base_test;
         rx_seq.start(env.rx_agent.rx_seqr);
 
         //Randomize number of packets to send
-        num_tx_packets = $urandom_range(10, 100);   
-        num_rx_packets = $urandom_range(10, 100);        
+        num_tx_packets = $urandom_range(50, 100);   
+        num_rx_packets = $urandom_range(50, 70);        
 
         //Set the total number of iterations for the scb - because we transmit an rx packet early, increment
         // the total number of rx packets that will be recieved so the scb takes it into account

@@ -82,7 +82,7 @@ virtual task main_phase(uvm_phase phase);
 
         //If it is a bad packet, append a 0x00 to teh front of teh queue and if it is not a bad packet
         // append 0xff
-        if(bad_pckt) begin
+        if(bad_pckt | (cfg.rx_bad_pckt & crc_er)) begin
             tx_item_copy.tx_data.push_front(8'h00);
         end else
             tx_item_copy.tx_data.push_front(8'hff);

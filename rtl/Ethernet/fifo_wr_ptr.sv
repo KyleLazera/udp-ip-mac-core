@@ -3,7 +3,8 @@
 module fifo_wr_ptr
 #(
     parameter ADDR_WIDTH = 8,
-    parameter ALMOST_FULL_DIFF = 50   
+    parameter ALMOST_FULL_DIFF = 50,
+    parameter FRAME_FIFO = 0   
 )
 (
     input wire clk,
@@ -11,21 +12,22 @@ module fifo_wr_ptr
     
     /* Control/Status Signals */
     input wire write,                               //Signal to indicate the FIFO is being written to
-    output reg full,                                //Signal to indicate FIFO is full
-    output reg almost_full,                         //Signal indicating the FIFO is almost full
+    output reg full = 1'b0,                                //Signal to indicate FIFO is full
+    output reg almost_full = 1'b0,                         //Signal indicating the FIFO is almost full
     
     /* Address Pointers */
     input wire [ADDR_WIDTH:0] rd_ptr,              //Read pointer that is passed from read clock domain (arrived in grey code)
     output reg [ADDR_WIDTH-1:0] w_addr,            //Write address that is used for the FIFO memory (In Binary)
-    output reg [ADDR_WIDTH:0] w_ptr,               //Write pointer that is used to compare to rd_ptr (In Grey Code)
+    output reg [ADDR_WIDTH:0] w_ptr = 1'b0,               //Write pointer that is used to compare to rd_ptr (In Grey Code)
 
-    /* FIFO Bad Packet signals */
+    /* FIFO Control signals */
     input wire drop_pckt,                          //indicates a bad packet was identified and needs to be dropped
-    input wire latch_addr                          //Latches the current write address
+    input wire latch_addr,                         //Latches the current write address
+    input wire frame_commit
 );
 
 /* Registers/Signals */
-reg [ADDR_WIDTH:0] wr_ptr_bin, wr_ptr_bin_next;    //Registers the next write address calculated in binary
+reg [ADDR_WIDTH:0] wr_ptr_bin = '0, wr_ptr_bin_next;    //Registers the next write address calculated in binary
 reg [ADDR_WIDTH:0] wr_ptr_grey;                    //Holds the grey code of the write pointer
 reg [ADDR_WIDTH:0] rd_ptr_bin;                     //Holds binary version of rd_ptr (passed via grey code from write domain) 
 reg [ADDR_WIDTH:0] wr_ptr_almost_full;             //Used to calculate the binary value for almsot full
@@ -44,8 +46,16 @@ always @(*) begin
 end
 
 //Caluclate next wr_ptr and convert to grey code so it can be sent to the read clock domain for comparison
-assign wr_ptr_bin_next = wr_ptr_bin + (write & !full);                              
-assign wr_ptr_grey = (wr_ptr_bin_next >> 1) ^ wr_ptr_bin_next;                      
+assign wr_ptr_bin_next = wr_ptr_bin + (write & !full);  
+
+generate 
+    if(FRAME_FIFO)
+        assign wr_ptr_grey = (temp_wr_ptr >> 1) ^ temp_wr_ptr;
+    else
+        assign wr_ptr_grey = (wr_ptr_bin_next >> 1) ^ wr_ptr_bin_next;  
+endgenerate
+//assign wr_ptr_grey = (wr_ptr_bin_next >> 1) ^ wr_ptr_bin_next;                      
+//assign wr_ptr_grey = (temp_wr_ptr >> 1) ^ temp_wr_ptr;
 
 //Caluclate binary value of the address with the almost full threshold added
 assign wr_ptr_almost_full = wr_ptr_bin_next + ALMOST_FULL_DIFF;                                    
@@ -60,8 +70,8 @@ assign almost_full_next = (~wr_ptr_almost_full[ADDR_WIDTH] == rd_ptr_bin[ADDR_WI
 /* Synchronous logic */
 always @(posedge clk) begin
     if(!reset_n) begin
-        wr_ptr_bin <= 0;
-        w_ptr <= 0;
+        wr_ptr_bin <= '0;
+        w_ptr <= '0;
         full <= 1'b0;
         almost_full <= 1'b0;
     end else begin

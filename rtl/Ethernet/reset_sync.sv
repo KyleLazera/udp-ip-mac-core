@@ -1,13 +1,5 @@
 `timescale 1ns/1ps
 
-////////////////////////////////////////////////////////////////////////
-// This module is used to synchronize an asynchronous and synchronous reset
-// signal. This module is used to synchronize a reset signal to be passed
-// into an asynchronous reset.
-// This module asserts the resets asynchronously - avoiding the issue of 
-// deassertion missing the reset recovery time and de-asserts the reset 
-// asynchronously - avoiding the possibility of missing the signal.
-////////////////////////////////////////////////////////////////////////
 
 module reset_sync #(
     parameter ACTIVE_LOW = 1 //Indicates whether the reset signal is active high or active low    

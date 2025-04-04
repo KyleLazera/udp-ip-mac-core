@@ -3,9 +3,10 @@ set_property CFGBVS VCCO [current_design]
 
 ## Clock Signal
 set_property -dict { PACKAGE_PIN R4    IOSTANDARD LVCMOS33 } [get_ports { i_clk }]; #IO_L13P_T2_MRCC_34 Sch=sysclk
-#create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports i_clk]
 
-set_property -dict { PACKAGE_PIN B22 IOSTANDARD LVCMOS12 } [get_ports { i_reset_n }]; #IO_L20N_T3_16 Sch=btnc
+##Active low reset
+set_property -dict { PACKAGE_PIN G4  IOSTANDARD LVCMOS15 } [get_ports { i_reset_n }]; #IO_L12N_T1_MRCC_35 Sch=cpu_resetn
+
 
 ## Ethernet
 #set_property -dict { PACKAGE_PIN Y14   IOSTANDARD LVCMOS25 } [get_ports { eth_int_b }]; #IO_L6N_T0_VREF_13 Sch=eth_int_b

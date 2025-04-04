@@ -39,7 +39,7 @@ class tc_half_duplex_tx_random extends eth_mac_base_test;
             2 : cfg.set_link_speed(cfg.MB_10_SPEED);
         endcase       
 
-        cfg.set_link_speed(cfg.MB_10_SPEED);
+        cfg.set_link_speed(cfg.GBIT_SPEED);
                                                                                                          
     endfunction : build_phase
     
@@ -55,7 +55,7 @@ class tc_half_duplex_tx_random extends eth_mac_base_test;
         rx_seq.start(env.rx_agent.rx_seqr);
 
         //Randomize number of packets to send
-        num_packets = $urandom_range(10, 100);        
+        num_packets = $urandom_range(50, 100);        
 
         //Set the total number of iterations for the scb
         env.eth_scb.num_tx_iterations = num_packets;

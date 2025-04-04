@@ -182,7 +182,7 @@ always @(posedge clk) begin
                     //Transmit the data from shift reg 4 to FIFO & CRC checker
                     axis_data_reg <= rgmii_rdx[4];
 
-                    if((s_rx_axis_trdy == 1'b0) || !rgmii_dv[4] && rgmii_er[4]) begin //!rgmii_mac_rx_dv && rgmii_mac_rx_er || 
+                    if((s_rx_axis_trdy == 1'b0) || !rgmii_dv[4] && rgmii_er[4]) begin 
                         axis_user_reg <= 1'b1;
                         state_reg <= BAD_PCKT;
                     end

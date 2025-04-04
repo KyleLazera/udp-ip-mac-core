@@ -177,11 +177,12 @@ always @(posedge clk) begin
                 end
                 PREAMBLE : begin
                     rgmii_dv_reg <= 1'b1;
+
                     //If we have recieved out 6th byte of the preamble
                     if(byte_ctr == 3'd6) begin
                         tx_data_reg <= ETH_HDR;
                         byte_ctr <= byte_ctr + 1;
-                        axis_rdy_reg <= ~mii_select;
+                        //axis_rdy_reg <= ~mii_select;
                     end
                     //If all 7 bytes of the Header have been sent, transmit the SFD  
                     else if(byte_ctr == 3'd7) begin

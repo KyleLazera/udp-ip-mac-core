@@ -22,8 +22,8 @@ module sync_r2w
 /* Sequential Logic */
 always @(posedge clk) begin
     if(!reset_n) begin
-        rd_ptr_0 <= 0;
-        rd_ptr_1 <= 0;
+        rd_ptr_0 <= {ADDR_WIDTH{1'b0}};
+        rd_ptr_1 <= {ADDR_WIDTH{1'b0}};
     end else begin
         rd_ptr_1 <= rd_ptr_0;
         rd_ptr_0 <= i_rd_ptr;
