@@ -27,7 +27,13 @@ interface rgmii_rx_bfm;
         forever 
             #(period) rgmii_phy_rxc <= ~rgmii_phy_rxc; 
     
-    endtask : generate_clock    
+    endtask : generate_clock   
+
+    task rgmii_reset();
+        rgmii_phy_rxc <= 1'b0;
+        rgmii_phy_rxd <= {RGMII_DATA_WIDTH-1{1'b0}};
+        rgmii_phy_rxctl <= 1'b0;
+    endtask : rgmii_reset 
 
     task rgmii_drive_data(bit[7:0] rx_data[$], bit [1:0] link_speed, bit data_err, output bit bad_pckt);
         int data_not_valid = 1'b0;

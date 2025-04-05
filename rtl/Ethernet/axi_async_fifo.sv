@@ -21,6 +21,7 @@ module axi_async_fifo
 (
     /* AXI Master - Output/Read Signals */
     input wire m_aclk,
+    input wire m_sresetn,
     output wire [AXI_DATA_WIDTH-1:0] m_axis_tdata,
     output wire m_axis_tlast,
     output wire m_axis_tvalid,
@@ -41,12 +42,12 @@ reg [FIFO_ADDR_WIDTH:0] wr_ptr_binary = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_packet_commit = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_packet_commit_grey = {FIFO_ADDR_WIDTH{1'b0}};
-reg [FIFO_ADDR_WIDTH:0] rd_ptr_grey_sync = {FIFO_ADDR_WIDTH{1'b0}};
+reg [FIFO_ADDR_WIDTH:0] rd_ptr_grey_sync;
 
 /* Read Domain Pointers */
 reg [FIFO_ADDR_WIDTH:0] rd_ptr_binary = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] rd_ptr_grey = {FIFO_ADDR_WIDTH{1'b0}};
-reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey_sync = {FIFO_ADDR_WIDTH{1'b0}};
+reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey_sync;
 
 /* BRAM Instantiation */
 (* ram_style="block" *) reg [FIFO_WORD_SIZE-1:0] bram [0:FIFO_DEPTH-1]; 
@@ -57,36 +58,57 @@ reg s_axis_trdy_out = 1'b0;
 wire full;
 wire empty;
 
-reg m_sresetn = 1'b1;
-reg m_sreset_sync;
-reg wr_reset_stretch = 1'b1;
+/* Reset Logic */
 
-/* Reset Logic - Stretch the reset from the write domain and synchronize
- * it into the read domain. Only lower the stretched input reset once the 
- * synchornized reset has entered into the read domain.
- */
+reg [2:0] s_reset_sync = 3'b0;
+reg [2:0] m_reset_sync = 3'b0;
 
- always @(posedge s_aclk) begin
-    wr_reset_stretch <= (!s_sresetn | ~wr_reset_stretch) & (!s_sresetn & m_sreset_sync);
- end
+wire m2s_reset_sync;
+wire s2m_reset_sync;
 
-cdc_signal_sync #(
+////////////////////////////////////////////////////////////////////////////
+// By Asynchronously setting the first FF in the sycnhronization pipeline
+// we can avoid the problem of a timing violation when asserting the reset.
+////////////////////////////////////////////////////////////////////////////
+
+always @(posedge s_aclk or negedge s_sresetn) begin
+    if(!s_sresetn)
+        m_reset_sync[0] <= 1'b0;
+    else
+        m_reset_sync[0] <= 1'b1;
+end
+
+always @(posedge m_aclk or negedge m_sresetn) begin
+    if(!m_sresetn)
+        s_reset_sync[0] <= 1'b0;
+    else
+        s_reset_sync[0] <= 1'b1;
+end
+
+////////////////////////////////////////////////////////////////////////////
+// Asynchronous resets can avoid the possible timing violation when asserting 
+// the reset, however, when de-asserting the reset, asynchronous resets can
+// cause a timing violation. Therefore, the asynchronous reset is synchronously 
+// de-asserted.
+////////////////////////////////////////////////////////////////////////////
+
+cdc_signal_sync#(
     .PIPELINE(0),
     .WIDTH(1)
-) reset_wr2rd_sync (
+) slave_to_master_reset_sync (
     .i_dst_clk(m_aclk),
-    .i_signal(~wr_reset_stretch),
-    .o_signal_sync(m_sresetn),
+    .i_signal(m_reset_sync[0]),
+    .o_signal_sync(s2m_reset_sync),
     .o_pulse_sync()
 );
 
-cdc_signal_sync #(
+cdc_signal_sync#(
     .PIPELINE(0),
     .WIDTH(1)
-) reset_rd2wr_sync (
+) master_to_slave_reset_sync (
     .i_dst_clk(s_aclk),
-    .i_signal(m_sresetn),
-    .o_signal_sync(m_sreset_sync),
+    .i_signal(s_reset_sync[0]),
+    .o_signal_sync(m2s_reset_sync),
     .o_pulse_sync()
 );
 
@@ -99,7 +121,7 @@ assign empty = (rd_ptr_grey == wr_ptr_grey_sync);
 wire [FIFO_ADDR_WIDTH:0] wr_ptr_binary_next = wr_ptr_binary + !full;
 
 always @(posedge s_aclk) begin
-    if(!m_sresetn) begin
+    if(!s_sresetn | !m2s_reset_sync) begin
         wr_ptr_binary <= {FIFO_ADDR_WIDTH{1'b0}};
         wr_ptr_packet_commit <= {FIFO_ADDR_WIDTH{1'b0}};
         wr_ptr_packet_commit_grey <= {FIFO_ADDR_WIDTH{1'b0}};
@@ -144,7 +166,7 @@ integer i;
 wire [FIFO_ADDR_WIDTH:0] rd_ptr_binary_next = rd_ptr_binary + !empty;
 
 always @(posedge m_aclk) begin
-    if(!m_sresetn) begin
+    if(!m_sresetn | !s2m_reset_sync) begin
         rd_ptr_binary <= {FIFO_ADDR_WIDTH{1'b0}};
         rd_ptr_grey <= {FIFO_ADDR_WIDTH{1'b0}};        
     end else begin
@@ -202,7 +224,8 @@ sync_w2r #(
 );
 
 /* Output Signals */
-assign s_axis_trdy = ~full;
+
+assign s_axis_trdy = ~full & m2s_reset_sync;    
 assign m_axis_tvalid = m_axis_tvalid_pipe[PIPELINE_STAGES]; 
 assign m_axis_tdata = m_axis_tdata_pipe[PIPELINE_STAGES][FIFO_WORD_SIZE-1:1];
 assign m_axis_tlast = m_axis_tdata_pipe[PIPELINE_STAGES][0];

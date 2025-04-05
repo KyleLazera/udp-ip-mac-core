@@ -105,6 +105,7 @@ axi_async_fifo #(
 ) rx_fifo (
     /* AXI Master - Output Signals / Read Side */
     .m_aclk(i_clk),
+    .m_sresetn(i_reset_n),
     .m_axis_tdata(m_rx_axis_tdata),
     .m_axis_tlast(m_rx_axis_tlast),
     .m_axis_tvalid(m_rx_axis_tvalid),
@@ -131,6 +132,7 @@ axi_async_fifo #(
 ) tx_fifo (
     /* AXI Master - Output Signals */
     .m_aclk(clk_125),
+    .m_sresetn(i_reset_n),
     .m_axis_tdata(tx_fifo_tdata),
     .m_axis_tlast(tx_fifo_tlast),
     .m_axis_tvalid(tx_fifo_tvalid),

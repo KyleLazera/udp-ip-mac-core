@@ -267,16 +267,16 @@ ethernet_mac_fifo ethernet_mac(
     .rgmii_phy_txctl(rgmii_phy_txctl),
 
     /* TX FIFO AXI Interface */
-    .s_tx_axis_tdata(),             
-    .s_tx_axis_tvalid(),                                 
-    .s_tx_axis_tlast(),                         
-    .m_tx_axis_trdy(),                                 
+    .s_tx_axis_tdata(data_feedback_payload),             
+    .s_tx_axis_tvalid(data_feedback_rdy),                                 
+    .s_tx_axis_tlast(data_feedback_last),                         
+    .m_tx_axis_trdy(tx_fifo_rdy),                                 
 
     /* Rx FIFO - AXI Interface*/
-    .m_rx_axis_tdata(),           
-    .m_rx_axis_tvalid(),                                
-    .m_rx_axis_tlast(),                                
-    .s_rx_axis_trdy()                                              
+    .m_rx_axis_tdata(rx_data),           
+    .m_rx_axis_tvalid(rx_data_valid),                                
+    .m_rx_axis_tlast(rx_data_last),                                
+    .s_rx_axis_trdy(data_feedback_tx_rdy)                                              
 );
 
 

@@ -25,7 +25,7 @@ class tc_full_duplex_random extends eth_mac_base_test;
         cfg.enable_rx_monitor();
         cfg.enable_tx_monitor();
         cfg.enable_rx_bad_pckt();
-        //cfg.tx_burst_size = 1; 
+        cfg.tx_burst_size = 1; 
         link_speed = $urandom_range(0, 2);
 
         /*case(link_speed)

@@ -61,7 +61,10 @@ always @(posedge rgmii_mac_rx_clk) begin
     if(!reset_n)
         rxc_cntr <= 2'b00;
     else begin
-        rxc_cntr <= (rxc_cntr == 2'b10) ? 2'b01 : rxc_cntr + 1;
+        if(!rgmii_phy_rxctl & !rx_dv)
+            rxc_cntr <= 2'b10;
+        else
+            rxc_cntr <= (rxc_cntr == 2'b10) ? 2'b01 : rxc_cntr + 1;
     end
 end
 
@@ -106,7 +109,6 @@ i_buff(.clk(rgmii_phy_rxc),
 //it produces the XOR with dava valid and error flag - this is from the RGMII standard
 assign rgmii_mac_rx_dv = rx_dv;
 assign rgmii_mac_rx_er = rx_er ^ rx_dv;
-//assign rgmii_mac_rx_rdy = (link_speed == 2'b10) ? 1'b1 : (rxc_cntr == 2'b10); 
 assign rgmii_mac_rx_rdy = (mii_select == 1'b0) ? 1'b1 : (rxc_cntr == 2'b10);
 
 /*** PHY TX (Data Transmission) ***/
