@@ -9,14 +9,21 @@ module ethernet_mac_project_top #(
     input wire i_clk,
     input wire i_reset_n,
 
+    /* Testing status */
+    output wire o_reset_status,
+
     /* External RGMII Interface */
     input wire rgmii_phy_rxc,                                   //Recieved ethernet clock signal
     input wire [RGMII_DATA_WIDTH-1:0] rgmii_phy_rxd,            //Receieved data from PHY
     input wire rgmii_phy_rxctl,                                 //Control signal (dv ^ er) from PHY
     output wire rgmii_phy_txc,                                  //Outgoing data clock signal
     output wire [RGMII_DATA_WIDTH-1:0] rgmii_phy_txd,           //Outgoing ethernet packet data
-    output wire rgmii_phy_txctl                                 //Outgoing control signal (dv ^ er)   
+    output wire rgmii_phy_txctl,                                //Outgoing control signal (dv ^ er)   
+    output wire rgmii_phy_rstb                                  //Active low PHY reset
 );
+
+assign o_reset_status = i_reset_n;
+assign rgmii_phy_rstb = i_reset_n;
 
 /****************************************************************
 Reset Synchronization used for MMCM and IDELAYCTRL - These modules 

@@ -52,6 +52,7 @@ reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey_sync;
 /* BRAM Instantiation */
 (* ram_style="block" *) reg [FIFO_WORD_SIZE-1:0] bram [0:FIFO_DEPTH-1]; 
 
+
 reg s_frame_commit = 1'b0;
 reg s_axis_trdy_out = 1'b0;
 

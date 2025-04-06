@@ -131,7 +131,7 @@ end
 always @(posedge clk) begin
     if(~reset_n) begin
         state_reg <= IDLE;
-        tx_data_reg <= 8'h0;
+        tx_data_reg <= 8'h00;
         byte_ctr <= 3'h0;
         pckt_size <= 8'h0;
         mii_sdr <= 1'b0;
