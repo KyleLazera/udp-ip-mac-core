@@ -1,3 +1,14 @@
+## Table of Contents
+- [Overview](#overview)
+  - [Limitations & Future Improvements](#limitations-and-future-improvements)
+- [Top Level Design](#top-level-design)
+  - [RGMII Interface](#rgmii-interface)
+  - [Input Delay](#introducing-delay-for-receiver)
+  - [Asynch FIFO](#asynch-fifo)
+    - [Double Flop Synchronizers](#double-flop-synchronizers)
+  - [CRC32 Computation](#crc32-computation)
+    - [Sarwates Algorithm](#sarwates-algorithm)
+
 # Overview
 This project is a custom Tri-mode Ethernet MAC (TEMAC) core that interfaces with RGMII, designed in Verilog and tested on the Nexys Video (Artix-7 200T) FPGA.
 Supported Features
@@ -11,7 +22,7 @@ Supported Features
   - AXI-Stream Interface – Provides a high-speed, standardized interface to external modules.
   - FIFO Buffering – Implements internal FIFO queues to buffer incoming and outgoing packets, reducing latency.
 
-### Limitations & Future Improvements
+### Limitations And Future Improvements
   - No MDIO Module – Does not currently implement MDIO (Management Data Input/Output) for PHY configuration.
   - No Pause Frame/Flow Control Support
   - No Jumbo Frame Support – Limited to standard Ethernet frame sizes (≤1518 bytes).
