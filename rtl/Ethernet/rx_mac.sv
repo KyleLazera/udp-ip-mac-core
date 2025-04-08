@@ -17,7 +17,7 @@
  *    7 Bytes     1 Byte   6 Bytes    6 Bytes     2 Bytes   46 - 1500 Bytes  Optional   4 Bytes  96-Bit Times
  *  ----------------------------------------------------------------------------------------------------
  *  |            |      |          |            |         |                |          |       |        |
- *  | Preamble   | SFD  | Dst Addr |  Src Addr  |  Length |    Payload     |  Padding |  CRC  |  IFG   |
+ *  | Preamble   | SFD  | Dst Addr |  Src Addr  |  Type   |    Payload     |  Padding |  CRC  |  IFG   |
  *  |            |      |          |            |         |                |          |       |        |
  *  ----------------------------------------------------------------------------------------------------
 */
@@ -43,7 +43,12 @@ module rx_mac
     input wire [DATA_WIDTH-1:0] rgmii_mac_rx_data,              //Input data from the RGMII PHY interface
     input wire rgmii_mac_rx_dv,                                 //Indicates data from PHY is valid
     input wire rgmii_mac_rx_er,                                 //Indicates an error in the data from the PHY
-    input wire rgmii_mac_rx_rdy                                 //Used as a valid signal for the rx data
+    input wire rgmii_mac_rx_rdy,                                //Used as a valid signal for the rx data
+
+    /* Flow Control Signals */
+    output wire tx_pause_frame,                                 //Indicates the TX MAC to transmit a pause frame
+    output wire rx_pause_frame,                                 //indicates a pause frame was recieved and to puase the TX MAC 
+    input wire mii_sel                                          //Determine whether we are in 10/100mbps mode or 1gbps mode
 );
 
 /* Local variables */
@@ -59,11 +64,18 @@ typedef enum {IDLE,                                             //State that wai
 /* Signal/Register Declarations */
 state_type state_reg;
 
+//Packet inspection Registers
+reg [41:0] dst_addr = 42'b0;
+reg [41:0] src_addr = 42'b0;
+reg [15:0] eth_type = 16'b0;
+reg [15:0] opcode = 16'b0;
+reg [15:0] pause_frame_time = 16'b0;
+
 //AXI Stream Signals/registers
-reg axis_valid_reg;                                 //FF that holds value of m_rx_axis_tvalid
-reg axis_user_reg;                                  //Holds the value of the user signal to the FIFO
-reg axis_last_reg;                                  //Holds the value of the m_rx_axis_tlast value
-reg [DATA_WIDTH-1:0] axis_data_reg;                 //Holds the data to be transmitted out to the FIFO
+reg axis_valid_reg;                                             //FF that holds value of m_rx_axis_tvalid
+reg axis_user_reg;                                              //Holds the value of the user signal to the FIFO
+reg axis_last_reg;                                              //Holds the value of the m_rx_axis_tlast value
+reg [DATA_WIDTH-1:0] axis_data_reg;                             //Holds the data to be transmitted out to the FIFO
 
 //CRC Registers
 reg [31:0] crc_state, crc_next;                                 //Holds the output state of the CRC32 module                                                                     
@@ -72,11 +84,19 @@ reg sof;                                                        //Start of frame
 wire crc_en, crc_reset;                                         //CRC enable & reset   
 wire [31:0] crc_data_out;                                       //Ouput from the CRC32 module
 
-//Shift registers to store incoming data from rgmii
-reg [DATA_WIDTH-1:0] rgmii_rdx [4:0] = '{default: '0};
-//Shift regiters to store data valid and error signals from rgmii
-reg [4:0] rgmii_dv = 5'b0;
-reg [4:0] rgmii_er = 5'b0;
+//Shift registers
+reg [3:0] byte_cntr = 4'b0;                                     // Counter used to count bytes for packet inspection
+reg [DATA_WIDTH-1:0] rgmii_rdx [4:0] = '{default: '0};          //Shift registers to store incoming data from rgmii
+reg [4:0] rgmii_dv = 5'b0;                                      //Shift regiters to store data valid from rgmii
+reg [4:0] rgmii_er = 5'b0;                                      //Shift register to store error signals from rgmii
+
+//Pause Frame registers
+reg [7:0] bit_time_cntr = 8'b0;                                 // Counts the number of bit times that have passed
+reg [15:0] pause_quanta_cntr = 16'b0;                           // Counts how many 512 bit times have passed
+reg [15:0] pause_time = 16'b0;                                  // This is the total time to wait for ( in 512 bit time units - how long to send 512 bits)
+reg rx_pause_reg = 1'b0;                                        // Flag indicating a pause frame was recieved
+reg tx_pause_reg = 1'b0;                                        // Flag indicating we need to transmit a pause frame
+reg [6:0] cc_per_bit_time;                                     // Determines how many clock cycles are in 512 bit times for each clock speed
 
 /*Logic for shifting data & signals into shift registers from RGMII */
 always @(posedge clk) begin
@@ -150,6 +170,60 @@ assign sof = ((rgmii_rdx[4] == ETH_SFD) && (hdr_cnt == 3'd7) && (rgmii_dv[4] && 
 assign crc_en = crc_en_reg;
 assign crc_reset = (~reset_n || sof);
 
+/*** Pause Frame Logic ***/
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// The ethernet standard specifies that a pause frame can be triggered if the ethernet
+// packet contains the following values:
+// Ethery Type = 0x8808 (Slow Protocol)
+// Opcode = 0x0001      (Pause Frame)
+// The Opcode is the first 2 bytes of the payload data & teh following 2 bytes are the 
+// time quanta. The time quanta is a value that will be counted up to, however, each
+// time quanta is equivelent to 512 bit times (time it takes to send 512 bits).
+// Therefore if teh time quanta value is 0x0003 this means we need to count 512 bit times
+// 3 times.
+// For 1gbps, 512 bit times = 512 ns, for 100mbps 512 bit times = 5120ns and for 100mbps 
+// 512 bit times = 51,200ns.
+/////////////////////////////////////////////////////////////////////////////////////////
+
+always @(*) begin
+    case(mii_sel)
+        1'b0: cc_per_bit_time = 7'd63;
+        1'b1: cc_per_bit_time = 7'd127;
+    endcase
+end
+
+always @(posedge clk) begin
+    if(~reset_n) begin
+        bit_time_cntr <= 8'b0;
+        pause_quanta_cntr <= 16'b0;    
+    end else begin
+
+        if(({eth_type, opcode} == 32'h8808_0001) & !rx_pause_reg) begin
+            rx_pause_reg <= 1'b1;
+            pause_time <= pause_frame_time;
+            bit_time_cntr <= 8'b0;
+            pause_quanta_cntr <= 16'b0;            
+        end
+
+        //While the rx_pause flag is high, count up to the specified time quanta 
+        // The counting must occur according to the ethernet standard explained above
+        if(rx_pause_reg) begin
+            bit_time_cntr <= bit_time_cntr + 1;
+
+            if(bit_time_cntr == cc_per_bit_time) begin
+                pause_quanta_cntr <= pause_quanta_cntr + 1;
+            end
+        end
+
+        // Once we have counted up to the specified pause value, lower the rx pause flag
+        // and reset the counters 
+        if(pause_quanta_cntr == pause_time) begin
+            rx_pause_reg <= 1'b0;
+        end
+    end       
+end
+
 /* State Machine Logic */
 always @(posedge clk) begin
     if(~reset_n) begin
@@ -158,16 +232,21 @@ always @(posedge clk) begin
         axis_data_reg <= 1'b0;
         axis_last_reg <= 1'b0;
         axis_user_reg <= 1'b0;
-        crc_en_reg <= 1'b0;        
+        crc_en_reg <= 1'b0;  
+        byte_cntr <= 4'b0;             
     end else begin
-            axis_valid_reg <= 1'b0;
-            axis_last_reg <= 1'b0;
-            crc_en_reg <= 1'b0;
-            axis_user_reg <= 1'b0;
+        axis_valid_reg <= 1'b0;
+        axis_last_reg <= 1'b0;
+        crc_en_reg <= 1'b0;
+        axis_user_reg <= 1'b0;
 
         if(rgmii_mac_rx_rdy) begin
             case(state_reg)
                 IDLE: begin
+                    eth_type <= 16'b0;
+                    opcode <= 16'b0;
+                    pause_frame_time <= 16'b0;
+                    byte_cntr <= 4'b0;
                     //If data valid is high, SFD & HDR is found & FIFO is ready for data 
                     if(rgmii_rdx[4] == ETH_SFD && hdr_cnt == 3'd7 && rgmii_dv[4] && s_rx_axis_trdy) begin  
                         crc_en_reg <= 1'b1;
@@ -175,6 +254,26 @@ always @(posedge clk) begin
                     end                  
                 end
                 PAYLOAD : begin
+
+                    //////////////////////////////////////////////////////////////////////////////////
+                    // Because teh data from the rgmii is recieved via 5 shift registers, on
+                    // each clock edge, we have access to 5 valid data bytes. Therefore, once the SFD
+                    // has been detected, the dst addr (6 bytes), src addr (6 bytes), type (2 bytes),
+                    // opcode (2 bytes) and time quanta (2 bytes) can all be extracted within 15 cycles.
+                    ////////////////////////////////////////////////////////////////////////////////////
+                    if(!(&byte_cntr))
+                        byte_cntr <= byte_cntr + 1;
+                   
+                   // Inspect the ethernet type
+                    if(byte_cntr == 4'd12) begin
+                        eth_type <= {rgmii_rdx[4], rgmii_rdx[3]};
+                    end
+                    // Inspect the opcode of the packet
+                    else if(byte_cntr == 4'd14) begin
+                        opcode <= {rgmii_rdx[4], rgmii_rdx[3]};
+                        pause_frame_time <= {rgmii_rdx[2], rgmii_rdx[1]};
+                    end 
+
                     //If there is data to transmit, calculate crc and raise valid flag
                     axis_valid_reg <= 1'b1;
                     crc_en_reg <= 1'b1;
@@ -182,11 +281,11 @@ always @(posedge clk) begin
                     //Transmit the data from shift reg 4 to FIFO & CRC checker
                     axis_data_reg <= rgmii_rdx[4];
 
-                    if((s_rx_axis_trdy == 1'b0) || !rgmii_dv[4] && rgmii_er[4]) begin 
+                    //If there is an error detected, the RX FIFO is full, or a pause frame is detected, do not store the packet in the FIFO
+                    if((s_rx_axis_trdy == 1'b0) || !rgmii_mac_rx_dv && rgmii_mac_rx_er || ({eth_type, opcode} == 32'h8808_0001)) begin 
                         axis_user_reg <= 1'b1;
                         state_reg <= BAD_PCKT;
-                    end
-
+                    end                                        
                     else if(!rgmii_mac_rx_dv && !rgmii_mac_rx_er) begin
                         axis_last_reg <= 1'b1;
                         crc_en_reg <= 1'b0;
@@ -207,9 +306,14 @@ always @(posedge clk) begin
 end 
 
 /* Output Logic */
+
+// AXI Stream Output Logic
 assign m_rx_axis_tdata = axis_data_reg;
 assign m_rx_axis_tuser = axis_user_reg;
 assign m_rx_axis_tvalid = axis_valid_reg;
 assign m_rx_axis_tlast = axis_last_reg;
+//Pause Frame Output Logic
+assign rx_pause_frame = rx_pause_reg;
+assign tx_pause_frame = tx_pause_reg;
 
 endmodule

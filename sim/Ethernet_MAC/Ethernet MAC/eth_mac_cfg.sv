@@ -14,6 +14,7 @@ class eth_mac_cfg extends uvm_object;
     bit [1:0] link_speed = GBIT_SPEED;
     int tx_burst_size = 0;
     bit rx_bad_pckt = 1'b0;
+    bit pause_frames = 1'b0;
 
     function new(string name = "eth_mac_cfg");
         super.new(name);

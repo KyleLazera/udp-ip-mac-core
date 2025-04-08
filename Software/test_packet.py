@@ -12,10 +12,7 @@ payload = (base_message * repeat_count)[:1492]  # trim in case of rounding
 
 # Build Ethernet packet
 packet = Ether(dst="ff:ff:ff:ff:ff:ff", type=0x1234) / payload.encode()
+packets = packet*100000
 
 # Send the packet 
-sendp([packet] * 100000, iface=iface, verbose=False)
-
-
-
-
+sendp(packets, iface=iface, verbose=False)

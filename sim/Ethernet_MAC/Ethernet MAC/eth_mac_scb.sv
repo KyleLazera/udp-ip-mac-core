@@ -36,19 +36,28 @@ class eth_mac_scb extends uvm_scoreboard;
         rx_mon_port = new("rx_mon_port", this);
     endfunction : build_phase
 
-    task check_bad_pckt(ref bit[7:0] packet[$]);
-        if(packet.pop_front() == 8'h00) begin
+    task decode_packet(ref bit[7:0] packet[$]);
+        bit [7:0] decode_byte = packet.pop_front();
+        
+        if(decode_byte == 8'h00 || decode_byte == 8'h01) begin
             rx_packets_rec++;
 
-            `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
-            `uvm_info("scb", "RX Bad Packet Dropped", UVM_MEDIUM)
-            `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
+            if(decode_byte == 8'h00) begin
+                `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
+                `uvm_info("scb", "RX Bad Packet Dropped", UVM_MEDIUM)
+                `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)                 
+            end else if(decode_byte == 8'h01) begin
+                `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)
+                `uvm_info("scb", "Pause Frame Receieved", UVM_MEDIUM)
+                `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)   
+            end
 
             rx_drv_port.get(rx_rgmii); 
-            check_bad_pckt(rx_rgmii.tx_data);                  
+            decode_packet(rx_rgmii.tx_data);
 
-        end   
-    endtask : check_bad_pckt
+        end      
+    
+    endtask : decode_packet
 
     virtual task main_phase(uvm_phase phase);   
         super.main_phase(phase);
@@ -62,7 +71,8 @@ class eth_mac_scb extends uvm_scoreboard;
                         rx_mon_port.get(rx_fifo);
                         rx_drv_port.get(rx_rgmii);    
 
-                        check_bad_pckt(rx_rgmii.tx_data);                                           
+                        // Determine whether the packet we sent to teh MAC is expected to be read fromt eh FIFO or not
+                        decode_packet(rx_rgmii.tx_data);                                           
 
                         //Make sure the reference model data size and the monitor data size are equivelent
                         assert(rx_fifo.rx_data.size() == rx_rgmii.tx_data.size()) begin

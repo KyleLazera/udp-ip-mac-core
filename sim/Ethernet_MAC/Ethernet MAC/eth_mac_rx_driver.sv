@@ -29,6 +29,7 @@ virtual task main_phase(uvm_phase phase);
     eth_mac_item tx_item, tx_item_copy;
     eth_mac eth_mac_base;
     bit crc_er = 1'b0;
+    bit send_pause_frame = 1'b0;
     bit bad_pckt;
     super.main_phase(phase);    
 
@@ -53,9 +54,19 @@ virtual task main_phase(uvm_phase phase);
             crc_er = ($urandom_range(1, 100) == 1);
         end
 
+        //todo: reduce probability of pause frame being sent
+        if(cfg.pause_frames) 
+            send_pause_frame = ($urandom_range(1,20) == 1);
+
         tx_item_copy = eth_mac_item::type_id::create("tx_item_copy");
         //Fetch sequence item to write
         seq_item_port.get_next_item(tx_item);
+        
+        if(send_pause_frame) begin
+            eth_mac_base.generate_pause_packet(tx_item.tx_data);
+            `uvm_info("rx_driver", "Pause Frame Generated", UVM_MEDIUM)
+        end
+        
         //Copy data to send to the screoboard for reference
         tx_item_copy.copy(tx_item);
 
@@ -80,11 +91,16 @@ virtual task main_phase(uvm_phase phase);
         //Drive data on the RGMII signals to the MAC
         rd_if.rgmii_drive_data(tx_item.tx_data, cfg.link_speed, cfg.rx_bad_pckt, bad_pckt);   
 
-        //If it is a bad packet, append a 0x00 to teh front of teh queue and if it is not a bad packet
-        // append 0xff
-        if(bad_pckt | (cfg.rx_bad_pckt & crc_er)) begin
+        // For the purpose of the scoreboad, each packet needs to be decoded on whether it is supposed to be dropped or not
+        // To achieve the decoding a specifiec byte is appended tot eh front of each packet that is removed by teh scoreboard
+        // 8'h00: This is a bad packet/bad CRC & should be dropped by scb
+        // 8'h01: This is a pause frame and should not be stored in the FIFO (should be dropped by scb)
+        // 8'hff: This is a good packet and should be kept
+        if(bad_pckt | (cfg.rx_bad_pckt & crc_er)) 
             tx_item_copy.tx_data.push_front(8'h00);
-        end else
+        else if(send_pause_frame)
+            tx_item_copy.tx_data.push_front(8'h01);
+        else
             tx_item_copy.tx_data.push_front(8'hff);
 
         //Send copied data to the scoreboard

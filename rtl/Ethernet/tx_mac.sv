@@ -34,6 +34,9 @@ module tx_mac
     output wire [DATA_WIDTH-1:0] rgmii_mac_tx_data,         //Bytes to be transmitted to the RGMII
     output wire rgmii_mac_tx_dv,                            //Indicates the data is valid 
     output wire rgmii_mac_tx_er,                            //Indicates there is an error in the data
+
+    /* Pause Frame Signals */
+    input wire rx_pause,                                    //Indicates the rx mac recieved a pause frame, and we need to wait before sending next packet                            
     
     /* Configurations */
     input wire mii_select,                                  //Configures data rate (Double Data Rate (DDR) or Single Data Rate (SDR))    
@@ -167,8 +170,8 @@ always @(posedge clk) begin
             case(state_reg)
                 IDLE: begin
                     mii_sdr <= 1'b0;
-                    //If there is data in the FIFO, prepare to begin transaction
-                    if(s_tx_axis_tvalid) begin
+                    //If the FIFO has valid data and we are NOT in a pause state, initiate a transaction                  
+                    if(s_tx_axis_tvalid & !rx_pause) begin
                         byte_ctr <= 3'b0;
                         mii_sdr <= 1'b0;
                         pckt_size <= 6'b0;

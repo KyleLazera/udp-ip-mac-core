@@ -169,6 +169,19 @@ cdc_signal_sync#(.PIPELINE(0)) mii_select_sync (
     .o_pulse_sync()
 );
 
+/* Pause Frame Connections */
+
+wire rx_pause_flag;
+wire rx_pause_flag_sync;
+
+cdc_signal_sync#(.PIPELINE(0)) rx_pause_sync (
+    .i_dst_clk(clk_125),
+    .i_signal(rx_pause_flag),
+    .o_signal_sync(rx_pause_flag_sync),
+    .o_pulse_sync()
+);
+
+
 /**********************************************************
  * Module Instantiations & Intermediary Signals 
 ***********************************************************/
@@ -214,7 +227,7 @@ rgmii_phy_if rgmii_phy
    
     // Control Signal(s)
     .link_speed(link_speed),
-    .mii_select(rx_mii_select)         
+    .mii_select(rx_mii_select)        
 );
 
 //TX MAC
@@ -240,7 +253,10 @@ tx_mac
     .rgmii_mac_tx_rdy(rgmii_mac_tx_rdy),                    
     .rgmii_mac_tx_data(mac_rgmii_tx_data), 
     .rgmii_mac_tx_dv(mac_rgmii_tx_dv),                    
-    .rgmii_mac_tx_er(mac_rgmii_tx_er),                    
+    .rgmii_mac_tx_er(mac_rgmii_tx_er),
+
+    // Pause Frame Signals 
+    .rx_pause(rx_pause_flag_sync),                    
                                                 
     // Control signals(s)                            
     .mii_select(mii_sel),
@@ -270,7 +286,12 @@ rx_mac_module
     .rgmii_mac_rx_data(rgmii_mac_rx_data),
     .rgmii_mac_rx_dv(rgmii_mac_rx_dv),                   
     .rgmii_mac_rx_er(rgmii_mac_rx_er),
-    .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy)                 
+    .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy),
+
+    // Pause Frame Control
+    .tx_pause_frame(),                                 
+    .rx_pause_frame(rx_pause_flag),                                 
+    .mii_sel(rx_mii_select)      
 ); 
 
 assign rgmii_rxc = rgmii_mac_rx_clk;
