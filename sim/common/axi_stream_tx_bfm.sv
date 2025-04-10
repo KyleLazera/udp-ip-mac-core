@@ -13,6 +13,13 @@ interface axi_stream_tx_bfm #(
     reg s_axis_tuser;
     reg s_axis_trdy;
 
+    // Used to initialize values to avoid Dont Cares
+    task init_axi_tx();
+        s_axis_tdata = 1'b0;
+        s_axis_tvalid = 1'b0;
+        s_axis_tlast = 1'b0;
+    endtask : init_axi_tx
+
     /* This task is a basic transmission test that pulls the valid flag low temporarily
      * after sending a frame & keeps tuser low for the entire duration*/
     task axis_transmit_basic(bit [7:0] data[$]);

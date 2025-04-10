@@ -12,6 +12,12 @@ interface axi_stream_rx_bfm #(
     reg m_axis_tvalid;
     reg m_axis_trdy;
 
+    // Used to initialize values to avoid Dont Cares
+    task init_axi_rx();
+        m_axis_trdy = 1'b0;
+    endtask : init_axi_rx
+
+    // Read data via AXI-Stream
     task axis_read(ref bit [7:0] data[$]);
 
         //Raise trdy flag to indicate we are redy to read data

@@ -1,28 +1,18 @@
 `include "../../common/axi_stream_rx_bfm.sv"
 `include "../../common/axi_stream_tx_bfm.sv"
+`include "ip_tx_pkg.sv"
 
 module ip_tx_top;
+
+import ip_tx_pkg::*;
 
 // Clock & Reset Signals
 bit clk_100;
 bit reset_n;
 
-// IP Header struct
-typedef struct packed {
-  bit                  hdr_valid;
-  bit                  hdr_rdy;
-  logic [15:0]         total_length;
-  logic [7:0]          protocol;
-  logic [31:0]         src_ip_addr;
-  logic [31:0]         dst_ip_addr;
-  logic [47:0]         src_mac_addr;
-  logic [47:0]         dst_mac_addr;
-} ip_tx_hdr_t;
-
-//instantiate IP header & payload
+//instantiate IP header & ip_tx class instance
 ip_tx_hdr_t ip_hdr;
-bit [7:0] payload[$];
-bit [7:0] rx_data[$];
+ip_tx ip_tx_inst;
 
 // AXI Stream Interface Declarations
 axi_stream_tx_bfm axi_tx(.s_aclk(clk_100), .s_sresetn(reset_n));
@@ -61,43 +51,26 @@ ipv4_tx #(
    .m_tx_axis_tlast(axi_rx.m_axis_tlast),                  
    .m_tx_axis_trdy(axi_rx.m_axis_trdy) 
 );
-
-// Generate data on the header IP values
-function automatic generate_header_data(ref ip_tx_hdr_t ip_hdr);
-    ip_hdr.hdr_valid      = 1'b1;
-    ip_hdr.total_length   = $urandom();
-    ip_hdr.protocol       = $urandom();
-    ip_hdr.src_ip_addr    = $urandom();
-    ip_hdr.dst_ip_addr    = $urandom();
-    ip_hdr.src_mac_addr   = 48'hFFFFFFFFFFFF; 
-    ip_hdr.dst_mac_addr   = 48'h121314151617;
-endfunction : generate_header_data    
-
-function void generate_payload();
-    int size = $urandom_range(10, 20);
-
-    repeat(size) begin
-        payload.push_back($urandom_range(0, 255));
-    end
-endfunction : generate_payload
+ 
 
 initial begin
-    axi_tx.s_axis_tdata = 1'b0;
-    axi_tx.s_axis_tvalid = 1'b0;
-    axi_tx.s_axis_tlast = 1'b0;
-    axi_rx.m_axis_trdy = 1'b1;
+    //Init axi lines
+    axi_tx.init_axi_tx();
+    axi_rx.init_axi_rx();
 
     //Wait for reset to be asserted
     @(posedge reset_n);
 
-    //Drive IP values on the DUT
-    generate_header_data(ip_hdr);
-    generate_payload();
+    repeat(3) begin
+        //Drive IP values on the DUT
+        ip_tx_inst.generate_header_data(ip_hdr);
+        ip_tx_inst.generate_payload();
 
-    fork
-        begin axi_tx.axis_transmit_basic(payload); end
-        begin axi_rx.axis_read(rx_data); end
-    join
+        fork
+            begin axi_tx.axis_transmit_basic(tx_data); end
+            begin axi_rx.axis_read(rx_data); end
+        join
+    end
 
     #1000;
 
