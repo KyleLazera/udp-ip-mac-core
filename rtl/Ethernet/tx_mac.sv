@@ -36,7 +36,8 @@ module tx_mac
     output wire rgmii_mac_tx_er,                            //Indicates there is an error in the data
 
     /* Pause Frame Signals */
-    input wire rx_pause,                                    //Indicates the rx mac recieved a pause frame, and we need to wait before sending next packet                            
+    input wire rx_pause,                                    //Indicates the rx mac recieved a pause frame, and we need to wait before sending next packet  
+    input wire tx_pause,                                    //Signal indicating rx FIFO is almost overflowing and we need to transmit a pause frame                          
     
     /* Configurations */
     input wire mii_select,                                  //Configures data rate (Double Data Rate (DDR) or Single Data Rate (SDR))    
@@ -46,16 +47,16 @@ module tx_mac
 /* Local Parameters */
 localparam [7:0] ETH_HDR = 8'h55;               
 localparam [7:0] ETH_SFD = 8'hD5;  
-localparam [7:0] ETH_PAD = 8'h00;    
+localparam [7:0] ETH_PAD = 8'h00;   
 localparam MIN_FRAME_WIDTH = 59;                            //46 byte minimum Payload + 12 Address Bytes + 2 Type/Length Bytes = 60 bytes         
 
 /* FSM State Declarations */
-typedef enum{IDLE,              //State when no transactions are occuring
-             PREAMBLE,          //Transmit the ethernet preamble & SFD
-             PACKET,            //Transmit the payload receieved from the FIFO
-             PADDING,           //Add padding to the payload if it did not meet minimum requirements
-             FCS,               //Append the Frame Check Sequence
-             IFG                //Add an Inter Frame Gap
+typedef enum{IDLE,                                  //State when no transactions are occuring
+             PREAMBLE,                              //Transmit the ethernet preamble & SFD
+             PACKET,                                //Transmit the payload receieved from the FIFO
+             PADDING,                               //Add padding to the payload if it did not meet minimum requirements
+             FCS,                                   //Append the Frame Check Sequence
+             IFG                                    //Add an Inter Frame Gap
              } state_type; 
 
 
@@ -68,15 +69,16 @@ reg [2:0] byte_ctr;                                 //Counts the number of bytes
 reg [7:0] pckt_size;                                //Counts size of payload in bytes (Ensure they payload is between 46 - 1500 bytes) 
 reg mii_sdr;                                        //Indicates the next data transfer needs to shift byte by 4 (for SDR in MII mode)
 reg axis_rdy_reg;                                   //Implements a FF between the outgoing s_tx_axis_rdy signal and FIFO  
+reg tx_pause_frame = 1'b0;                          //A flag indicating we are sending a pause frame
 
 /* CRC32 Interface Signals */
-reg [31:0] crc_state, crc_next;                                 //Holds the output state of the CRC32 module                                       
-reg [DATA_WIDTH-1:0] crc_in_data_reg;                           //Holds the input values for the CRC32 module                               
-reg crc_en_reg;                                                 //Register that holds crc_en state 
-wire [DATA_WIDTH-1:0] crc_data_in;                              //Signal that drives the CRC data into the module
-reg sof;                                                        //Start of frame signal                              
-wire crc_en, crc_reset;                                         //CRC enable & reset   
-wire [31:0] crc_data_out;                                       //Ouput from the CRC32 module
+reg [31:0] crc_state, crc_next;                     //Holds the output state of the CRC32 module                                       
+reg [DATA_WIDTH-1:0] crc_in_data_reg;               //Holds the input values for the CRC32 module                               
+reg crc_en_reg;                                     //Register that holds crc_en state 
+wire [DATA_WIDTH-1:0] crc_data_in;                  //Signal that drives the CRC data into the module
+reg sof;                                            //Start of frame signal                              
+wire crc_en, crc_reset;                             //CRC enable & reset   
+wire [31:0] crc_data_out;                           //Ouput from the CRC32 module
 
 /* CRC32 Module Instantiation */
 crc32 #(.DATA_WIDTH(8)) 
@@ -170,6 +172,11 @@ always @(posedge clk) begin
             case(state_reg)
                 IDLE: begin
                     mii_sdr <= 1'b0;
+
+                    //If the RX FIFO is almost full, raise the tx pause flag
+                    if(tx_pause)
+                        tx_pause_frame <= 1'b1;
+
                     //If the FIFO has valid data and we are NOT in a pause state, initiate a transaction                  
                     if(s_tx_axis_tvalid & !rx_pause) begin
                         byte_ctr <= 3'b0;
@@ -185,7 +192,6 @@ always @(posedge clk) begin
                     if(byte_ctr == 3'd6) begin
                         tx_data_reg <= ETH_HDR;
                         byte_ctr <= byte_ctr + 1;
-                        //axis_rdy_reg <= ~mii_select;
                     end
                     //If all 7 bytes of the Header have been sent, transmit the SFD  
                     else if(byte_ctr == 3'd7) begin
@@ -204,11 +210,11 @@ always @(posedge clk) begin
                 end
                 PACKET: begin
                     rgmii_dv_reg <= 1'b1;
-                    crc_en_reg <= 1'b1;
-                    crc_in_data_reg <= s_tx_axis_tdata;
-                    axis_rdy_reg <= 1'b1;
-                    tx_data_reg <= s_tx_axis_tdata;
+                    crc_en_reg <= 1'b1;                    
+                    axis_rdy_reg <= 1'b1;                    
                     mii_sdr <= 1'b1;
+                    crc_in_data_reg <= s_tx_axis_tdata;
+                    tx_data_reg <= s_tx_axis_tdata;                    
 
                     //Only increment the packet counter if it is less than 60. Once min frame size has been surpassed
                     //packet counter is no longer needed

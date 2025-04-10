@@ -4,12 +4,13 @@
 
 module ethernet_mac_fifo
 #(
+    parameter FLOW_CONTROL = 1, 
     /* These Parameters are not meant to be adjusted */
     parameter FIFO_DATA_WIDTH = 9,
     parameter AXI_DATA_WIDTH = 8,
     parameter RGMII_DATA_WIDTH = 4,
     parameter RX_FIFO_DEPTH = 8192, 
-    parameter TX_FIFO_DEPTH = 4096    
+    parameter TX_FIFO_DEPTH = 4096  
 )
 (
     input wire i_clk,                                           //System clock to read data from rx and tx FIFO's - 100MHz
@@ -29,7 +30,7 @@ module ethernet_mac_fifo
     input wire [AXI_DATA_WIDTH-1:0] s_tx_axis_tdata,            //Tx word to send via ethernet  
     input wire s_tx_axis_tvalid,                                //Write enable signal into the tx FIFO
     input wire s_tx_axis_tlast,                                 //Indicates the final byte within a packet
-    output wire m_tx_axis_trdy,                                 //Indicates the tx FIFO is not almost full/has space to store data
+    output wire m_tx_axis_trdy,                                 //Indicates the tx FIFO is not full/has space to store data
 
     /* Rx FIFO - AXI Interface*/
     output wire [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata,            //Rx data receieved from ethernet MAC   
@@ -64,7 +65,8 @@ Ethernet MAC Instantiation
 
 ethernet_mac#(
     .FIFO_DATA_WIDTH(8), 
-    .RGMII_DATA_WIDTH(RGMII_DATA_WIDTH)
+    .RGMII_DATA_WIDTH(RGMII_DATA_WIDTH),
+    .FLOW_CONTROL(FLOW_CONTROL)
     )
 tri_speed_eth_mac (
     .clk_125(clk_125),

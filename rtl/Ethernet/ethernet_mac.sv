@@ -8,7 +8,8 @@
 module ethernet_mac
 #(
     parameter FIFO_DATA_WIDTH = 8,
-    parameter RGMII_DATA_WIDTH = 4
+    parameter RGMII_DATA_WIDTH = 4,
+    parameter FLOW_CONTROL = 1
 )
 (
     input wire clk_125,
@@ -257,7 +258,8 @@ tx_mac
 
     // Pause Frame Signals 
     .rx_pause(rx_pause_flag_sync),                    
-                                                
+    .tx_pause(),                                    
+
     // Control signals(s)                            
     .mii_select(mii_sel),
     .link_speed(link_speed)                          
@@ -266,7 +268,8 @@ tx_mac
 //RX MAC
 rx_mac 
 #(
-    .DATA_WIDTH(8)
+    .DATA_WIDTH(8),
+    .FLOW_CONTROL(FLOW_CONTROL)
 )
 rx_mac_module
 (
@@ -288,8 +291,7 @@ rx_mac_module
     .rgmii_mac_rx_er(rgmii_mac_rx_er),
     .rgmii_mac_rx_rdy(rgmii_mac_rx_rdy),
 
-    // Pause Frame Control
-    .tx_pause_frame(),                                 
+    // Pause Frame Control                              
     .rx_pause_frame(rx_pause_flag),                                 
     .mii_sel(rx_mii_select)      
 ); 

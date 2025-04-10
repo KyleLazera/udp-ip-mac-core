@@ -24,7 +24,8 @@
 
 module rx_mac
 #(
-    parameter DATA_WIDTH = 8
+    parameter DATA_WIDTH = 8,
+    parameter FLOW_CONTROL = 1                              // Determine is Flow Control is supported in the RX MAC
 )
 (
     input wire clk,
@@ -46,8 +47,7 @@ module rx_mac
     input wire rgmii_mac_rx_rdy,                                //Used as a valid signal for the rx data
 
     /* Flow Control Signals */
-    output wire tx_pause_frame,                                 //Indicates the TX MAC to transmit a pause frame
-    output wire rx_pause_frame,                                 //indicates a pause frame was recieved and to puase the TX MAC 
+    output wire rx_pause_frame,                                 //Indicates a pause frame was recieved and to puase the TX MAC 
     input wire mii_sel                                          //Determine whether we are in 10/100mbps mode or 1gbps mode
 );
 
@@ -186,43 +186,48 @@ assign crc_reset = (~reset_n || sof);
 // 512 bit times = 51,200ns.
 /////////////////////////////////////////////////////////////////////////////////////////
 
-always @(*) begin
-    case(mii_sel)
-        1'b0: cc_per_bit_time = 7'd63;
-        1'b1: cc_per_bit_time = 7'd127;
-    endcase
-end
+generate if(FLOW_CONTROL) begin
 
-always @(posedge clk) begin
-    if(~reset_n) begin
-        bit_time_cntr <= 8'b0;
-        pause_quanta_cntr <= 16'b0;    
-    end else begin
+    always @(*) begin
+        case(mii_sel)
+            1'b0: cc_per_bit_time = 7'd63;
+            1'b1: cc_per_bit_time = 7'd127;
+        endcase
+    end
 
-        if(({eth_type, opcode} == 32'h8808_0001) & !rx_pause_reg) begin
-            rx_pause_reg <= 1'b1;
-            pause_time <= pause_frame_time;
+    always @(posedge clk) begin
+        if(~reset_n) begin
             bit_time_cntr <= 8'b0;
-            pause_quanta_cntr <= 16'b0;            
-        end
+            pause_quanta_cntr <= 16'b0;    
+        end else begin
 
-        //While the rx_pause flag is high, count up to the specified time quanta 
-        // The counting must occur according to the ethernet standard explained above
-        if(rx_pause_reg) begin
-            bit_time_cntr <= bit_time_cntr + 1;
-
-            if(bit_time_cntr == cc_per_bit_time) begin
-                pause_quanta_cntr <= pause_quanta_cntr + 1;
+            if(({eth_type, opcode} == 32'h8808_0001) & !rx_pause_reg) begin
+                rx_pause_reg <= 1'b1;
+                pause_time <= pause_frame_time;
+                bit_time_cntr <= 8'b0;
+                pause_quanta_cntr <= 16'b0;            
             end
-        end
 
-        // Once we have counted up to the specified pause value, lower the rx pause flag
-        // and reset the counters 
-        if(pause_quanta_cntr == pause_time) begin
-            rx_pause_reg <= 1'b0;
-        end
-    end       
+            //While the rx_pause flag is high, count up to the specified time quanta 
+            // The counting must occur according to the ethernet standard explained above
+            if(rx_pause_reg) begin
+                bit_time_cntr <= bit_time_cntr + 1;
+
+                if(bit_time_cntr == cc_per_bit_time) begin
+                    pause_quanta_cntr <= pause_quanta_cntr + 1;
+                end
+            end
+
+            // Once we have counted up to the specified pause value, lower the rx pause flag
+            // and reset the counters 
+            if(pause_quanta_cntr == pause_time) begin
+                rx_pause_reg <= 1'b0;
+            end
+        end       
+    end
+
 end
+endgenerate
 
 /* State Machine Logic */
 always @(posedge clk) begin
@@ -261,18 +266,21 @@ always @(posedge clk) begin
                     // has been detected, the dst addr (6 bytes), src addr (6 bytes), type (2 bytes),
                     // opcode (2 bytes) and time quanta (2 bytes) can all be extracted within 15 cycles.
                     ////////////////////////////////////////////////////////////////////////////////////
-                    if(!(&byte_cntr))
-                        byte_cntr <= byte_cntr + 1;
-                   
-                   // Inspect the ethernet type
-                    if(byte_cntr == 4'd12) begin
-                        eth_type <= {rgmii_rdx[4], rgmii_rdx[3]};
+                    
+                    if(FLOW_CONTROL) begin
+                        if(!(&byte_cntr))
+                            byte_cntr <= byte_cntr + 1;
+                    
+                        // Inspect the ethernet type
+                        if(byte_cntr == 4'd12) begin
+                            eth_type <= {rgmii_rdx[4], rgmii_rdx[3]};
+                        end
+                        // Inspect the opcode of the packet
+                        else if(byte_cntr == 4'd14) begin
+                            opcode <= {rgmii_rdx[4], rgmii_rdx[3]};
+                            pause_frame_time <= {rgmii_rdx[2], rgmii_rdx[1]};
+                        end 
                     end
-                    // Inspect the opcode of the packet
-                    else if(byte_cntr == 4'd14) begin
-                        opcode <= {rgmii_rdx[4], rgmii_rdx[3]};
-                        pause_frame_time <= {rgmii_rdx[2], rgmii_rdx[1]};
-                    end 
 
                     //If there is data to transmit, calculate crc and raise valid flag
                     axis_valid_reg <= 1'b1;

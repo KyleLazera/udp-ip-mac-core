@@ -23,7 +23,9 @@ eth_mac_wr_if eth_wr_if (clk_100, reset_n); //write vif
 eth_mac_rd_if eth_rd_if (clk_100, reset_n); //read interface
 
 //DUT
-ethernet_mac_fifo eth_mac_fifo_0 (
+ethernet_mac_fifo #(
+    .FLOW_CONTROL(0)    
+)eth_mac_fifo_0 (
     .i_clk(clk_100),
     .clk_125(clk_125),
     .clk90_125(clk90_125),

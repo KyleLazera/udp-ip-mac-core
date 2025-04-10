@@ -10,9 +10,16 @@ base_message = "This is a testing packet of size 1500 bytes"
 repeat_count = 1492 // len(base_message)
 payload = (base_message * repeat_count)[:1492]  # trim in case of rounding
 
+#Pause Frame
+pause_time = 1000  
+pause_frame = Ether(dst="ff:ff:ff:ff:ff:ff", type=0x8808) / b'\x00\x01' / bytes([pause_time >> 8, pause_time & 0xFF])
+
 # Build Ethernet packet
-packet = Ether(dst="ff:ff:ff:ff:ff:ff", type=0x1234) / payload.encode()
-packets = packet*100000
+# packet = Ether(dst="ff:ff:ff:ff:ff:ff", type=0x1234) / payload.encode()
+packet = Ether(dst="ff:ff:ff:ff:ff:ff", type=0x1234) / "This is a sample packet for testing."
+packets = packet*10000
 
 # Send the packet 
+sendp(packets, iface=iface, verbose=False)
+sendp(pause_frame, iface=iface, verbose=False)
 sendp(packets, iface=iface, verbose=False)
