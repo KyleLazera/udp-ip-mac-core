@@ -5,12 +5,18 @@ package ip_tx_pkg;
 typedef struct packed {
   bit                  hdr_rdy;
   bit                  hdr_valid;
+  logic [3:0]          version;
+  logic [3:0]          length;
+  logic [7:0]          tos;
   logic [15:0]         total_length;
+  logic [15:0]         ip_hdr_id;
+  logic [2:0]          ip_hdr_flags;
+  logic [12:0]         ip_hdr_frag_offset;
+  logic [7:0]          ip_hdr_ttl;  
   logic [7:0]          protocol;
+  logic [15:0]         ip_hdr_checksum;
   logic [31:0]         src_ip_addr;
   logic [31:0]         dst_ip_addr;
-  logic [47:0]         src_mac_addr;
-  logic [47:0]         dst_mac_addr;
 } ip_tx_hdr_t;
 
 // Input payload & output payload queues
@@ -19,27 +25,102 @@ bit [7:0] rx_data[$];
 
 class ip_tx;
 
+function automatic calculate_checksum(ref ip_tx_hdr_t ip_hdr);
+    logic [15:0] words[0:9]; 
+    logic [16:0] sum; 
+  
+    // Form the 16-bit words 
+    words[0] = {ip_hdr.version, ip_hdr.length, ip_hdr.tos};                    
+    words[1] = ip_hdr.total_length;
+    words[2] = ip_hdr.ip_hdr_id;
+    words[3] = {ip_hdr.ip_hdr_flags, ip_hdr.ip_hdr_frag_offset};
+    words[4] = {ip_hdr.ip_hdr_ttl, ip_hdr.protocol};
+    words[5] = 16'h0000; // Placeholder for checksum (set to 0 during calculation)
+    words[6] = ip_hdr.src_ip_addr[31:16];
+    words[7] = ip_hdr.src_ip_addr[15:0];
+    words[8] = ip_hdr.dst_ip_addr[31:16];
+    words[9] = ip_hdr.dst_ip_addr[15:0];    
+    
+    // Calculate one's complement sum - If there is a carry out from a sum, add that back to the 
+    // lsb 
+    sum = 0;
+    for (int i = 0; i < 10; i++) begin
+        sum += words[i];
+        if (sum > 16'hFFFF)
+            sum = (sum & 16'hFFFF) + 1; 
+    end 
+    
+    ip_hdr.ip_hdr_checksum = ~sum[15:0];    
+endfunction : calculate_checksum
+
 // Generate data for the header IP header values
 function automatic generate_header_data(ref ip_tx_hdr_t ip_hdr);
     ip_hdr.hdr_valid      = 1'b1;
+    ip_hdr.version        = 4'd4;
+    ip_hdr.length         = 4'd5;
+    ip_hdr.tos            = $urandom();
     ip_hdr.total_length   = $urandom();
+    ip_hdr.ip_hdr_id      = 0;
+    ip_hdr.ip_hdr_flags   = 0;
+    ip_hdr.ip_hdr_frag_offset= 0;
+    ip_hdr.ip_hdr_ttl     = 8'd64;      
     ip_hdr.protocol       = $urandom();
     ip_hdr.src_ip_addr    = $urandom();
     ip_hdr.dst_ip_addr    = $urandom();
-    ip_hdr.src_mac_addr   = 48'hFFFFFFFFFFFF; 
-    ip_hdr.dst_mac_addr   = 48'h121314151617;
-endfunction : generate_header_data   
+    
+    calculate_checksum(ip_hdr);
+
+endfunction : generate_header_data 
 
 // Generate raw payload data to encapsulate wihtin an IP frame
 function void generate_payload();
     int size = $urandom_range(10, 20);
+    tx_data.delete();
     repeat(size) begin
         tx_data.push_back($urandom_range(0, 255));
     end
 endfunction : generate_payload
 
-function void check();
-    // Push the IP header to the front of the apyload and compare the tx_data to the recieved data
+// Self-checking function to compare the tx and rx packets 
+function void check(ip_tx_hdr_t ip_hdr);
+    /* Create encapsulated frame */
+    logic [159:0] eth_hdr = {
+        ip_hdr.version,
+        ip_hdr.length,
+        ip_hdr.tos,
+        ip_hdr.total_length,
+        ip_hdr.ip_hdr_id,
+        ip_hdr.ip_hdr_flags,
+        ip_hdr.ip_hdr_frag_offset,
+        ip_hdr.ip_hdr_ttl,
+        ip_hdr.protocol,
+        ip_hdr.ip_hdr_checksum,
+        ip_hdr.src_ip_addr,
+        ip_hdr.dst_ip_addr
+    };
+
+    // Generate the desired IP Packet
+    for(int i = 0; i < 20; i++)
+        tx_data.push_front(eth_hdr[((i+1)*8)-1 -: 8]);
+
+    //Ensure the packets are the correct size
+    assert(tx_data.size() == rx_data.size()) 
+        else begin
+            $display("Tx Packet Size: %0d != Rx Packet Size: %0d MISMATCH", tx_data.size(), rx_data.size()); 
+            $stop;
+        end
+
+    // Compare data wihtin packets
+    foreach(rx_data[i]) begin
+        assert(rx_data[i] == tx_data[i]) //$display("rx_data: %0h == tx_data %0h MATCH", rx_data[i], tx_data[i]);
+            else begin 
+                $display("rx_data [%0d] %0h != tx_data [%0d] %0h MISMATCH", i, rx_data[i], i, tx_data[i]); 
+                $stop; 
+            end
+    end  
+
+    //Clear packet for next iteration
+    rx_data.delete();
 endfunction : check
 
 endclass : ip_tx

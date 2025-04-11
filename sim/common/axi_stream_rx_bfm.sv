@@ -17,7 +17,7 @@ interface axi_stream_rx_bfm #(
         m_axis_trdy = 1'b0;
     endtask : init_axi_rx
 
-    // Read data via AXI-Stream
+    // Reads data via teh AXI-Stream protocol
     task axis_read(ref bit [7:0] data[$]);
 
         //Raise trdy flag to indicate we are redy to read data

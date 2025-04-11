@@ -20,14 +20,20 @@ interface axi_stream_tx_bfm #(
         s_axis_tlast = 1'b0;
     endtask : init_axi_tx
 
-    /* This task is a basic transmission test that pulls the valid flag low temporarily
-     * after sending a frame & keeps tuser low for the entire duration*/
-    task axis_transmit_basic(bit [7:0] data[$]);
+    // Task to transmit data via AXI-Stream - arguments as follows:
+    // data - Data to transmit via AXI-Stream
+    // bursts - When 1, valid flag is help high between frames and when 0, valid is lowered between frames
+    // fwft - follows fwft procedure
+    task axis_transmit_basic(bit [7:0] data[$], bit bursts = 1'b1, fwft = 1'b1);
 
         //Raise tvalid & tuser flag to indicate we are ready to transmit
         @(posedge s_aclk);
         s_axis_tvalid <= 1'b1;
         s_axis_tuser <= 1'b0;
+
+        //Put word on the tdata line if fwft
+        if(fwft)
+            s_axis_tdata <= data.pop_front();
 
         //Wait for the trdy flag to go high
         while(!s_axis_trdy)
@@ -35,12 +41,15 @@ interface axi_stream_tx_bfm #(
 
         //Transmit data on each clock edge
         while(data.size() != 0) begin
-            s_axis_tdata <= data.pop_front;
+            s_axis_tdata <= data.pop_front();
             s_axis_tlast <= (data.size() == 0);
             @(posedge s_aclk);
         end
         
-        s_axis_tvalid <= 1'b0;
+        // If bursts is enabled, don't lower the valid flag
+        if(!bursts)
+            s_axis_tvalid <= 1'b0;
+        
         s_axis_tlast <= 1'b0;
         @(posedge s_aclk);
 

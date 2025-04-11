@@ -21,22 +21,21 @@ module ipv4_checksum
 );
 
 reg [16:0] sum = 17'b0;
-reg [15:0] ip_checksum = 16'b0;;
+
+wire [16:0] initial_sum = ip_hdr_field + sum[15:0];
 
 always @(posedge i_clk) begin
     if(!i_reset_n) begin
         sum <= 17'b0;
     end else begin
         if(ip_checksum_en) begin
-            ip_checksum <= ~sum;
-            sum <= (ip_hdr_field + sum[15:0]) + sum[16];
+            sum <= initial_sum[15:0] + initial_sum[16];
         end else begin
             sum <= 17'b0;
-            ip_checksum <= 17'b0;
         end
     end
 end
 
-assign ip_hdr_checksum = ip_checksum;
+assign ip_hdr_checksum = ~sum[15:0];
 
 endmodule : ipv4_checksum
