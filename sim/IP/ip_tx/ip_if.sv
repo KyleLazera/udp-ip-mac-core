@@ -7,13 +7,26 @@ interface ip_if
 
     import ip_tx_pkg::*;
 
-   logic ip_tx_hdr_valid;                                       
-   logic ip_tx_hdr_rdy;                                        
-   logic [7:0]  ip_tx_hdr_type;                                     
-   logic [15:0] ip_tx_total_length;                                
-   logic [7:0]  ip_tx_protocol;                                  
-   logic [31:0] ip_tx_src_ip_addr;                                
-   logic [31:0] ip_tx_dst_ip_addr; 
+    localparam SRC_MAC_ADDR = 48'h10_12_65_23_43_12;
+    localparam DST_MAC_ADDR = 48'hFF_FF_FF_FF_FF_FF;
+    localparam ETH_TYPE = 16'h0800;
+
+    logic ip_tx_hdr_valid;                                       
+    logic ip_tx_hdr_rdy;                                        
+    logic [7:0]  ip_tx_hdr_type;                                     
+    logic [15:0] ip_tx_total_length;                                
+    logic [7:0]  ip_tx_protocol;                                  
+    logic [31:0] ip_tx_src_ip_addr;                                
+    logic [31:0] ip_tx_dst_ip_addr; 
+    logic [47:0] eth_tx_src_mac_addr;
+    logic [47:0] eth_tx_dst_mac_addr;
+    logic [15:0] eth_tx_type;     
+    
+    logic m_eth_hdr_trdy;
+    logic m_eth_hdr_tvalid;
+    logic [47:0] m_eth_src_mac_addr;                               
+    logic [47:0] m_eth_dst_mac_addr;                              
+    logic [15:0] m_eth_type;         
 
    /* Methods */
 
@@ -24,8 +37,14 @@ interface ip_if
         ip_tx_protocol <= ip_hdr.protocol; 
         ip_tx_src_ip_addr <= ip_hdr.src_ip_addr;
         ip_tx_dst_ip_addr <= ip_hdr.dst_ip_addr;
+        //Drive MAC and eth type
+        eth_tx_src_mac_addr <= SRC_MAC_ADDR;
+        eth_tx_dst_mac_addr <= DST_MAC_ADDR;
+        eth_tx_type <= ETH_TYPE;
+
         @(posedge i_clk);
         
+        //Wait until the master indicates it is ready then lower the valid flag
         while(!ip_tx_hdr_rdy)
             @(posedge i_clk);
 

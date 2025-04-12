@@ -42,17 +42,25 @@ ipv4_tx #(
    .s_tx_axis_tvalid(axi_tx.s_axis_tvalid),                 
    .s_tx_axis_tlast(axi_tx.s_axis_tlast),                  
    .s_tx_axis_trdy(axi_tx.s_axis_trdy), 
-   .ip_tx_hdr_type(ip_hdr_if.ip_tx_hdr_type),                  
-   .ip_tx_hdr_valid(ip_hdr_if.ip_tx_hdr_valid),                  
-   .ip_tx_hdr_rdy(ip_hdr_if.ip_tx_hdr_rdy),                     
-   .ip_tx_total_length(ip_hdr_if.ip_tx_total_length),              
-   .ip_tx_protocol(ip_hdr_if.ip_tx_protocol),                 
-   .ip_tx_src_ip_addr(ip_hdr.src_ip_addr),             
-   .ip_tx_dst_ip_addr(ip_hdr.dst_ip_addr),                           
+   .s_ip_tx_hdr_type(ip_hdr_if.ip_tx_hdr_type),                  
+   .s_ip_tx_hdr_valid(ip_hdr_if.ip_tx_hdr_valid),                  
+   .s_ip_tx_hdr_rdy(ip_hdr_if.ip_tx_hdr_rdy),                     
+   .s_ip_tx_total_length(ip_hdr_if.ip_tx_total_length),              
+   .s_ip_tx_protocol(ip_hdr_if.ip_tx_protocol),                 
+   .s_ip_tx_src_ip_addr(ip_hdr_if.ip_tx_src_ip_addr),             
+   .s_ip_tx_dst_ip_addr(ip_hdr_if.ip_tx_dst_ip_addr), 
+   .s_eth_tx_src_mac_addr(ip_hdr_if.eth_tx_src_mac_addr),
+   .s_eth_tx_dst_mac_addr(ip_hdr_if.eth_tx_dst_mac_addr),
+   .s_eth_tx_type(ip_hdr_if.eth_tx_type),                                 
    .m_tx_axis_tdata(axi_rx.m_axis_tdata),                 
    .m_tx_axis_tvalid(axi_rx.m_axis_tvalid),                
    .m_tx_axis_tlast(axi_rx.m_axis_tlast),                  
-   .m_tx_axis_trdy(axi_rx.m_axis_trdy) 
+   .m_tx_axis_trdy(axi_rx.m_axis_trdy),
+   .m_eth_hdr_trdy(),
+   .m_eth_hdr_tvalid(),
+   .m_eth_src_mac_addr(),                                
+   .m_eth_dst_mac_addr(),                                 
+   .m_eth_type()     
 );
  
 
