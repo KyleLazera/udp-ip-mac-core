@@ -2,10 +2,10 @@
 - [Overview](#overview)
   - [Limitations & Future Improvements](#limitations-and-future-improvements)
 - [Top Level Design](#top-level-design)
+  - [Signals Description](#signals-description)
   - [RGMII Interface](#rgmii-interface)
   - [Input Delay](#introducing-delay-for-receiver)
-  - [Asynch FIFO](#asynch-fifo)
-    - [Double Flop Synchronizers](#double-flop-synchronizers)
+  - [Double Flop Synchronizers](#double-flop-synchronizers)
   - [CRC32 Computation](#crc32-computation)
     - [Sarwates Algorithm](#sarwates-algorithm)
 
@@ -36,6 +36,44 @@ The Ethernet MAC top level architecture is displayed above. In the image above, 
   - Purple: This is the output tx clock domain and  can range between 2.5MHz (10mbps), 25MHz (100mbps) or 125MHz  (1gbps)
 It should also be noted that each unit is connected via AXI-Stream along with any additional signals needed.
 
+## Signals Description 
+
+The Ethernet MAC receives data in the format of AXI-Stream packets and follows the AXI-Stream protocol. The AXI-Stream interface is a unidirectional, high-speed data transfer protocol commonly used for streaming data between modules. It uses a simple handshake mechanism involving `tvalid` and `tready` signals:
+
+- `tvalid`: Asserted by the sender to indicate valid data is present on the `tdata` lines.
+- `tready`: Asserted by the receiver to indicate it is ready to accept data.
+
+Data is transferred only when both`tvalid` and `tready` are high on teh same clock cycle. The `tlast` signal is used to indicate teh final data word in a packet, marking the end of a transmission.
+Data Transferred via AXI-Stream to the Ethernet MAC module should be in the following format: 
+
+------------------------------------------------------------------------------
+|   Destination MAC Address |  Source MAC Address  | Ethernet Type | Payload |
+------------------------------------------------------------------------------
+
+The MAC is responsible for prepending the preamble sequence, adding padding if necessary, and calculating and appending the CRC32 checksum to complete the Ethernet frame.
+
+| Signal              | Direction | Description                                                                                      |
+|---------------------|-----------|--------------------------------------------------------------------------------------------------|
+| i_clk               | Input     | System clock used to read data from RX and TX FIFOs (100 MHz).                                   |
+| clk_125             | Input     | 125 MHz clock used to drive the TX MAC and RGMII interface.                                     |
+| clk90_125           | Input     | 125 MHz clock with a 90° phase shift, used to transmit RGMII signals and apply skew between clock and data lines. |
+| i_reset_n           | Input     | Active-low synchronous reset.                                                                   |
+| rgmii_phy_rxc       | Input     | Received Ethernet clock signal from PHY (can be 2.5 MHz, 25 MHz, or 125 MHz depending on link speed). |
+| rgmii_phy_rxd       | Input     | Data received from PHY. Operates in DDR (1 Gbps) or SDR (10/100 Mbps) modes based on link speed. |
+| rgmii_phy_rxctl     | Input     | Control signal from PHY.                                                               |
+| rgmii_phy_txc       | Output    | Transmit clock signal to PHY (2.5 MHz, 25 MHz, or 125 MHz depending on link speed).             |
+| rgmii_phy_txd       | Output    | Transmit Ethernet data to PHY. Operates in DDR (1 Gbps) or SDR (10/100 Mbps) mode.              |
+| rgmii_phy_txctl     | Output    | Transmit control signal to PHY.                                                        |
+| s_tx_axis_tdata     | Input     | AXI-Stream TX data to be transmitted via Ethernet.                                               |
+| s_tx_axis_tvalid    | Input     | AXI-Stream signal indicating that `tdata` contains valid data.                                   |
+| s_tx_axis_tlast     | Input     | AXI-Stream signal indicating the final byte of the current packet.                              |
+| m_tx_axis_trdy      | Output    | Indicates the TX FIFO is ready to accept more data (not full).                                  |
+| m_rx_axis_tdata     | Output    | AXI-Stream RX data received from the RX FIFO.                                                    |
+| m_rx_axis_tvalid    | Output    | Indicates that the RX FIFO has valid data available & that teh data on `tdata` line is valid.                                             |
+| m_rx_axis_tlast     | Output    | Indicates the final byte of the current RX packet.                                               |
+| s_rx_axis_trdy      | Input     | Read enable signal for the RX FIFO; indicates the slave is ready to receive data.               |
+
+
 ## RGMII Interface
 The RGMII interface is a 12 wire interface that reduces the total number of wires required for operation when compared to MII or GMII. It does this by reducing the total number of data wires to 4 and utilizing double data rate for 1gbps. RGMII supports 10/100 mbps and 1gbps all through the same interface. The image below displays the RGMII interface with the Artix-7 FPGA on the Nexys Video development board.
 ![Screenshot 2025-03-15 142555](https://github.com/user-attachments/assets/23814329-503a-47e2-84d9-fb43fbc31047) 
@@ -59,12 +97,6 @@ An important aspect with RGMII is ensuring that the received clock and data have
 ![Screenshot 2025-03-18 200215](https://github.com/user-attachments/assets/192b20ea-14ef-4f33-8948-5015a2b8d55e)
 
 As can be seen in the image, each data line is driven first through an IDELAY2 and then into an IDDR. The IDDR is necessary specifically for 1gbps operation, however, to also sample at SDR (single data rate) for 10/100mbps there was extra logic implemented in the rgmii_phy_if module. The received clock is simply passed through a BUFIO and drives the IDDR’s. Additionally, not shown here, the received clock is also passed through a BUFG and then fed to the RX MAC as the main clock.
-
-## Asynch FIFO
-
-There are 2 asynchronous FIFO’s used in the design. These FIFO’s serve 2 purposes: To buffer packets so the receiving side can read out full packets and to cross data from the system clock domain (100MHz) into the Ethernet MAC domain. The Asynch FIFO was designed based on the paper “Simulation and Synthesis Techniques for Asynchronous FIFO Design” by Sunburst Design, with a few changes such as implementing logic to drop bad packets and adding almost full/empty flags. The block diagram of the FIFO is displayed below.
-
-![Asynch FIFO drawio](https://github.com/user-attachments/assets/333ce1c6-dc18-4d97-a9fe-4dc4e75f6a69)
 
 ### Double Flop Synchronizers:
 
