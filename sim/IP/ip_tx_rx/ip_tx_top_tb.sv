@@ -1,11 +1,11 @@
 `include "../../common/axi_stream_rx_bfm.sv"
 `include "../../common/axi_stream_tx_bfm.sv"
 `include "ip_if.sv"
-`include "ip_tx_pkg.sv"
+`include "ip_pkg.sv"
 
-module ip_tx_top;
+module ip_tx_top_tb;
 
-import ip_tx_pkg::*;
+import ip_pkg::*;
 
 localparam FWFT = 1'b1;
 
@@ -15,7 +15,7 @@ bit reset_n;
 
 //instantiate IP header & ip_tx class instance
 ip_tx_hdr_t ip_hdr;
-ip_tx ip_tx_inst;
+ip ip_tx_inst;
 
 // AXI Stream Interface Declarations
 axi_stream_tx_bfm axi_tx(.s_aclk(clk_100), .s_sresetn(reset_n));
@@ -80,7 +80,7 @@ initial begin
                 ip_tx_inst.generate_payload();
 
                 fork
-                    begin ip_hdr_if.drive_hdr(ip_hdr); end
+                    begin ip_hdr_if.drive_ip_hdr(ip_hdr); end
                     //Bursts randomized and FWFT enabled
                     begin axi_tx.axis_transmit_basic(tx_data, 1'b1, FWFT); end               
                 join
@@ -101,4 +101,4 @@ initial begin
 
 end
 
-endmodule : ip_tx_top
+endmodule : ip_tx_top_tb

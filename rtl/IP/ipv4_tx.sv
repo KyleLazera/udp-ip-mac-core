@@ -119,8 +119,8 @@ reg [AXI_STREAM_WIDTH-1:0] m_tx_axis_tdata_reg = 8'b0;
 reg m_tx_axis_tvalid_reg = 1'b0; 
 reg m_tx_axis_tlast_reg = 1'b0;     
 reg s_tx_axis_trdy_reg = 1'b0;
-reg s_ip_hdr_rdy_reg;
-reg m_eth_hdr_rdy_reg;
+reg s_ip_hdr_rdy_reg = 1'b0;
+reg m_eth_hdr_tvalid_reg = 1'b0;
 
 /* Flag/Status Registers */
 reg hdr_latched = 1'b0;
@@ -174,7 +174,7 @@ always @(posedge i_clk) begin
       m_tx_axis_tvalid_reg <= 1'b0; 
       m_tx_axis_tlast_reg <= 1'b0;  
       s_ip_hdr_rdy_reg <= 1'b0;
-      m_eth_hdr_rdy_reg <= 1'b0;      
+      m_eth_hdr_tvalid_reg <= 1'b0;      
 
       // Checksum Registers      
       checksum_sum <= 16'b0;
@@ -189,15 +189,19 @@ always @(posedge i_clk) begin
       m_tx_axis_tvalid_reg <= 1'b0;
       m_tx_axis_tlast_reg <= 1'b0;      
       s_ip_hdr_rdy_reg <= 1'b0;
-      m_eth_hdr_rdy_reg <= 1'b0;   
+      m_eth_hdr_tvalid_reg <= 1'b1;   
 
       // FSM
       case(state_reg)
          IDLE : begin
             ip_hdr_cnt <= 5'b0;            
-            m_eth_hdr_rdy_reg <= 1'b0; 
+            m_eth_hdr_tvalid_reg <= 1'b0; 
              
-            // ip header handshaking logic 
+            //////////////////////////////////////////////////////////////////////////////////////////
+            // De-assert the rdy flag if the handhsake is complete or if the hdr_latched flag is 
+            // asserted. If we only used the hdr_latched flag, the rdy flag would de-assert 1 cc after
+            // we latched the header.
+            //////////////////////////////////////////////////////////////////////////////////////////
             if(hdr_latched || s_ip_hdr_rdy_reg & s_ip_tx_hdr_valid)      
                s_ip_hdr_rdy_reg <= 1'b0;
             else
@@ -213,9 +217,9 @@ always @(posedge i_clk) begin
                ip_hdr_dst_ip_addr <= s_ip_tx_dst_ip_addr;
                //Initially set checksum to 0 - this is changed after it is calculated
                ip_hdr_checksum <= 16'b0;
-               eth_type_reg <= m_eth_type;
-               eth_src_mac_addr_reg <= m_eth_src_mac_addr;
-               eth_dst_mac_addr_reg <= m_eth_dst_mac_addr;
+               eth_type_reg <= s_eth_tx_type;
+               eth_src_mac_addr_reg <= s_eth_tx_src_mac_addr;
+               eth_dst_mac_addr_reg <= s_eth_tx_dst_mac_addr;
 
                //Indicate the header has been latched
                hdr_latched <= 1'b1;
@@ -316,6 +320,8 @@ always @(posedge i_clk) begin
          end
          PAYLOAD : begin
             s_tx_axis_trdy_reg <= 1'b1;
+            m_eth_hdr_tvalid_reg <= !hdr_latched;
+
 
             if(s_tx_axis_trdy_reg & s_tx_axis_tvalid & m_tx_axis_trdy) begin
                m_tx_axis_tdata_reg <= s_tx_axis_tdata;
@@ -326,20 +332,31 @@ always @(posedge i_clk) begin
                // clock edge
                if(s_tx_axis_tlast & m_tx_axis_tvalid_reg) begin
                   s_tx_axis_trdy_reg <= 1'b0;
+                  s_ip_hdr_rdy_reg <= 1'b1;
                   state_reg <= IDLE;
                end
+            end   
 
-            end         
+            if(m_eth_hdr_trdy & m_eth_hdr_tvalid_reg) 
+               hdr_latched <= 1'b1;                     
 
          end
       endcase
    end
 end
 
-assign s_tx_axis_trdy = s_tx_axis_trdy_reg;
-assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
+/* Ethernet Header Output Signals */
+assign m_eth_hdr_tvalid = m_eth_hdr_tvalid_reg;
+assign m_eth_src_mac_addr = eth_src_mac_addr_reg;                       
+assign m_eth_dst_mac_addr = eth_dst_mac_addr_reg;                  
+assign m_eth_type = eth_type_reg;
+
+/* Ethernet Payload Output Signals */
 assign m_tx_axis_tdata = m_tx_axis_tdata_reg;
 assign m_tx_axis_tvalid = m_tx_axis_tvalid_reg;
 assign m_tx_axis_tlast = m_tx_axis_tlast_reg;
+
+assign s_tx_axis_trdy = s_tx_axis_trdy_reg;
+assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
 
 endmodule 

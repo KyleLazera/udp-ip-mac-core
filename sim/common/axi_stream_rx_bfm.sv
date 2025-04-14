@@ -17,15 +17,15 @@ interface axi_stream_rx_bfm #(
         m_axis_trdy = 1'b0;
     endtask : init_axi_rx
 
-    // Reads data via teh AXI-Stream protocol
+    // Reads data via the AXI-Stream protocol
     task axis_read(ref bit [7:0] data[$]);
 
-        //Raise trdy flag to indicate we are redy to read data
+        //Raise trdy flag 
         @(posedge m_aclk);
         m_axis_trdy <= 1'b1;
         @(posedge m_aclk);
 
-        //Wait for the trdy flag to go high
+        //If tvalid flag is not high, wait until it does
         while(!m_axis_tvalid)
             @(posedge m_aclk);
 
