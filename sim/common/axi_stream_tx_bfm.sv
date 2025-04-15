@@ -22,7 +22,7 @@ interface axi_stream_tx_bfm #(
 
     // Task to transmit data via AXI-Stream - arguments as follows:
     // data - Data to transmit via AXI-Stream
-    // bursts - When 1, valid flag is help high between frames and when 0, valid is lowered between frames
+    // bursts - When 1, valid flag is held high between frames and when 0, valid is lowered between frames
     // fwft - follows fwft procedure
     task axis_transmit_basic(bit [7:0] data[$], bit bursts = 1'b1, fwft = 1'b1);
 
@@ -39,10 +39,12 @@ interface axi_stream_tx_bfm #(
         while(!s_axis_trdy)
             @(posedge s_aclk);
 
-        //Transmit data on each clock edge
+        //Transmit data on each clock edge if the tvalid and trdy signals are high
         while(data.size() != 0) begin
-            s_axis_tdata <= data.pop_front();
-            s_axis_tlast <= (data.size() == 0);
+            if(s_axis_trdy & s_axis_tvalid) begin
+                s_axis_tdata <= data.pop_front();
+                s_axis_tlast <= (data.size() == 0);
+            end
             @(posedge s_aclk);
         end
         

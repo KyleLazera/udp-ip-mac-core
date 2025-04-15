@@ -38,22 +38,22 @@ ipv4_rx #(
 ) ip_rx (
    .i_clk(clk_100),
    .i_reset_n(reset_n),
-    .s_eth_hdr_valid(ip_hdr_if.s_eth_hdr_tvalid),
-    .s_eth_hdr_rdy(ip_hdr_if.s_eth_hdr_trdy),
-    .s_eth_rx_src_mac_addr(ip_hdr_if.m_eth_src_mac_addr),
-    .s_eth_rx_dst_mac_addr(ip_hdr_if.m_eth_dst_mac_addr),
-    .s_eth_rx_type(ip_hdr_if.m_eth_type),
+    .s_eth_hdr_valid(ip_hdr_if.ip_tx_hdr_valid),
+    .s_eth_hdr_rdy(ip_hdr_if.ip_tx_hdr_rdy),
+    .s_eth_rx_src_mac_addr(ip_hdr_if.eth_tx_src_mac_addr),
+    .s_eth_rx_dst_mac_addr(ip_hdr_if.eth_tx_dst_mac_addr),
+    .s_eth_rx_type(ip_hdr_if.eth_tx_type),
     .s_rx_axis_tdata(axi_tx.s_axis_tdata),
     .s_rx_axis_tvalid(axi_tx.s_axis_tvalid),
     .s_rx_axis_tlast(axi_tx.s_axis_tlast),
     .s_rx_axis_trdy(axi_tx.s_axis_trdy),
-    .m_ip_hdr_trdy(),
-    .m_ip_hdr_tvalid(),
-    .m_ip_rx_src_ip_addr(),
-    .m_ip_rx_dst_ip_addr(),
-    .m_eth_rx_src_mac_addr(),
-    .m_eth_rx_dst_mac_addr(),
-    .m_eth_rx_type(),    
+    .m_ip_hdr_trdy(ip_hdr_if.eth_rx_hdr_trdy),
+    .m_ip_hdr_tvalid(ip_hdr_if.eth_rx_hdr_tvalid),
+    .m_ip_rx_src_ip_addr(ip_hdr_if.ip_rx_src_ip_addr),
+    .m_ip_rx_dst_ip_addr(ip_hdr_if.ip_rx_dst_ip_addr),
+    .m_eth_rx_src_mac_addr(ip_hdr_if.eth_rx_src_mac_addr),
+    .m_eth_rx_dst_mac_addr(ip_hdr_if.eth_rx_dst_mac_addr),
+    .m_eth_rx_type(ip_hdr_if.eth_rx_type),    
     .m_rx_axis_tdata(axi_rx.m_axis_tdata),
     .m_rx_axis_tvalid(axi_rx.m_axis_tvalid),
     .m_rx_axis_tlast(axi_rx.m_axis_tlast),
@@ -63,7 +63,9 @@ ipv4_rx #(
  
 
 initial begin
-    //Init axi lines
+    ip_rx_inst = new();
+
+    //Init AXI data lines 
     axi_tx.init_axi_tx();
     axi_rx.init_axi_rx();
 
@@ -74,8 +76,7 @@ initial begin
 
         fork
             begin 
-                //ip_rx_inst.generate_header_data(ip_hdr);                
-                //ip_rx_inst.generate_payload();
+                // Generate a full IP Packet
                 ip_rx_inst.generate_ip_packet(ip_hdr);
 
                 fork
@@ -87,7 +88,7 @@ initial begin
             end
             begin 
                 axi_rx.axis_read(rx_data); 
-                //ip_rx_inst.check(ip_hdr);
+                ip_rx_inst.check(.ip_hdr(ip_hdr), .tx_ip(1'b0));
             end
         join
 

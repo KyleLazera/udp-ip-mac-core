@@ -19,13 +19,26 @@ typedef struct packed {
   logic [31:0]         dst_ip_addr;
 } ip_tx_hdr_t;
 
+// Ethernet Header Struct
+typedef struct packed {
+    logic [47:0] src_mac_addr;
+    logic [47:0] dst_mac_addr;
+    logic [15:0] eth_type;
+} eth_hdr_t;
+
 // Input payload & output payload queues
 bit [7:0] tx_data[$];
 bit [7:0] rx_data[$];
 
 class ip;
 
-    /* Methods */
+    protected int payload_size = 0;
+
+    function new();
+        this.payload_size = $urandom_range(10, 1480);
+    endfunction : new
+
+    /* Protected Mehtods */
 
     /* Calculate the IP Header Checksum Value for the specified inputs */
     protected function automatic calculate_checksum(ref ip_tx_hdr_t ip_hdr);
@@ -55,43 +68,10 @@ class ip;
         ip_hdr.ip_hdr_checksum = ~sum[15:0];    
     endfunction : calculate_checksum
 
-    /* Generate data for the IP Header. Certain fields are kept constant */
-    function automatic generate_header_data(ref ip_tx_hdr_t ip_hdr);
-        ip_hdr.hdr_valid      = 1'b1;
-        ip_hdr.version        = 4'd4;   //IPv4
-        ip_hdr.length         = 4'd5;  
-        ip_hdr.tos            = $urandom();
-        ip_hdr.total_length   = $urandom();
-        ip_hdr.ip_hdr_id      = 0;
-        ip_hdr.ip_hdr_flags   = 0;
-        ip_hdr.ip_hdr_frag_offset= 0;
-        ip_hdr.ip_hdr_ttl     = 8'd64;      
-        ip_hdr.protocol       = $urandom();
-        ip_hdr.src_ip_addr    = $urandom();
-        ip_hdr.dst_ip_addr    = $urandom();
-
-        calculate_checksum(ip_hdr);
-
-    endfunction : generate_header_data 
-
-    // Generate raw payload data to encapsulate wihtin an IP frame
-    function void generate_payload();
-        int size = $urandom_range(20, 1480);
-        tx_data.delete();
-        repeat(size) begin
-            tx_data.push_back($urandom_range(0, 255));
-        end
-    endfunction : generate_payload
-
-    // Generate a full IP packet
-    function automatic generate_ip_packet(ref ip_tx_hdr_t ip_hdr);
+    protected function void encapsulate_ip_packet(ip_tx_hdr_t ip_hdr);
         logic [159:0] ip_hdr;
 
-        // Create payload and IP Header
-        generate_header_data(ip_hdr);
-        generate_payload();
-
-        /* Create encapsulated frame */
+        /* Create IP Header */
         ip_hdr = {
             ip_hdr.version,
             ip_hdr.length,
@@ -106,34 +86,71 @@ class ip;
             ip_hdr.src_ip_addr,
             ip_hdr.dst_ip_addr
         };
-
-        // Generate the desired IP Packet
+        
+        /* Pre-pend the IP Header to the front of the Payload */
         for(int i = 0; i < 20; i++)
             tx_data.push_front(ip_hdr[((i+1)*8)-1 -: 8]); 
+
+    endfunction : encapsulate_ip_packet
+
+    /* De-Encapsulate an IP Frame */
+    protected function void de_encapsulate_ip_packet();
+        //Pop off the front 20 bytes of the IP Packet
+        for(int i = 0; i < 20; i++)
+            tx_data.pop_front(); 
+
+    endfunction : de_encapsulate_ip_packet
+
+    /* Public Methods */
+
+    /* Generate data for the IP Header. Certain fields are kept constant */
+    function automatic generate_header_data(ref ip_tx_hdr_t ip_hdr);
+        ip_hdr.hdr_valid      = 1'b1;
+        ip_hdr.version        = 4'd4;   //IPv4
+        ip_hdr.length         = 4'd5;  
+        ip_hdr.tos            = $urandom();
+        ip_hdr.total_length   = payload_size + ip_hdr.length*4;
+        ip_hdr.ip_hdr_id      = 0;
+        ip_hdr.ip_hdr_flags   = 0;
+        ip_hdr.ip_hdr_frag_offset= 0;
+        ip_hdr.ip_hdr_ttl     = 8'd64;      
+        ip_hdr.protocol       = $urandom();
+        ip_hdr.src_ip_addr    = $urandom();
+        ip_hdr.dst_ip_addr    = $urandom();
+
+        calculate_checksum(ip_hdr);
+
+    endfunction : generate_header_data 
+
+    /* Generate raw payload data to encapsulate wihtin an IP frame */
+    function void generate_payload();
+        //payload_size = $urandom_range(10, 20);
+        tx_data.delete();
+        repeat(payload_size) begin
+            tx_data.push_back($urandom_range(0, 255));
+        end
+    endfunction : generate_payload
+
+    /* Generate a full IP packet */
+    function automatic generate_ip_packet(ref ip_tx_hdr_t ip_hdr);
+        
+        // Create payload and IP Header & encapsulate it
+        generate_payload();
+        generate_header_data(ip_hdr);        
+        encapsulate_ip_packet(ip_hdr);
 
     endfunction : generate_ip_packet
 
     // Self-checking function to compare the tx and rx packets 
-    function void check(ip_tx_hdr_t ip_hdr);
-        /* Create encapsulated frame */
-        logic [159:0] eth_hdr = {
-            ip_hdr.version,
-            ip_hdr.length,
-            ip_hdr.tos,
-            ip_hdr.total_length,
-            ip_hdr.ip_hdr_id,
-            ip_hdr.ip_hdr_flags,
-            ip_hdr.ip_hdr_frag_offset,
-            ip_hdr.ip_hdr_ttl,
-            ip_hdr.protocol,
-            ip_hdr.ip_hdr_checksum,
-            ip_hdr.src_ip_addr,
-            ip_hdr.dst_ip_addr
-        };
+    function void check(ip_tx_hdr_t ip_hdr, bit tx_ip);
 
-        // Generate the desired IP Packet
-        for(int i = 0; i < 20; i++)
-            tx_data.push_front(eth_hdr[((i+1)*8)-1 -: 8]);
+        // If we are comparing in tx mode, we need to encapsulate the tx data (raw payload) & compare
+        // it with the rx data. If we are checking the rx ip, we need to de-encapsulate the output packet
+        // before comparing it.
+        if(tx_ip) begin
+            encapsulate_ip_packet(ip_hdr);
+        end else
+            de_encapsulate_ip_packet();
 
         //Ensure the packets are the correct size
         assert(tx_data.size() == rx_data.size()) 

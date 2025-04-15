@@ -88,7 +88,7 @@ initial begin
             end
             begin 
                 axi_rx.axis_read(rx_data); 
-                ip_tx_inst.check(ip_hdr);
+                ip_tx_inst.check(.ip_hdr(ip_hdr), .tx_ip(1'b1));
             end
         join
 

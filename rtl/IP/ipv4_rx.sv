@@ -79,9 +79,9 @@ reg [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata_reg = {AXI_DATA_WIDTH-1{1'b0}};
 reg m_rx_axis_tvalid_reg = 1'b0;
 reg m_rx_axis_tlast_reg = 1'b0;
 reg s_rx_axis_trdy_reg = 1'b0;
+reg bad_pckt_reg = 1'b0;
 
 reg [4:0] hdr_cntr = 5'b0;
-reg [15:0] byte_cntr = 16'b0;
 reg latched_hdr = 1'b0;
 
 /* Checksum Calculation Logic */ 
@@ -120,12 +120,18 @@ reg [15:0] eth_rx_type = 16'd0;
 
 /* IP Header Data Path Registers */
 reg m_ip_hdr_tvalid_reg = 1'b0;
-reg [31:0] ip_src_ip_addr_reg = 32'b0;
-reg [31:0] ip_dst_ip_addr_reg = 32'b0;
-reg [15:0] ip_checksum_reg = 16'b0;
-reg [3:0] ip_ihl = 4'b0;
-reg [15:0] ip_total_length_reg = 16'b0;
-reg [3:0] ip_hdr_length_reg = 4'b0;
+reg [3:0] ip_hdr_version;
+reg [3:0] ip_hdr_length;
+reg [7:0] ip_hdr_type;
+reg [15:0] ip_hdr_total_length;
+reg [15:0] ip_hdr_id;
+reg [2:0] ip_hdr_flags;
+reg [12:0] ip_hdr_frag_offset;
+reg [7:0] ip_hdr_ttl;
+reg [7:0] ip_hdr_protocol;
+reg [15:0] ip_hdr_checksum;
+reg [31:0] ip_hdr_src_ip_addr;                                 
+reg [31:0] ip_hdr_dst_ip_addr;  
 
 /* De-encapsulation Logic */
 always @(posedge i_clk) begin
@@ -137,15 +143,17 @@ always @(posedge i_clk) begin
         s_rx_axis_trdy_reg <= 1'b0;
         m_rx_axis_tvalid_reg <= 1'b0;
 
+        bad_pckt_reg <= 1'b0;
         latched_hdr <= 1'b0;
-        byte_cntr <= 16'b0;
         hdr_cntr <= 5'b0;
         checksum_sum <= 16'b0;
     end else begin
         // Default Values
         eth_hdr_rdy_reg <= 1'b0;
+        bad_pckt_reg <= 1'b0;
         s_rx_axis_trdy_reg <= 1'b0;
         m_rx_axis_tvalid_reg <= 1'b0;
+        m_ip_hdr_tvalid_reg <= 1'b0;
 
         case(state)
         IDLE: begin
@@ -172,7 +180,6 @@ always @(posedge i_clk) begin
                 latched_hdr <= 1'b0;
                 s_rx_axis_trdy_reg <= 1'b1;
                 checksum_sum <= 16'b0;
-                byte_cntr <= 16'b0;
                 hdr_cntr <= 5'b0;
                 state <= HEADER_CHECK;
             end
@@ -181,116 +188,70 @@ always @(posedge i_clk) begin
             s_rx_axis_trdy_reg <= 1'b1;
 
             if(s_rx_axis_trdy_reg & s_rx_axis_tvalid) begin
+
+                // Pass the 16 bit field into the checksum on every 2nd cntr iteration
+                if(hdr_cntr[0] == 1'b0)
+                    ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};
+                else 
+                    checksum_sum <= ip_checksum(checksum_sum, {ip_checksum_fields[7:0], s_rx_axis_tdata});
+
+                // Iterate through each byte of the IP header and store the values in the data registers
                 case(hdr_cntr)
                     5'd0: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};
-                        ip_ihl <= s_rx_axis_tdata[3:0];
-                        // Ensure the IP version is IPv4
-                        if(s_rx_axis_tdata[7:4] != IPV4_VERSION)
-                            state <= WAIT;
-                    end
-                    5'd1: begin                        
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};
-                    end
-                    5'd2: begin
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        //Pass in the first 16-bit field into the Checksum calculation
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end
-                    5'd3: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                        
-                        // Store the total length of the IP payload
-                        ip_total_length_reg <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                              
-                    end  
-                    5'd4: begin                        
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end 
-                    5'd5: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                     
-                    end  
-                    5'd6: begin                        
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end   
-                    5'd7: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                  
-                    end  
-                    5'd8: begin                        
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end 
-                    5'd9: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                     
-                    end  
-                    5'd10: begin                        
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end  
-                    5'd11: begin
-                        //Store the checksum value from the rx IP Header
-                        ip_checksum_reg <= {ip_checksum_fields[7:0], s_rx_axis_tdata};
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                                              
-                    end  
-                    5'd12: begin                                          
-                        //Pass in a 0 as the checksum field 
-                        checksum_sum <= ip_checksum(checksum_sum, 16'b0); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end   
-                    5'd13: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                  
-                    end  
-                    5'd14: begin 
-                        //Shift in upper 16 bytes of the source IP
-                        ip_src_ip_addr_reg <= {ip_src_ip_addr_reg[15:0], ip_checksum_fields};
-
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end 
-                    5'd15: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                     
-                    end  
-                    5'd16: begin 
-                        //Shift in the lower 16 bytes of source IP
-                        ip_src_ip_addr_reg <= {ip_src_ip_addr_reg[15:0], ip_checksum_fields};
-
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end 
-                    5'd17: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                  
-                    end  
-                    5'd18: begin                        
-                        //Shift in the upper 16 bytes of destination IP
-                        ip_dst_ip_addr_reg <= {ip_dst_ip_addr_reg[15:0], ip_checksum_fields};
-
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields); 
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                               
-                    end 
-                    5'd19: begin
-                        ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};                                                                     
-                    end  
-                    5'd20: begin       
-                        //Shift in the lower 16 bytes of destination IP
-                        ip_dst_ip_addr_reg <= {ip_dst_ip_addr_reg[15:0], ip_checksum_fields};
-                        checksum_sum <= ip_checksum(checksum_sum, ip_checksum_fields);                                                                              
-                    end 
-                    5'd21: begin
-                        // Before shifting to the next state, ensure the checksum recieved is correct 
-                        if(~checksum_sum == ip_checksum_reg) begin
-                            s_rx_axis_trdy_reg <= m_rx_axis_trdy & s_rx_axis_tvalid;
-
-                            // todo: Could reduce teh total number of cc's by sampling first input data here
-
-                            // Subtract the total length register from the number of header bytes
-                            ip_total_length_reg <= ip_total_length_reg - (ip_ihl << 2);                        
-
-                            state <= PAYLOAD;
+                        // Make sure the packet is an IPv4 packet
+                        if(s_rx_axis_tdata[7:4] == IPV4_VERSION) begin
+                            ip_hdr_length <= s_rx_axis_tdata[3:0];
+                            ip_hdr_version <= s_rx_axis_tdata[7:4];
                         end else
                             state <= WAIT;
+                    end
+                    5'd1: ip_hdr_type <= s_rx_axis_tdata;
+                    5'd2: ip_hdr_total_length[15:8] <= s_rx_axis_tdata;
+                    5'd3: ip_hdr_total_length[7:0] <= s_rx_axis_tdata;
+                    5'd4: ip_hdr_id[15:8] <= s_rx_axis_tdata;
+                    5'd5: ip_hdr_id[7:0] <= s_rx_axis_tdata;
+                    5'd6: begin
+                        ip_hdr_flags <= s_rx_axis_tdata[7:5];
+                        ip_hdr_frag_offset[12:8] <= s_rx_axis_tdata[4:0];
+                        // Subtract the total length register from the number of header bytes
+                        ip_hdr_total_length <= ip_hdr_total_length - (ip_hdr_length << 2); 
+                    end
+                    5'd7: ip_hdr_frag_offset[7:0] <= s_rx_axis_tdata;
+                    5'd8: ip_hdr_ttl <= s_rx_axis_tdata;
+                    5'd9: ip_hdr_protocol <= s_rx_axis_tdata;
+                    5'd10: ip_hdr_checksum[15:8] <= s_rx_axis_tdata;
+                    5'd11: ip_hdr_checksum[7:0] <= s_rx_axis_tdata;
+                    5'd12: ip_hdr_src_ip_addr[31:24] <= s_rx_axis_tdata;
+                    5'd13: ip_hdr_src_ip_addr[23:16] <= s_rx_axis_tdata;
+                    5'd14: ip_hdr_src_ip_addr[15:8] <= s_rx_axis_tdata;
+                    5'd15: ip_hdr_src_ip_addr[7:0] <= s_rx_axis_tdata;    
+                    5'd16: ip_hdr_dst_ip_addr[31:24] <= s_rx_axis_tdata;
+                    5'd17: ip_hdr_dst_ip_addr[23:16] <= s_rx_axis_tdata;
+                    5'd18: ip_hdr_dst_ip_addr[15:8] <= s_rx_axis_tdata;
+                    5'd19: ip_hdr_dst_ip_addr[7:0] <= s_rx_axis_tdata;   
+                    5'd20: begin
+                        // Make sure the checksum is correct 
+                        if(checksum_sum == 16'hffff) begin
+                            s_rx_axis_trdy_reg <= m_rx_axis_trdy & s_rx_axis_tvalid;
+                            m_ip_hdr_tvalid_reg <= 1'b1;
 
-                    end                                                                                                                         
-                endcase
+                            //Store the first raw payload data
+                            m_rx_axis_tdata_reg <= s_rx_axis_tdata;
+                            m_rx_axis_tvalid_reg <= s_rx_axis_tvalid;
+                            m_rx_axis_tlast_reg <= s_rx_axis_tlast;  
+                            // Decrement the payload byte counter
+                            ip_hdr_total_length <= ip_hdr_total_length - 1'b1;  
+
+                            if(s_rx_axis_tlast & s_rx_axis_tvalid)
+                                state <= IDLE;                     
+
+                            state <= PAYLOAD;                             
+                        end else begin
+                            bad_pckt_reg <= 1'b1;
+                            state <= WAIT;
+                        end
+                    end                                    
+                endcase            
 
                 hdr_cntr <= hdr_cntr + 1'b1;
             end
@@ -298,6 +259,7 @@ always @(posedge i_clk) begin
         PAYLOAD: begin
             s_rx_axis_trdy_reg <= 1'b1;
             m_rx_axis_tvalid_reg <= 1'b1;
+            m_ip_hdr_tvalid_reg <= 1'b1;
 
             // If the up-stream module & down-stream module have data/can recieve data
             // we can latch the incoming data
@@ -306,10 +268,17 @@ always @(posedge i_clk) begin
                 m_rx_axis_tvalid_reg <= s_rx_axis_tvalid;
                 m_rx_axis_tlast_reg <= s_rx_axis_tlast;
 
-                byte_cntr <= byte_cntr + 1'b1;
+                // Count the number of bytes recieved
+                ip_hdr_total_length <= ip_hdr_total_length - 1'b1;
 
                 if(s_rx_axis_tlast & s_rx_axis_tvalid) begin
-                    //todo: Compare the byte_cntr to the ip_total_length_reg
+                    
+                    // Total bytes in the payload did not match the bytes specified in the IP Header
+                    if(ip_hdr_total_length != 16'b0)begin
+                        bad_pckt_reg <= 1'b1;
+                        state <= IDLE;
+                    end
+
                     s_rx_axis_trdy_reg <= 1'b0;
                     state <= IDLE;
                 end
@@ -334,5 +303,15 @@ assign s_rx_axis_trdy = s_rx_axis_trdy_reg;
 assign m_rx_axis_tvalid = m_rx_axis_tvalid_reg;
 assign m_rx_axis_tdata = m_rx_axis_tdata_reg;
 assign m_rx_axis_tlast = m_rx_axis_tlast_reg;
+
+assign bad_packet = bad_pckt_reg;
+
+/* Output Ethernet/IP Header Info */
+assign m_ip_hdr_tvalid = m_ip_hdr_tvalid_reg;
+assign m_ip_rx_src_ip_addr = ip_hdr_src_ip_addr;
+assign m_ip_rx_dst_ip_addr = ip_hdr_dst_ip_addr;
+assign m_eth_rx_src_mac_addr = eth_rx_src_mac_addr;
+assign m_eth_rx_dst_mac_addr = eth_rx_dst_mac_addr;
+assign m_eth_rx_type = eth_rx_type;
 
 endmodule
