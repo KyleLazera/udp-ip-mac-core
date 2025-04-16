@@ -14,12 +14,10 @@ bit clk_100;
 bit reset_n;
 
 //instantiate IP header & ip_tx class instance
-ip_tx_hdr_t ip_hdr;
+ip_pckt_t tx_ip_pckt, rx_ip_pckt;
 ip ip_tx_inst;
 
 // AXI Stream Interface Declarations
-axi_stream_tx_bfm axi_tx(.s_aclk(clk_100), .s_sresetn(reset_n));
-axi_stream_rx_bfm axi_rx(.m_aclk(clk_100), .m_sresetn(reset_n));
 ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
 
 always #5 clk_100 = ~clk_100;
@@ -38,10 +36,10 @@ ipv4_tx #(
 ) ip_tx (
    .i_clk(clk_100),
    .i_reset_n(reset_n),
-   .s_tx_axis_tdata(axi_tx.s_axis_tdata),                 
-   .s_tx_axis_tvalid(axi_tx.s_axis_tvalid),                 
-   .s_tx_axis_tlast(axi_tx.s_axis_tlast),                  
-   .s_tx_axis_trdy(axi_tx.s_axis_trdy), 
+   .s_tx_axis_tdata(ip_hdr_if.axi_tx.s_axis_tdata),                 
+   .s_tx_axis_tvalid(ip_hdr_if.axi_tx.s_axis_tvalid),                 
+   .s_tx_axis_tlast(ip_hdr_if.axi_tx.s_axis_tlast),                  
+   .s_tx_axis_trdy(ip_hdr_if.axi_tx.s_axis_trdy), 
    .s_ip_tx_hdr_type(ip_hdr_if.ip_tx_hdr_type),                  
    .s_ip_tx_hdr_valid(ip_hdr_if.ip_tx_hdr_valid),                  
    .s_ip_tx_hdr_rdy(ip_hdr_if.ip_tx_hdr_rdy),                     
@@ -52,46 +50,38 @@ ipv4_tx #(
    .s_eth_tx_src_mac_addr(ip_hdr_if.eth_tx_src_mac_addr),
    .s_eth_tx_dst_mac_addr(ip_hdr_if.eth_tx_dst_mac_addr),
    .s_eth_tx_type(ip_hdr_if.eth_tx_type),                                 
-   .m_tx_axis_tdata(axi_rx.m_axis_tdata),                 
-   .m_tx_axis_tvalid(axi_rx.m_axis_tvalid),                
-   .m_tx_axis_tlast(axi_rx.m_axis_tlast),                  
-   .m_tx_axis_trdy(axi_rx.m_axis_trdy),
-   .m_eth_hdr_trdy(),
-   .m_eth_hdr_tvalid(),
-   .m_eth_src_mac_addr(),                                
-   .m_eth_dst_mac_addr(),                                 
-   .m_eth_type()     
+   .m_tx_axis_tdata(ip_hdr_if.axi_rx.m_axis_tdata),                 
+   .m_tx_axis_tvalid(ip_hdr_if.axi_rx.m_axis_tvalid),                
+   .m_tx_axis_tlast(ip_hdr_if.axi_rx.m_axis_tlast),                  
+   .m_tx_axis_trdy(ip_hdr_if.axi_rx.m_axis_trdy),
+   .m_eth_hdr_trdy(ip_hdr_if.eth_rx_hdr_trdy),
+   .m_eth_hdr_tvalid(ip_hdr_if.eth_rx_hdr_tvalid),
+   .m_eth_src_mac_addr(ip_hdr_if.eth_rx_src_mac_addr),                                
+   .m_eth_dst_mac_addr(ip_hdr_if.eth_rx_dst_mac_addr),                                 
+   .m_eth_type(ip_hdr_if.eth_rx_type)     
 );
- 
 
 initial begin
     //Init axi lines
-    axi_tx.init_axi_tx();
-    axi_rx.init_axi_rx();
+    ip_hdr_if.axi_tx.init_axi_tx();
+    ip_hdr_if.axi_rx.init_axi_rx();
 
     //Wait for reset to be asserted
     @(posedge reset_n);
 
-    repeat(3) begin
+    repeat(50) begin
 
         fork
             begin 
-                ip_tx_inst.generate_header_data(ip_hdr);                
-                ip_tx_inst.generate_payload();
-
-                fork
-                    begin ip_hdr_if.drive_ip_hdr(ip_hdr); end
-                    //Bursts randomized and FWFT enabled
-                    begin axi_tx.axis_transmit_basic(tx_data, 1'b1, FWFT); end               
-                join
-                                               
+                ip_tx_inst.generate_packet(tx_ip_pckt);                
+                ip_hdr_if.drive_ip_payload(tx_ip_pckt);                                             
             end
             begin 
-                axi_rx.axis_read(rx_data); 
-                ip_tx_inst.check(.ip_hdr(ip_hdr), .tx_ip(1'b1));
+                ip_hdr_if.read_encap_data(rx_ip_pckt);
             end
         join
 
+        ip_tx_inst.self_check(.tx_pckt(tx_ip_pckt), .rx_pckt(rx_ip_pckt), .tx_ip(1'b1));
         
     end
 

@@ -1,25 +1,22 @@
-`include "../../common/axi_stream_rx_bfm.sv"
-`include "../../common/axi_stream_tx_bfm.sv"
 `include "ip_if.sv"
 `include "ip_pkg.sv"
 
 module ip_rx_top_tb;
 
-import ip_pkg::*;
+localparam RX_IP = 1'b0;
+localparam TX_IP = 1'b1;
 
-localparam FWFT = 1'b1;
+import ip_pkg::*;
 
 // Clock & Reset Signals
 bit clk_100;
 bit reset_n;
 
 //instantiate IP header & ip_tx class instance
-ip_tx_hdr_t ip_hdr;
+ip_pckt_t tx_ip_pckt, rx_ip_pckt;
 ip ip_rx_inst;
 
-// AXI Stream Interface Declarations
-axi_stream_tx_bfm axi_tx(.s_aclk(clk_100), .s_sresetn(reset_n));
-axi_stream_rx_bfm axi_rx(.m_aclk(clk_100), .m_sresetn(reset_n));
+//IP Header Interface
 ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
 
 always #5 clk_100 = ~clk_100;
@@ -43,10 +40,10 @@ ipv4_rx #(
     .s_eth_rx_src_mac_addr(ip_hdr_if.eth_tx_src_mac_addr),
     .s_eth_rx_dst_mac_addr(ip_hdr_if.eth_tx_dst_mac_addr),
     .s_eth_rx_type(ip_hdr_if.eth_tx_type),
-    .s_rx_axis_tdata(axi_tx.s_axis_tdata),
-    .s_rx_axis_tvalid(axi_tx.s_axis_tvalid),
-    .s_rx_axis_tlast(axi_tx.s_axis_tlast),
-    .s_rx_axis_trdy(axi_tx.s_axis_trdy),
+    .s_rx_axis_tdata(ip_hdr_if.axi_tx.s_axis_tdata),
+    .s_rx_axis_tvalid(ip_hdr_if.axi_tx.s_axis_tvalid),
+    .s_rx_axis_tlast(ip_hdr_if.axi_tx.s_axis_tlast),
+    .s_rx_axis_trdy(ip_hdr_if.axi_tx.s_axis_trdy),
     .m_ip_hdr_trdy(ip_hdr_if.eth_rx_hdr_trdy),
     .m_ip_hdr_tvalid(ip_hdr_if.eth_rx_hdr_tvalid),
     .m_ip_rx_src_ip_addr(ip_hdr_if.ip_rx_src_ip_addr),
@@ -54,44 +51,39 @@ ipv4_rx #(
     .m_eth_rx_src_mac_addr(ip_hdr_if.eth_rx_src_mac_addr),
     .m_eth_rx_dst_mac_addr(ip_hdr_if.eth_rx_dst_mac_addr),
     .m_eth_rx_type(ip_hdr_if.eth_rx_type),    
-    .m_rx_axis_tdata(axi_rx.m_axis_tdata),
-    .m_rx_axis_tvalid(axi_rx.m_axis_tvalid),
-    .m_rx_axis_tlast(axi_rx.m_axis_tlast),
-    .m_rx_axis_trdy(axi_rx.m_axis_trdy),
+    .m_rx_axis_tdata(ip_hdr_if.axi_rx.m_axis_tdata),
+    .m_rx_axis_tvalid(ip_hdr_if.axi_rx.m_axis_tvalid),
+    .m_rx_axis_tlast(ip_hdr_if.axi_rx.m_axis_tlast),
+    .m_rx_axis_trdy(ip_hdr_if.axi_rx.m_axis_trdy),
     .bad_packet()        
 );
  
 
-initial begin
-    ip_rx_inst = new();
-
+initial begin    
     //Init AXI data lines 
-    axi_tx.init_axi_tx();
-    axi_rx.init_axi_rx();
+    ip_hdr_if.axi_tx.init_axi_tx();
+    ip_hdr_if.axi_rx.init_axi_rx();
 
     //Wait for reset to be asserted
     @(posedge reset_n);
 
-    repeat(3) begin
+    repeat(50) begin
 
         fork
             begin 
-                // Generate a full IP Packet
-                ip_rx_inst.generate_ip_packet(ip_hdr);
-
-                fork
-                    begin ip_hdr_if.drive_ethernet_hdr(); end
-                    //Bursts randomized and FWFT enabled
-                    begin axi_tx.axis_transmit_basic(tx_data, 1'b1, FWFT); end               
-                join
-                                               
+                // Generate a full IP Packet & ethernet header and transmit to the IP rx module
+                ip_rx_inst.generate_packet(tx_ip_pckt);
+                ip_rx_inst.encapsulate_ip_packet(tx_ip_pckt);                
+                ip_hdr_if.drive_eth_packet(tx_ip_pckt);
             end
             begin 
-                axi_rx.axis_read(rx_data); 
-                ip_rx_inst.check(.ip_hdr(ip_hdr), .tx_ip(1'b0));
+                // Sample both the AXI-Stream packet and the header data
+                ip_hdr_if.read_raw_packet(rx_ip_pckt);             
             end
         join
 
+        // Check the packets transmitted vs recieved 
+        ip_rx_inst.self_check(.tx_pckt(tx_ip_pckt), .rx_pckt(rx_ip_pckt), .tx_ip(1'b0)); 
         
     end
 

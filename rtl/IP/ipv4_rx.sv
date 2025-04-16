@@ -261,6 +261,12 @@ always @(posedge i_clk) begin
             m_rx_axis_tvalid_reg <= 1'b1;
             m_ip_hdr_tvalid_reg <= 1'b1;
 
+            // Once the downstream module has read the header data, we can lower the hdr_valid signal
+            if(latched_hdr || (m_ip_hdr_trdy & m_ip_hdr_tvalid)) begin
+                m_ip_hdr_tvalid_reg <= 1'b0;
+                latched_hdr <= 1'b1;
+            end 
+            
             // If the up-stream module & down-stream module have data/can recieve data
             // we can latch the incoming data
             if(m_rx_axis_trdy & s_rx_axis_tvalid) begin
@@ -272,9 +278,10 @@ always @(posedge i_clk) begin
                 ip_hdr_total_length <= ip_hdr_total_length - 1'b1;
 
                 if(s_rx_axis_tlast & s_rx_axis_tvalid) begin
-                    
+                    latched_hdr <= 1'b0;
+
                     // Total bytes in the payload did not match the bytes specified in the IP Header
-                    if(ip_hdr_total_length != 16'b0)begin
+                    if(ip_hdr_total_length != 16'b1)begin
                         bad_pckt_reg <= 1'b1;
                         state <= IDLE;
                     end

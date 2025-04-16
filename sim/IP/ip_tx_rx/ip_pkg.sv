@@ -1,10 +1,12 @@
 
 package ip_pkg;
 
+localparam SRC_MAC_ADDR = 48'h10_12_65_23_43_12;
+localparam DST_MAC_ADDR = 48'hFF_FF_FF_FF_FF_FF;
+localparam ETH_TYPE = 16'h0800;
+
 // IP Header struct
-typedef struct packed {
-  bit                  hdr_rdy;
-  bit                  hdr_valid;
+typedef struct {
   logic [3:0]          version;
   logic [3:0]          length;
   logic [7:0]          tos;
@@ -17,45 +19,40 @@ typedef struct packed {
   logic [15:0]         ip_hdr_checksum;
   logic [31:0]         src_ip_addr;
   logic [31:0]         dst_ip_addr;
-} ip_tx_hdr_t;
+} ip_hdr_t;
 
 // Ethernet Header Struct
-typedef struct packed {
+typedef struct {
     logic [47:0] src_mac_addr;
     logic [47:0] dst_mac_addr;
     logic [15:0] eth_type;
 } eth_hdr_t;
 
-// Input payload & output payload queues
-bit [7:0] tx_data[$];
-bit [7:0] rx_data[$];
+// Packet struct
+typedef struct {
+    eth_hdr_t eth_hdr;                          // Ethernet Header info passed into the module
+    ip_hdr_t ip_hdr;                            // IP Header info passed into the module (in-parallel or part of packet)
+    bit[7:0] payload[$];                        // Raw data passed into module
+} ip_pckt_t;
 
-class ip;
-
-    protected int payload_size = 0;
-
-    function new();
-        this.payload_size = $urandom_range(10, 1480);
-    endfunction : new
-
-    /* Protected Mehtods */
+class ip;  
 
     /* Calculate the IP Header Checksum Value for the specified inputs */
-    protected function automatic calculate_checksum(ref ip_tx_hdr_t ip_hdr);
+    protected function automatic calculate_checksum(ref ip_pckt_t tx_pckt);
         logic [15:0] words[0:9]; 
         logic [16:0] sum; 
     
         // Form the 16-bit words 
-        words[0] = {ip_hdr.version, ip_hdr.length, ip_hdr.tos};                    
-        words[1] = ip_hdr.total_length;
-        words[2] = ip_hdr.ip_hdr_id;
-        words[3] = {ip_hdr.ip_hdr_flags, ip_hdr.ip_hdr_frag_offset};
-        words[4] = {ip_hdr.ip_hdr_ttl, ip_hdr.protocol};
+        words[0] = {tx_pckt.ip_hdr.version, tx_pckt.ip_hdr.length, tx_pckt.ip_hdr.tos};                    
+        words[1] = tx_pckt.ip_hdr.total_length;
+        words[2] = tx_pckt.ip_hdr.ip_hdr_id;
+        words[3] = {tx_pckt.ip_hdr.ip_hdr_flags, tx_pckt.ip_hdr.ip_hdr_frag_offset};
+        words[4] = {tx_pckt.ip_hdr.ip_hdr_ttl, tx_pckt.ip_hdr.protocol};
         words[5] = 16'h0000; // Placeholder for checksum (set to 0 during calculation)
-        words[6] = ip_hdr.src_ip_addr[31:16];
-        words[7] = ip_hdr.src_ip_addr[15:0];
-        words[8] = ip_hdr.dst_ip_addr[31:16];
-        words[9] = ip_hdr.dst_ip_addr[15:0];    
+        words[6] = tx_pckt.ip_hdr.src_ip_addr[31:16];
+        words[7] = tx_pckt.ip_hdr.src_ip_addr[15:0];
+        words[8] = tx_pckt.ip_hdr.dst_ip_addr[31:16];
+        words[9] = tx_pckt.ip_hdr.dst_ip_addr[15:0];    
 
         // Calculate one's complement sum - If there is a carry out from a sum, add that back to the lsb 
         sum = 0;
@@ -65,112 +62,131 @@ class ip;
                 sum = (sum & 16'hFFFF) + 1; 
         end 
 
-        ip_hdr.ip_hdr_checksum = ~sum[15:0];    
+        tx_pckt.ip_hdr.ip_hdr_checksum = ~sum[15:0];    
     endfunction : calculate_checksum
 
-    protected function void encapsulate_ip_packet(ip_tx_hdr_t ip_hdr);
-        logic [159:0] ip_hdr;
-
-        /* Create IP Header */
-        ip_hdr = {
-            ip_hdr.version,
-            ip_hdr.length,
-            ip_hdr.tos,
-            ip_hdr.total_length,
-            ip_hdr.ip_hdr_id,
-            ip_hdr.ip_hdr_flags,
-            ip_hdr.ip_hdr_frag_offset,
-            ip_hdr.ip_hdr_ttl,
-            ip_hdr.protocol,
-            ip_hdr.ip_hdr_checksum,
-            ip_hdr.src_ip_addr,
-            ip_hdr.dst_ip_addr
-        };
-        
-        /* Pre-pend the IP Header to the front of the Payload */
-        for(int i = 0; i < 20; i++)
-            tx_data.push_front(ip_hdr[((i+1)*8)-1 -: 8]); 
-
-    endfunction : encapsulate_ip_packet
-
-    /* De-Encapsulate an IP Frame */
-    protected function void de_encapsulate_ip_packet();
-        //Pop off the front 20 bytes of the IP Packet
-        for(int i = 0; i < 20; i++)
-            tx_data.pop_front(); 
-
-    endfunction : de_encapsulate_ip_packet
-
-    /* Public Methods */
-
-    /* Generate data for the IP Header. Certain fields are kept constant */
-    function automatic generate_header_data(ref ip_tx_hdr_t ip_hdr);
-        ip_hdr.hdr_valid      = 1'b1;
-        ip_hdr.version        = 4'd4;   //IPv4
-        ip_hdr.length         = 4'd5;  
-        ip_hdr.tos            = $urandom();
-        ip_hdr.total_length   = payload_size + ip_hdr.length*4;
-        ip_hdr.ip_hdr_id      = 0;
-        ip_hdr.ip_hdr_flags   = 0;
-        ip_hdr.ip_hdr_frag_offset= 0;
-        ip_hdr.ip_hdr_ttl     = 8'd64;      
-        ip_hdr.protocol       = $urandom();
-        ip_hdr.src_ip_addr    = $urandom();
-        ip_hdr.dst_ip_addr    = $urandom();
-
-        calculate_checksum(ip_hdr);
-
-    endfunction : generate_header_data 
-
-    /* Generate raw payload data to encapsulate wihtin an IP frame */
-    function void generate_payload();
-        //payload_size = $urandom_range(10, 20);
+    /* Generate raw Payload data */
+    protected function void generate_payload(ref bit[7:0] tx_data[$], int payload_size);
         tx_data.delete();
         repeat(payload_size) begin
             tx_data.push_back($urandom_range(0, 255));
         end
     endfunction : generate_payload
 
-    /* Generate a full IP packet */
-    function automatic generate_ip_packet(ref ip_tx_hdr_t ip_hdr);
-        
-        // Create payload and IP Header & encapsulate it
-        generate_payload();
-        generate_header_data(ip_hdr);        
-        encapsulate_ip_packet(ip_hdr);
+    /* Generate data for the IP/Ethernet Header. Certain fields are kept constant */
+    protected function automatic generate_header_data(ref ip_pckt_t tx_pckt, int payload_size);
 
-    endfunction : generate_ip_packet
+        // Generate the IP Header and checksum
+        tx_pckt.ip_hdr.version        =  4'd4;  
+        tx_pckt.ip_hdr.length         = 4'd5;  
+        tx_pckt.ip_hdr.tos            = $urandom();
+        tx_pckt.ip_hdr.total_length   = payload_size +  tx_pckt.ip_hdr.length*4;
+        tx_pckt.ip_hdr.ip_hdr_id      = 0;
+        tx_pckt.ip_hdr.ip_hdr_flags   = 0;
+        tx_pckt.ip_hdr.ip_hdr_frag_offset= 0;
+        tx_pckt.ip_hdr.ip_hdr_ttl     = 8'd64;      
+        tx_pckt.ip_hdr.protocol       = $urandom();
+        tx_pckt.ip_hdr.src_ip_addr    = $urandom();
+        tx_pckt.ip_hdr.dst_ip_addr    = $urandom();
+
+        calculate_checksum(tx_pckt);
+
+        // Geneate the Ethernet Header Fields
+        tx_pckt.eth_hdr.src_mac_addr = SRC_MAC_ADDR;
+        tx_pckt.eth_hdr.dst_mac_addr = DST_MAC_ADDR;
+        tx_pckt.eth_hdr.eth_type = ETH_TYPE;
+
+    endfunction : generate_header_data 
+
+    function void generate_packet(ref ip_pckt_t tx_pckt);
+        int payload_size = $urandom_range(10,1480);
+        $display("Payload Size: %0d", payload_size);
+        
+        //Clear the data queues 
+        tx_pckt.payload.delete();
+        generate_header_data(tx_pckt, payload_size);
+        generate_payload(tx_pckt.payload, payload_size);
+    endfunction : generate_packet
+
+    function void encapsulate_ip_packet(ref ip_pckt_t tx_pckt);
+        logic [159:0] ip_hdr;
+
+        // Create IP Header 
+        ip_hdr = {
+            tx_pckt.ip_hdr.version,
+            tx_pckt.ip_hdr.length,
+            tx_pckt.ip_hdr.tos,
+            tx_pckt.ip_hdr.total_length,
+            tx_pckt.ip_hdr.ip_hdr_id,
+            tx_pckt.ip_hdr.ip_hdr_flags,
+            tx_pckt.ip_hdr.ip_hdr_frag_offset,
+            tx_pckt.ip_hdr.ip_hdr_ttl,
+            tx_pckt.ip_hdr.protocol,
+            tx_pckt.ip_hdr.ip_hdr_checksum,
+            tx_pckt.ip_hdr.src_ip_addr,
+            tx_pckt.ip_hdr.dst_ip_addr
+        };
+
+        // Pre-pend the IP Header to the front of the Payload 
+        for(int i = 0; i < 20; i++)
+            tx_pckt.payload.push_front(ip_hdr[((i+1)*8)-1 -: 8]); 
+
+    endfunction : encapsulate_ip_packet
+
+    /* De-Encapsulate an IP Frame */ 
+    function void de_encapsulate_ip_packet(ref ip_pckt_t ip_pckt);
+        //Pop off the front 20 bytes of the IP Packet
+        for(int i = 0; i < 20; i++)
+            ip_pckt.payload.pop_front(); 
+
+    endfunction : de_encapsulate_ip_packet    
 
     // Self-checking function to compare the tx and rx packets 
-    function void check(ip_tx_hdr_t ip_hdr, bit tx_ip);
-
-        // If we are comparing in tx mode, we need to encapsulate the tx data (raw payload) & compare
-        // it with the rx data. If we are checking the rx ip, we need to de-encapsulate the output packet
-        // before comparing it.
+    task self_check(ref ip_pckt_t tx_pckt, ref ip_pckt_t rx_pckt, input bit tx_ip);
+        
         if(tx_ip) begin
-            encapsulate_ip_packet(ip_hdr);
-        end else
-            de_encapsulate_ip_packet();
-
-        //Ensure the packets are the correct size
-        assert(tx_data.size() == rx_data.size()) 
-            else begin
-                $display("Tx Packet Size: %0d != Rx Packet Size: %0d MISMATCH", tx_data.size(), rx_data.size()); 
-                $stop;
-            end
-
-        // Compare data wihtin packets
-        foreach(rx_data[i]) begin
-            assert(rx_data[i] == tx_data[i]) //$display("rx_data: %0h == tx_data %0h MATCH", rx_data[i], tx_data[i]);
-                else begin 
-                    $display("rx_data [%0d] %0h != tx_data [%0d] %0h MISMATCH", i, rx_data[i], i, tx_data[i]); 
-                    $stop; 
+            encapsulate_ip_packet(tx_pckt);
+        end 
+        // If we are testing the RX IP Module - de-encapsulate the tx data before comparing with the rx_data
+        else begin
+            de_encapsulate_ip_packet(tx_pckt);
+        end
+        
+            //Ensure the packets are the correct size
+            assert(tx_pckt.payload.size() == rx_pckt.payload.size()) 
+                else begin
+                    $display("Tx Packet Size: %0d != Rx Packet Size: %0d MISMATCH", tx_pckt.payload.size(), rx_pckt.payload.size()); 
+                    $stop;
                 end
-        end  
 
-        //Clear packet for next iteration
-        rx_data.delete();
-    endfunction : check
+            // Compare data wihtin packets
+            foreach(rx_pckt.payload[i]) begin
+                assert(rx_pckt.payload[i] == tx_pckt.payload[i]) 
+                    else begin 
+                        $display("rx_data [%0d] %0h != tx_data [%0d] %0h MISMATCH", i, rx_pckt.payload[i], i, tx_pckt.payload[i]); 
+                        $stop; 
+                    end
+            end 
+
+        /* Check Packet Headers */
+        assert(tx_pckt.eth_hdr.src_mac_addr == rx_pckt.eth_hdr.src_mac_addr) else $display("Source MAC Address MISMATCH");
+        assert(tx_pckt.eth_hdr.dst_mac_addr == rx_pckt.eth_hdr.dst_mac_addr) else $display("Destination MAC Address MISMATCH");
+        assert(tx_pckt.eth_hdr.eth_type == rx_pckt.eth_hdr.eth_type) else $display("Ethernet Type MISMATCH");
+
+    endtask : self_check    
+
+    /* Public Methods 
+
+    // Generate a full IP packet 
+    function automatic generate_ip_packet(ref bit[7:0] tx_data[$], ref ip_tx_hdr_t ip_hdr, ref eth_hdr_t eth_hdr);
+        
+        // Create payload and IP Header & encapsulate it
+        generate_payload(tx_data);
+        generate_header_data(ip_hdr, eth_hdr);        
+        encapsulate_ip_packet(ip_hdr, tx_data);
+
+    endfunction : generate_ip_packet*/
+
 
 endclass : ip
 
