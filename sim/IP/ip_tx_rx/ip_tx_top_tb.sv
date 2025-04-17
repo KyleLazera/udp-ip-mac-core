@@ -15,7 +15,7 @@ bit reset_n;
 
 //instantiate IP header & ip_tx class instance
 ip_pckt_t tx_ip_pckt, rx_ip_pckt;
-ip ip_tx_inst;
+ip_agent ip_tx_inst;
 
 // AXI Stream Interface Declarations
 ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
@@ -62,6 +62,7 @@ ipv4_tx #(
 );
 
 initial begin
+    ip_tx_inst = new();
     //Init axi lines
     ip_hdr_if.axi_tx.init_axi_tx();
     ip_hdr_if.axi_rx.init_axi_rx();
@@ -69,21 +70,26 @@ initial begin
     //Wait for reset to be asserted
     @(posedge reset_n);
 
-    repeat(50) begin
-
-        fork
-            begin 
+    fork
+        begin
+            forever
+                ip_tx_inst.self_check(.tx_pckt(tx_ip_pckt), .rx_pckt(rx_ip_pckt), .tx_ip(1'b1)); 
+        end
+        begin 
+            repeat(100) begin
                 ip_tx_inst.generate_packet(tx_ip_pckt);                
-                ip_hdr_if.drive_ip_payload(tx_ip_pckt);                                             
-            end
-            begin 
+                ip_hdr_if.drive_ip_payload(tx_ip_pckt);  
+                ->ip_tx_inst.tx_pckt_evt; 
+                @(ip_tx_inst.scb_complete); 
+            end                                         
+        end
+        begin 
+            forever begin
                 ip_hdr_if.read_encap_data(rx_ip_pckt);
+                ->ip_tx_inst.rx_pckt_evt;              
             end
-        join
-
-        ip_tx_inst.self_check(.tx_pckt(tx_ip_pckt), .rx_pckt(rx_ip_pckt), .tx_ip(1'b1));
-        
-    end
+        end
+    join_any
 
     #1000;
 

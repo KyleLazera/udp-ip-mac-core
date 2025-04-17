@@ -85,6 +85,7 @@ interface ip_if
 
     endtask : read_eth_header    
 
+    /* Drives IP payload with AXI-Stream data and IP/Ethernet header in parallel */
     task drive_ip_payload(ip_pckt_t ip_packet);
         fork
             drive_ip_hdr(ip_packet.ip_hdr);
@@ -92,15 +93,17 @@ interface ip_if
         join
     endtask : drive_ip_payload
 
+    /* Reads AXI-Stream data and ethernet header data in parallel */
     task read_encap_data(ref ip_pckt_t rx_packet);
         bit [7:0] rx_data [$];
-        
-        rx_packet.payload.delete();
 
         fork
             axi_rx.axis_read(rx_data);
             read_eth_header(rx_packet);
         join
+
+        // Before copying data over, clear the rx payload
+        rx_packet.payload.delete();
 
         foreach(rx_data[i])
             rx_packet.payload[i] = rx_data[i];
@@ -163,14 +166,14 @@ interface ip_if
 
     /* Task used to read the de-encapsulated data from the rx ip module */
     task read_raw_packet(ref ip_pckt_t rx_ip_pckt);
-        bit [7:0] rx_data[$];
-        
-        rx_ip_pckt.payload.delete();
+        bit [7:0] rx_data[$];        
         
         fork
             axi_rx.axis_read(rx_data);
             read_pckt_header(rx_ip_pckt);
         join
+
+        rx_ip_pckt.payload.delete();
 
         foreach(rx_data[i]) begin
             rx_ip_pckt.payload[i] = rx_data[i];

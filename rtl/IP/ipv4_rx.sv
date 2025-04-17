@@ -297,6 +297,7 @@ always @(posedge i_clk) begin
             // Wait until the remainder of the packet has been recieved
             if(s_rx_axis_tlast & s_rx_axis_tvalid) begin
                 s_rx_axis_trdy_reg <= 1'b0;
+                latched_hdr <= 1'b0;
                 state <= IDLE;
             end
         end

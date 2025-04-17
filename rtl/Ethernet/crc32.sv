@@ -65,7 +65,7 @@ reg [CRC_WIDTH-1:0] crc_next;                           //Holds the next CRC cal
 
 /* Initialize the LUT in ROM */
 initial begin 
-    $readmemb("C:/Users/klaze/Xilinx_FGPA_Projects/FPGA_Based_Network_Stack/Software/CRC_LUT.txt", crc_table);
+    $readmemb("../../Software/CRC_LUT.txt", crc_table);
 end
 
 /* Intermediary Logic */

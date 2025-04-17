@@ -14,7 +14,7 @@ bit reset_n;
 
 //instantiate IP header & ip_tx class instance
 ip_pckt_t tx_ip_pckt, rx_ip_pckt;
-ip ip_rx_inst;
+ip_agent ip_rx_inst;
 
 //IP Header Interface
 ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
@@ -59,7 +59,8 @@ ipv4_rx #(
 );
  
 
-initial begin    
+initial begin   
+    ip_rx_inst = new();
     //Init AXI data lines 
     ip_hdr_if.axi_tx.init_axi_tx();
     ip_hdr_if.axi_rx.init_axi_rx();
@@ -67,25 +68,45 @@ initial begin
     //Wait for reset to be asserted
     @(posedge reset_n);
 
-    repeat(50) begin
+    fork
+        begin
+            forever 
+                // Check the packets transmitted vs recieved 
+                ip_rx_inst.self_check(.tx_pckt(tx_ip_pckt), .rx_pckt(rx_ip_pckt), .tx_ip(1'b0)); 
+        end
+        begin 
+            for(int i = 0; i < 50; i++) begin
+                int prob_not_ipv4 = $urandom_range(7, 10);
+                int prob_bad_checksum = $urandom_range(11, 15);
 
-        fork
-            begin 
+                // Using the randomly generated variable, there will be a packet that is not IPv4 or has a bad checksum
+                // periodically transmitted to the module
+                if(i%prob_not_ipv4 == 0)
+                    ip_rx_inst.ip_cfg.version_is_ipv4 = 1'b0;
+                else if(i%prob_bad_checksum == 0) 
+                    ip_rx_inst.ip_cfg.bad_checksum = 1'b1;
+                else begin
+                    ip_rx_inst.ip_cfg.bad_checksum = 1'b0;
+                    ip_rx_inst.ip_cfg.version_is_ipv4 = 1'b1;
+                end
+                
                 // Generate a full IP Packet & ethernet header and transmit to the IP rx module
                 ip_rx_inst.generate_packet(tx_ip_pckt);
                 ip_rx_inst.encapsulate_ip_packet(tx_ip_pckt);                
                 ip_hdr_if.drive_eth_packet(tx_ip_pckt);
+                ->ip_rx_inst.tx_pckt_evt;
+                @(ip_rx_inst.scb_complete);
             end
-            begin 
+        end
+        begin 
+            forever begin
                 // Sample both the AXI-Stream packet and the header data
-                ip_hdr_if.read_raw_packet(rx_ip_pckt);             
-            end
-        join
-
-        // Check the packets transmitted vs recieved 
-        ip_rx_inst.self_check(.tx_pckt(tx_ip_pckt), .rx_pckt(rx_ip_pckt), .tx_ip(1'b0)); 
-        
-    end
+                ip_hdr_if.read_raw_packet(rx_ip_pckt);    
+                ->ip_rx_inst.rx_pckt_evt;   
+            end     
+        end
+    join_any
+    
 
     #1000;
 
