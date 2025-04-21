@@ -1,5 +1,5 @@
-`include "ip_if.sv"
-`include "ip_pkg.sv"
+`include "../common/ip_if.sv"
+`include "../common/ip_pkg.sv"
 
 module ip_rx_top_tb;
 

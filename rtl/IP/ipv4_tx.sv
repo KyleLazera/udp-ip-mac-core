@@ -227,7 +227,7 @@ always @(posedge i_clk) begin
 
             // If we have latched header data and both the up-stream and down-stream modules
             // are ready to recieve data, begin the encappsulation process.
-            if(hdr_latched & m_tx_axis_trdy & s_tx_axis_tvalid) begin 
+            if(hdr_latched & s_tx_axis_tvalid) begin //& m_tx_axis_trdy 
                hdr_latched <= 1'b0;
                checksum_sum <= 16'b0;
 

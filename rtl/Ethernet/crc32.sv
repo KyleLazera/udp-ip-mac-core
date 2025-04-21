@@ -65,7 +65,7 @@ reg [CRC_WIDTH-1:0] crc_next;                           //Holds the next CRC cal
 
 /* Initialize the LUT in ROM */
 initial begin 
-    $readmemb("../../Software/CRC_LUT.txt", crc_table);
+    $readmemb("/home/klazera/Projects/1gbs_ethernet_mac/Software/CRC_LUT.txt", crc_table);
 end
 
 /* Intermediary Logic */

@@ -158,6 +158,24 @@ class ip_agent;
 
     endfunction : encapsulate_ip_packet
 
+    function encap_eth_ip_packet(ref ip_pckt_t tx_pckt);
+        logic [111:0] eth_hdr;
+        
+        // Encapsulate the IP packet
+        encapsulate_ip_packet(tx_pckt);
+        
+        //Encapslate the IP within the ethernet packet
+        eth_hdr = {
+            tx_pckt.eth_hdr.src_mac_addr,
+            tx_pckt.eth_hdr.dst_mac_addr,
+            tx_pckt.eth_hdr.eth_type
+        };
+
+        for(int i = 0; i < 14; i++) 
+            tx_pckt.payload.push_front(eth_hdr[((i+1)*8)-1 -: 8]);
+        
+    endfunction : encap_eth_ip_packet
+
     /* De-Encapsulate an IP Frame to isolate the payload*/ 
     function void de_encapsulate_ip_packet(ref ip_pckt_t ip_pckt);
         //Pop off the front 20 bytes of the IP Packet
@@ -183,7 +201,7 @@ class ip_agent;
         @(rx_pckt_evt); 
 
         if(tx_ip) begin
-            encapsulate_ip_packet(tx_pckt);
+            encap_eth_ip_packet(tx_pckt);
         end 
         // If we are testing the RX IP Module - de-encapsulate the tx data before comparing with the rx_data
         else begin

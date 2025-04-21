@@ -6,7 +6,6 @@
  * the output signals on the RGMII signals 
  */
 
- //todo: Make sure the tvalid signal is only dropped after it has been sampled - this means s_trdy should be high when it is dropped 
 
 interface eth_mac_wr_if
 (

@@ -22,7 +22,7 @@ class eth_mac extends uvm_object;
 
     function new(string name = "eth_mac");
         super.new(name);
-        $readmemb("C:/Users/klaze/Xilinx_FGPA_Projects/FPGA_Based_Network_Stack/Software/CRC_LUT.txt", crc_lut);
+        $readmemb("/home/klazera/Projects/1gbs_ethernet_mac/Software/CRC_LUT.txt", crc_lut);
     endfunction : new
 
     //Fnction that calculates the crc32 for the input data

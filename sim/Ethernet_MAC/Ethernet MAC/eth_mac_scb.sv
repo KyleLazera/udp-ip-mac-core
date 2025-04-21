@@ -72,7 +72,11 @@ class eth_mac_scb extends uvm_scoreboard;
                         rx_drv_port.get(rx_rgmii);    
 
                         // Determine whether the packet we sent to teh MAC is expected to be read fromt eh FIFO or not
-                        decode_packet(rx_rgmii.tx_data);                                           
+                        decode_packet(rx_rgmii.tx_data);  
+
+                        foreach(rx_fifo.rx_data[i])
+                            assert(rx_fifo.rx_data[i] == rx_rgmii.tx_data[i]) `uvm_info("SCB", $sformatf("RX Monitor Data : %0h == RX Reference Data : %0h MATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]), UVM_MEDIUM)
+                            else `uvm_error("scb", $sformatf("RX Monitor Data : %0h != RX Reference Data : %0h MISMATCH", rx_fifo.rx_data[i], rx_rgmii.tx_data[i]));                                          
 
                         //Make sure the reference model data size and the monitor data size are equivelent
                         assert(rx_fifo.rx_data.size() == rx_rgmii.tx_data.size()) begin
@@ -104,7 +108,7 @@ class eth_mac_scb extends uvm_scoreboard;
                         //Fetch teh data from the monitor FIFO              
                         tx_mon_port.get(eth_wr_data);        
                         //Fetch the data from the reference model FIFO
-                        tx_drv_port.get(eth_wr_ref_data);                            
+                        tx_drv_port.get(eth_wr_ref_data);                              
 
                         assert(eth_wr_data.rx_data.size() == eth_wr_ref_data.tx_data.size()) begin
                             `uvm_info("scb", "----------------------------------------------------------------", UVM_MEDIUM)

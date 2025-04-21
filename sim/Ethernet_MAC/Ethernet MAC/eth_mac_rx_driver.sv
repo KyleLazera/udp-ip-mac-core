@@ -54,7 +54,6 @@ virtual task main_phase(uvm_phase phase);
             crc_er = ($urandom_range(1, 100) == 1);
         end
 
-        //todo: reduce probability of pause frame being sent
         if(cfg.pause_frames) 
             send_pause_frame = ($urandom_range(1,20) == 1);
 

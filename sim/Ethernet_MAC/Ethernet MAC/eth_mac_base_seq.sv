@@ -1,6 +1,8 @@
 `ifndef ETH_MAC_BASE_SEQ
 `define ETH_MAC_BASE_SEQ
 
+`include "eth_mac_item.sv"
+
 /* 
 * Original Author : Kyle Lazera 
 * Description: This is a base sequence class that the tx_seq and rx_sequence inherit from.

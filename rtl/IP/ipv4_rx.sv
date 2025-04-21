@@ -1,4 +1,4 @@
-
+`timescale 1ns / 1ps
 /* This module recieves ethernet payload data as well as ethernet header data
  * in parallel with one another. It passes through the ethernet headers, and inspects
  * the IP payload to determine if the packet is good or bad. This module checks for 

@@ -1,8 +1,6 @@
 # Simple regression script to run through all teh UVM testcases with different seed values. This can be invoked by calling
 # vivado -mode batch -source scripts/run_regression.tcl
 
-#todo: Add logging after all tests have run indicating whether the tests passed
-
 # Set project path - Change to relative
 set project_path "../Network Stack/Processorless_Network/Processorless_Network.xpr"
 set tc_path      "../sim/Ethernet_MAC/Ethernet MAC"

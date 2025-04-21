@@ -289,8 +289,9 @@ always @(posedge clk) begin
                     //Transmit the data from shift reg 4 to FIFO & CRC checker
                     axis_data_reg <= rgmii_rdx[4];
 
-                    //If there is an error detected, the RX FIFO is full, or a pause frame is detected, do not store the packet in the FIFO
-                    if((s_rx_axis_trdy == 1'b0) || !rgmii_mac_rx_dv && rgmii_mac_rx_er || ({eth_type, opcode} == 32'h8808_0001)) begin 
+                    //If the RX FIFO is full or there was a data error/data not valid, do not store the packet in the FIFO
+                    //todo: For flow control, we would also need to inspect the opcode and eth_type
+                    if((s_rx_axis_trdy == 1'b0) || !rgmii_dv[4] && rgmii_er[4]) begin 
                         axis_user_reg <= 1'b1;
                         state_reg <= BAD_PCKT;
                     end                                        
