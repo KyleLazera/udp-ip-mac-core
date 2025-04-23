@@ -1,13 +1,7 @@
 `include "../common/ip_if.sv"
-`include "../common/ip_pkg.sv"
+`include "ip_eth_frame.sv"
 
-/* This testbench is used to simulate the ip4v_tx DUT when it is not in ETH_FRAME mode.
- * Therefore, the ethernet header signals (Src MAC, dst MAC and ethernet type) are passed
- * through in parallel to the AXI-Stream data. And the output AXI-Stream data is only 
- * an encapsulated IP package.
- */
-
-module ip_tx_top_tb;
+module ip_tx_top_eth_frame;
 
 import ip_pkg::*;
 
@@ -19,7 +13,7 @@ bit reset_n;
 
 //instantiate IP header & ip_tx class instance
 ip_pckt_t tx_ip_pckt, rx_ip_pckt;
-ip_agent ip_tx_inst;
+ip_eth_frame ip_tx_inst;
 
 // AXI Stream Interface Declarations
 ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
@@ -37,7 +31,7 @@ end
 /* DUT Instantantiation */
 ipv4_tx #(
     .AXI_STREAM_WIDTH(8),
-    .ETH_FRAME(0)
+    .ETH_FRAME(1)
 ) ip_tx (
    .i_clk(clk_100),
    .i_reset_n(reset_n),
@@ -90,7 +84,7 @@ initial begin
         end
         begin 
             forever begin
-                ip_hdr_if.read_encap_data(rx_ip_pckt);
+                ip_hdr_if.axi_rx.axis_read(rx_ip_pckt.payload);
                 ->ip_tx_inst.rx_pckt_evt;              
             end
         end
@@ -102,4 +96,4 @@ initial begin
 
 end
 
-endmodule : ip_tx_top_tb
+endmodule : ip_tx_top_eth_frame

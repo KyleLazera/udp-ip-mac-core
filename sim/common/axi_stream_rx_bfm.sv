@@ -25,13 +25,21 @@ interface axi_stream_rx_bfm #(
         m_axis_trdy <= 1'b1;
         @(posedge m_aclk);
 
-        //If tvalid flag is not high, wait until it does
+        //If tvalid flag is not high, wait until it is
         while(!m_axis_tvalid)
             @(posedge m_aclk);
 
         //Sample data on each clock edge
-        while(!m_axis_tlast & (m_axis_tvalid & m_axis_trdy)) begin
-            data.push_back(m_axis_tdata);
+        while(!m_axis_tlast & m_axis_tvalid) begin
+            int deassert_trdy = ($urandom_range(0, 20) == 1);
+
+            if(m_axis_trdy)
+                data.push_back(m_axis_tdata);
+            
+            // Periodically de-assert trdy - this is used to make sure the modules being tested
+            // do not transmit data if trdy is lowered.
+            m_axis_trdy <= !deassert_trdy;
+
             @(posedge m_aclk);
         end
         

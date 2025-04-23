@@ -28,6 +28,7 @@ interface axi_stream_tx_bfm #(
 
         //Raise tvalid & tuser flag to indicate we are ready to transmit
         @(posedge s_aclk);
+        s_axis_tlast <= 1'b0;
         s_axis_tvalid <= 1'b1;
         s_axis_tuser <= 1'b0;
 
@@ -48,11 +49,13 @@ interface axi_stream_tx_bfm #(
             @(posedge s_aclk);
         end
         
+        while(!s_axis_trdy)
+            @(posedge s_aclk);
+
         // If bursts is enabled, don't lower the valid flag
         if(!bursts)
             s_axis_tvalid <= 1'b0;
-        
-        s_axis_tlast <= 1'b0;
+
         @(posedge s_aclk);
 
     endtask : axis_transmit_basic

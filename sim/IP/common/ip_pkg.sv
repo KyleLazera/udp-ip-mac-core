@@ -30,6 +30,7 @@ typedef struct {
 
 // IP Packet Struct
 typedef struct {
+    /* Network Packet */
     eth_hdr_t eth_hdr;                          // Ethernet Header info passed into the module
     ip_hdr_t ip_hdr;                            // IP Header info passed into the module (in-parallel or part of packet)
     bit[7:0] payload[$];                        // Raw data passed into module
@@ -44,8 +45,9 @@ class ip_agent;
 
     /* Config Variables */
     typedef struct {
-        bit version_is_ipv4;
-        bit bad_checksum;
+        bit version_is_ipv4;            // If true indicates packet version is IPv4
+        bit bad_checksum;               // If true, a bad checksum is added to IP header
+        bit bad_total_length;           // If true, a bad total length is added
     } cfg_ip_agent;
 
     cfg_ip_agent ip_cfg;
@@ -54,6 +56,7 @@ class ip_agent;
     function new();
         ip_cfg.version_is_ipv4 = 1'b1;
         ip_cfg.bad_checksum = 1'b0;
+        ip_cfg.bad_total_length = 1'b0;
     endfunction : new
 
     /* Calculate the IP Header Checksum Value for the specified inputs */
@@ -99,7 +102,8 @@ class ip_agent;
         tx_pckt.ip_hdr.version        = (ip_cfg.version_is_ipv4) ? 4'd4 : 4'd6;  
         tx_pckt.ip_hdr.length         = 4'd5;  
         tx_pckt.ip_hdr.tos            = $urandom();
-        tx_pckt.ip_hdr.total_length   = payload_size +  tx_pckt.ip_hdr.length*4;
+        // If bad_total_length is true, intentially make total_length wrong
+        tx_pckt.ip_hdr.total_length   = (ip_cfg.bad_total_length) ?  payload_size - 20 : payload_size +  tx_pckt.ip_hdr.length*4;
         tx_pckt.ip_hdr.ip_hdr_id      = 0;
         tx_pckt.ip_hdr.ip_hdr_flags   = 0;
         tx_pckt.ip_hdr.ip_hdr_frag_offset= 0;
@@ -124,7 +128,6 @@ class ip_agent;
     /* Creates the IP header and payload */
     function void generate_packet(ref ip_pckt_t tx_pckt);
         int payload_size = $urandom_range(10,1480);
-        $display("Payload Size: %0d", payload_size);
         
         //Clear the data queues 
         tx_pckt.payload.delete();
@@ -133,7 +136,7 @@ class ip_agent;
     endfunction : generate_packet
 
     /* Takes IP header and payload and forms an IP packet */
-    function void encapsulate_ip_packet(ref ip_pckt_t tx_pckt);
+    virtual function void encapsulate_ip_packet(ref ip_pckt_t tx_pckt);
         logic [159:0] ip_hdr;
 
         // Create IP Header 
@@ -158,50 +161,68 @@ class ip_agent;
 
     endfunction : encapsulate_ip_packet
 
-    function encap_eth_ip_packet(ref ip_pckt_t tx_pckt);
-        logic [111:0] eth_hdr;
-        
-        // Encapsulate the IP packet
-        encapsulate_ip_packet(tx_pckt);
-        
-        //Encapslate the IP within the ethernet packet
-        eth_hdr = {
-            tx_pckt.eth_hdr.src_mac_addr,
-            tx_pckt.eth_hdr.dst_mac_addr,
-            tx_pckt.eth_hdr.eth_type
-        };
-
-        for(int i = 0; i < 14; i++) 
-            tx_pckt.payload.push_front(eth_hdr[((i+1)*8)-1 -: 8]);
-        
-    endfunction : encap_eth_ip_packet
-
     /* De-Encapsulate an IP Frame to isolate the payload*/ 
     function void de_encapsulate_ip_packet(ref ip_pckt_t ip_pckt);
         //Pop off the front 20 bytes of the IP Packet
         for(int i = 0; i < 20; i++)
             ip_pckt.payload.pop_front(); 
 
-    endfunction : de_encapsulate_ip_packet    
+    endfunction : de_encapsulate_ip_packet 
+
+    /* Used to set configuration struct values based on probability to test edge cases */
+    function void set_config();
+        int prob_not_ipv4 = ($urandom_range(0, 15) == 1);
+        int prob_bad_checksum = ($urandom_range(0, 15) == 1);
+        int prob_bad_length = ($urandom_range(0, 15) == 1);
+        // Using the randomly generated variable, there will be a packet that is not IPv4 or has a bad checksum
+        // periodically transmitted to the module
+        if(prob_not_ipv4)
+            this.ip_cfg.version_is_ipv4 = 1'b0;
+        else if(prob_bad_checksum) 
+            this.ip_cfg.bad_checksum = 1'b1;
+        else if(prob_bad_length)
+            this.ip_cfg.bad_total_length = 1'b1;
+        else begin
+            this.ip_cfg.bad_checksum = 1'b0;
+            this.ip_cfg.version_is_ipv4 = 1'b1;
+            this.ip_cfg.bad_total_length = 1'b0;
+        end
+    endfunction : set_config   
 
     /* Self-checking function to compare the tx and rx packets */
-    task self_check(ref ip_pckt_t tx_pckt, ref ip_pckt_t rx_pckt, input bit tx_ip);  
+    virtual task self_check(ref ip_pckt_t tx_pckt, ref ip_pckt_t rx_pckt, input bit tx_ip);  
 
         // Wait for the tx packet to be recieved
         @(tx_pckt_evt);
 
-        // Do not wait for teh RX data event if IP Version is not IPv4
-        if(tx_pckt.ip_hdr.version != 4'd4 || ip_cfg.bad_checksum == 1'b1) begin
-            $display("Packet Dropped!");
+        // Do not wait for the RX data event if IP Version is not IPv4 or if the bad checksum flag is raised
+        if(tx_pckt.ip_hdr.version != 4'd4) begin
+            $display("//////////////////////////////////////");
+            $display("IP Version != IPv4 - Packet Dropped");
+            $display("//////////////////////////////////////");
             ->scb_complete;
             return;
-        end     
+        end 
+        else if(ip_cfg.bad_checksum == 1'b1) begin
+            $display("//////////////////////////////////////");
+            $display("Back Checksum - Packet Dropped");
+            $display("//////////////////////////////////////");
+            ->scb_complete;
+            return;   
+        end  
+        else if(ip_cfg.bad_total_length == 1'b1) begin
+            $display("//////////////////////////////////////");
+            $display("Bad Length - Packet Dropped");
+            $display("//////////////////////////////////////");
+            ->scb_complete;
+            return;   
+        end 
 
         // Wait for teh RX packet to be recieved
         @(rx_pckt_evt); 
 
         if(tx_ip) begin
-            encap_eth_ip_packet(tx_pckt);
+            encapsulate_ip_packet(tx_pckt);
         end 
         // If we are testing the RX IP Module - de-encapsulate the tx data before comparing with the rx_data
         else begin
@@ -209,7 +230,7 @@ class ip_agent;
         end
         
         //Ensure the packets are the correct size
-        assert(tx_pckt.payload.size() == rx_pckt.payload.size()) 
+        assert(tx_pckt.payload.size() == rx_pckt.payload.size()) $display("Tx Packet Size: %0d == Rx Packet Size: %0d MATCH", tx_pckt.payload.size(), rx_pckt.payload.size());
             else begin
                 $display("Tx Packet Size: %0d != Rx Packet Size: %0d MISMATCH", tx_pckt.payload.size(), rx_pckt.payload.size()); 
                 $stop;
@@ -225,9 +246,21 @@ class ip_agent;
         end 
 
         /* Check Packet Headers */
-        assert(tx_pckt.eth_hdr.src_mac_addr == rx_pckt.eth_hdr.src_mac_addr) else $display("Source MAC Address MISMATCH");
-        assert(tx_pckt.eth_hdr.dst_mac_addr == rx_pckt.eth_hdr.dst_mac_addr) else $display("Destination MAC Address MISMATCH");
-        assert(tx_pckt.eth_hdr.eth_type == rx_pckt.eth_hdr.eth_type) else $display("Ethernet Type MISMATCH");
+        assert(tx_pckt.eth_hdr.src_mac_addr == rx_pckt.eth_hdr.src_mac_addr) $display("Source MAC Address MATCH");
+            else begin
+                $display("Source MAC Address MISMATCH");
+                $stop;
+            end
+        assert(tx_pckt.eth_hdr.dst_mac_addr == rx_pckt.eth_hdr.dst_mac_addr) $display("Source MAC Address MATCH");
+            else begin
+                $display("Destination MAC Address MISMATCH");
+                $stop;
+            end
+        assert(tx_pckt.eth_hdr.eth_type == rx_pckt.eth_hdr.eth_type) $display("Source MAC Address MATCH");
+            else begin
+                $display("Ethernet Type MISMATCH");
+                $stop;
+            end
 
         ->scb_complete;
 

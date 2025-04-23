@@ -1,7 +1,12 @@
-`include "../common/ip_if.sv"
-`include "../common/ip_pkg.sv"
 
-module ip_rx_top_tb;
+`include "../common/ip_if.sv"
+`include "ip_eth_frame.sv"
+
+/* Tests the ipv4_rx module with ETH_FRAME parameter set, therefore, the AXI-Stream data contains the IP
+ * packet encapsulated within an ethernet header frame.
+ */
+
+module ip_rx_top_eth_frame;
 
 import ip_pkg::*;
 
@@ -11,7 +16,7 @@ bit reset_n;
 
 //instantiate IP header & ip_tx class instance
 ip_pckt_t tx_ip_pckt, rx_ip_pckt;
-ip_agent ip_rx_inst;
+ip_eth_frame ip_rx_inst;
 
 //IP Header Interface
 ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
@@ -29,7 +34,7 @@ end
 /* DUT Instantantiation */
 ipv4_rx #(
     .AXI_STREAM_WIDTH(8),
-    .ETH_FRAME(0)
+    .ETH_FRAME(1)
 ) ip_rx (
    .i_clk(clk_100),
    .i_reset_n(reset_n),
@@ -74,11 +79,11 @@ initial begin
         end
         begin 
             repeat(50) begin
-                ip_rx_inst.set_config(); 
+                ip_rx_inst.set_config();                
                 // Generate a full IP Packet & ethernet header and transmit to the IP rx module
                 ip_rx_inst.generate_packet(tx_ip_pckt);
-                ip_rx_inst.encapsulate_ip_packet(tx_ip_pckt);                
-                ip_hdr_if.drive_eth_packet(tx_ip_pckt);
+                ip_rx_inst.encap_eth_ip_packet(tx_ip_pckt);                
+                ip_hdr_if.axi_tx.axis_transmit_basic(.data(tx_ip_pckt.payload), .bursts(1'b0), .fwft(1'b1));
                 ->ip_rx_inst.tx_pckt_evt;
                 @(ip_rx_inst.scb_complete);
             end
@@ -99,4 +104,4 @@ initial begin
 
 end
 
-endmodule : ip_rx_top_tb
+endmodule : ip_rx_top_eth_frame

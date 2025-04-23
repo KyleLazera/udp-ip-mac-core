@@ -3,6 +3,8 @@
 /* This is an IPv4 Tranmission module that will be used to encapsulate data within an IP frame.
  * This module will recieve raw data as well as certain IP header fields in parallel for the encapsulation
  * and will output the data as an axi-stream data packet along with th ethernet header in parallel.
+ * To achieve a lower-latency for the IP stack, the option to encapsulate the IP packet within the Ethernet Header is
+ * available via the parameter ETH_FRAME.
  * For reference an IP frame is displayed below:
  *
  *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -44,7 +46,8 @@
 
 module ipv4_tx
 #(
-   parameter AXI_STREAM_WIDTH = 8
+   parameter AXI_STREAM_WIDTH = 8,
+   parameter ETH_FRAME = 1                                              // Encapsulates IP frame within an ethernet frame
 )(
    input wire i_clk,
    input wire i_reset_n,
@@ -85,14 +88,15 @@ module ipv4_tx
 localparam [3:0] IPv4_VERSION = 4'd4;
 localparam [3:0] IPv4_HDR_LENGTH = 4'd5;
 localparam [15:0] IPv4_IDENTIFICATION = 16'd0;
-localparam [2:0] IPV4_FLAGS = 3'd0;
+localparam [2:0] IPv4_FLAGS = 3'd0;
 localparam [12:0] IPv4_FRAG_OFFSET = 13'd0;
 localparam [7:0] IPv4_TTL = 8'd64;
 
 /* State Encoding */
 localparam [1:0] IDLE = 2'b00;
-localparam [1:0] HEADER = 2'b01; 
-localparam [1:0] PAYLOAD = 2'b10;
+localparam [1:0] IP_HEADER = 2'b01; 
+localparam [1:0] ETH_HEADER = 2'b10;
+localparam [1:0] PAYLOAD = 2'b11;
 
 /* Data Path IP Header Registers */
 reg [3:0] ip_hdr_version;
@@ -124,7 +128,7 @@ reg m_eth_hdr_tvalid_reg = 1'b0;
 
 /* Flag/Status Registers */
 reg hdr_latched = 1'b0;
-reg [4:0] ip_hdr_cnt = 5'b0;
+reg [4:0] hdr_cntr = 5'b0;
 
 /* Checksum Calculation Logic */ 
 reg [15:0] checksum_sum = 16'b0;
@@ -159,7 +163,7 @@ endfunction : ip_checksum
 assign ip_hdr_version = IPv4_VERSION;
 assign ip_hdr_length = IPv4_HDR_LENGTH;
 assign ip_hdr_id = IPv4_IDENTIFICATION;
-assign ip_hdr_flags = IPV4_FLAGS;
+assign ip_hdr_flags = IPv4_FLAGS;
 assign ip_hdr_frag_offset = IPv4_FRAG_OFFSET;
 assign ip_hdr_ttl = IPv4_TTL;
 
@@ -181,7 +185,7 @@ always @(posedge i_clk) begin
 
       //Flag/Status Registers
       hdr_latched <= 1'b0;
-      ip_hdr_cnt <= 5'b0;
+      hdr_cntr <= 5'b0;
 
    end else begin
       // Default signals 
@@ -194,22 +198,16 @@ always @(posedge i_clk) begin
       // FSM
       case(state_reg)
          IDLE : begin
-            ip_hdr_cnt <= 5'b0;            
+            hdr_cntr <= 5'b0;   
+            s_ip_hdr_rdy_reg <= 1'b1;         
             m_eth_hdr_tvalid_reg <= 1'b0; 
-             
-            //////////////////////////////////////////////////////////////////////////////////////////
-            // De-assert the rdy flag if the handhsake is complete or if the hdr_latched flag is 
-            // asserted. If we only used the hdr_latched flag, the rdy flag would de-assert 1 cc after
-            // we latched the header.
-            //////////////////////////////////////////////////////////////////////////////////////////
-            if(hdr_latched || s_ip_hdr_rdy_reg & s_ip_tx_hdr_valid)      
-               s_ip_hdr_rdy_reg <= 1'b0;
-            else
-               s_ip_hdr_rdy_reg <= 1'b1;
 
-            //Latch IP and Ethernet Header Data if valid and rdy handshake is succesfull
-            if(s_ip_hdr_rdy_reg & s_ip_tx_hdr_valid) begin
-               
+            //////////////////////////////////////////////////////////////////////////////////////////
+            // If the up-stream module has valid payload data & valid header data, latch the hdr data,
+            // latch the first byte to be output to the downstream module, & move to the next state.
+            //////////////////////////////////////////////////////////////////////////////////////////
+            if(s_tx_axis_tvalid & s_ip_tx_hdr_valid & s_ip_hdr_rdy_reg) begin
+               // Latch Header data
                ip_hdr_type <= s_ip_tx_hdr_type;
                ip_hdr_total_length <= s_ip_tx_total_length;
                ip_hdr_protocol <= s_ip_tx_protocol;
@@ -221,29 +219,63 @@ always @(posedge i_clk) begin
                eth_src_mac_addr_reg <= s_eth_tx_src_mac_addr;
                eth_dst_mac_addr_reg <= s_eth_tx_dst_mac_addr;
 
-               //Indicate the header has been latched
-               hdr_latched <= 1'b1;
-            end 
-
-            // If we have latched header data and both the up-stream and down-stream modules
-            // are ready to recieve data, begin the encappsulation process.
-            if(hdr_latched & s_tx_axis_tvalid) begin //& m_tx_axis_trdy 
-               hdr_latched <= 1'b0;
+               // Reset checksum reg & handshaking signals
                checksum_sum <= 16'b0;
-
-               // Drive the first part of the header along with the tvalid flag
-               m_tx_axis_tdata_reg <= {ip_hdr_version, ip_hdr_length};
                m_tx_axis_tvalid_reg <= 1'b1;
-               
-               state_reg <= HEADER;               
+               s_ip_hdr_rdy_reg <= 1'b0;
+
+               if(ETH_FRAME) begin
+                  m_tx_axis_tdata_reg <= s_eth_tx_src_mac_addr[47:40]; 
+                  // If we are outputting an encapsulated ethernet frame, do not raise the hdr valid flag
+                  // because the ethernet header data will be output on the AXI-Stream lines.
+                  m_eth_hdr_tvalid_reg <= 1'b0;
+                  state_reg <= ETH_HEADER;
+               end else begin
+                  m_tx_axis_tdata_reg <= {ip_hdr_version, ip_hdr_length}; 
+                  m_eth_hdr_tvalid_reg <= 1'b1;
+                  state_reg <= IP_HEADER;
+               end    
             end
+
          end
-         HEADER : begin
+         ETH_HEADER: begin
+            m_tx_axis_tvalid_reg <= 1'b1;
+
+            // Before transmitting data, ensure the down-stream module has the trdy
+            // flag set, indicating it is ready to recieve data.
+            if(m_tx_axis_trdy & m_tx_axis_tvalid_reg) begin
+
+               hdr_cntr <= hdr_cntr + 1;
+               
+               case(hdr_cntr) 
+                  4'd0: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[39:32];
+                  4'd1: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[31:24];
+                  4'd2: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[23:16];  
+                  4'd3: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[15:8];
+                  4'd4: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[7:0];      
+                  4'd5: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[47:40];
+                  4'd6: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[39:32];
+                  4'd7: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[31:24];
+                  4'd8: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[23:16];  
+                  4'd9: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[15:8];
+                  4'd10: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[7:0];  
+                  4'd11: m_tx_axis_tdata_reg <= eth_type_reg[15:8];
+                  4'd12: m_tx_axis_tdata_reg <= eth_type_reg[7:0];       
+                  4'd13: begin
+                      m_tx_axis_tdata_reg <= {ip_hdr_version, ip_hdr_length};       
+                      hdr_cntr <= 5'b0;
+                      state_reg <= IP_HEADER;
+                  end
+               endcase
+            end
+
+         end
+         IP_HEADER: begin
             m_tx_axis_tvalid_reg <= 1'b1;
             
             if(m_tx_axis_trdy & m_tx_axis_tvalid_reg) begin
                // Based on the header counter, determine which field of the header to transmit downstream
-               case(ip_hdr_cnt)
+               case(hdr_cntr)
                   5'd0: begin
                      m_tx_axis_tdata_reg <= ip_hdr_type;
                      checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_version, ip_hdr_length, ip_hdr_type});
@@ -314,18 +346,19 @@ always @(posedge i_clk) begin
                   end                                                                  
                endcase
                
-               ip_hdr_cnt <= ip_hdr_cnt + 1'b1;
+               hdr_cntr <= hdr_cntr + 1'b1;
             end
 
          end
          PAYLOAD : begin
-            s_tx_axis_trdy_reg <= 1'b1;
-            m_eth_hdr_tvalid_reg <= !hdr_latched;
+            //s_tx_axis_trdy_reg <= m_tx_axis_trdy;
+            m_tx_axis_tvalid_reg <= 1'b1;
+            m_eth_hdr_tvalid_reg <= (ETH_FRAME) ? 1'b0 : !hdr_latched;
 
 
-            if(s_tx_axis_trdy_reg & s_tx_axis_tvalid & m_tx_axis_trdy) begin
+            if(m_tx_axis_trdy & s_tx_axis_tvalid) begin
                m_tx_axis_tdata_reg <= s_tx_axis_tdata;
-               m_tx_axis_tvalid_reg <= s_tx_axis_tvalid;
+               //m_tx_axis_tvalid_reg <= s_tx_axis_tvalid;
                m_tx_axis_tlast_reg <= s_tx_axis_tlast;
 
                //If we just sampled the final byte of data, return to the IDLE state on the next
@@ -356,7 +389,8 @@ assign m_tx_axis_tdata = m_tx_axis_tdata_reg;
 assign m_tx_axis_tvalid = m_tx_axis_tvalid_reg;
 assign m_tx_axis_tlast = m_tx_axis_tlast_reg;
 
-assign s_tx_axis_trdy = s_tx_axis_trdy_reg;
+//assign s_tx_axis_trdy = s_tx_axis_trdy_reg;
+assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy : 1'b0;
 assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
 
 endmodule 
