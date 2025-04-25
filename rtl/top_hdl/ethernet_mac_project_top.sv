@@ -22,6 +22,12 @@ module ethernet_mac_project_top #(
     output wire rgmii_phy_rstb                                  //Active low PHY reset
 );
 
+/* Constants */
+localparam SRC_MAC = 48'hDEADBEEF000A;
+localparam SRC_IP = 32'h10_00_00_00;
+localparam ETH_TYPE = 16'h0800;
+localparam IP_PROTOCL = 8'h11;
+
 assign o_reset_status = i_reset_n;
 assign rgmii_phy_rstb = i_reset_n;
 
@@ -233,30 +239,138 @@ phy_rx_ctl_idelay
     .REGRST(1'b0)
 );
 
+/* RX AXI Signals from Ethernet MAC */
+reg [7:0] rx_axis_eth_tdata;
+reg rx_axis_eth_tvalid;
+reg rx_axis_eth_tlast;
+reg rx_axis_eth_trdy;
 
-/****************************************************************
-Ethernet MAC Instantiation :
-For the specific case of testing, the rx axi fifo signals are looped
-into the tx axi fifo signals. This is for a simple echo test, to see
-if teh ethernet MAC can echo the data it recieves.
-*****************************************************************/
+reg rx_ip_hdr_trdy;
+reg rx_ip_hdr_tvalid;
+reg [15:0] rx_ip_total_length;
+reg [31:0] rx_src_ip_addr;
+reg [31:0] rx_dst_ip_addr;
+reg [47:0] rx_src_mac_addr;
+reg [47:0] rx_dst_mac_addr;
+reg [15:0] rx_eth_type;
 
-reg [7:0] rx_data;
-reg rx_data_valid;
-reg rx_data_last;
-reg tx_fifo_rdy;
+reg [7:0] rx_axis_ip_tdata;
+reg rx_axis_ip_tvalid;
+reg rx_axis_ip_tlast;
+reg rx_axis_ip_trdy;
 
-reg data_feedback_rdy = 1'b0;
-reg [7:0] data_feedback_payload = 8'b0;
-reg data_feedback_last = 1'b0;
-reg data_feedback_tx_rdy = 1'b0;
+/* TX AXI Signals from IP Stack */
+reg [7:0] tx_axis_eth_tdata;
+reg tx_axis_eth_tvalid;
+reg tx_axis_eth_tlast;
+reg tx_axis_eth_trdy;
 
+reg tx_ip_hdr_trdy;
+reg tx_ip_hdr_tvalid;
+reg [15:0] tx_ip_total_length;
+reg [31:0] tx_src_ip_addr;
+reg [31:0] tx_dst_ip_addr;
+reg [47:0] tx_src_mac_addr;
+reg [47:0] tx_dst_mac_addr;
+reg [15:0] tx_eth_type;
+
+reg [7:0] tx_axis_ip_tdata;
+reg tx_axis_ip_tvalid;
+reg tx_axis_ip_tlast;
+reg tx_axis_ip_trdy;
+
+// Loop back logic for the axi-stream payload data
+assign tx_axis_ip_tdata = rx_axis_ip_tdata;
+assign tx_axis_ip_tvalid = rx_axis_ip_tvalid;
+assign tx_axis_ip_tlast = rx_axis_ip_tlast;
+assign rx_axis_ip_trdy = tx_axis_ip_trdy;
+
+// Header Data Loop back
 always @(posedge i_clk) begin
-    data_feedback_payload <= rx_data;
-    data_feedback_rdy <= rx_data_valid;
-    data_feedback_last <= rx_data_last;
-    data_feedback_tx_rdy <= tx_fifo_rdy;
+    tx_ip_hdr_tvalid <= rx_ip_hdr_tvalid;
+    rx_ip_hdr_trdy <= tx_ip_hdr_trdy;
+    tx_ip_total_length <= rx_ip_total_length;
+    tx_src_ip_addr <= SRC_IP;
+    tx_dst_ip_addr <= rx_src_ip_addr;
+    tx_src_mac_addr <= SRC_MAC;
+    tx_dst_mac_addr <= rx_src_mac_addr;
+    tx_eth_type <= ETH_TYPE;
 end
+
+/******** IP Stack Instantiation ********/
+
+ip #(.AXI_STREAM_WIDTH(8), 
+     .ETH_FRAME(1)
+) ip_stack (
+    .i_clk                  (i_clk),
+    .i_reset_n              (i_reset_n),
+
+    // TX To Ethernet MAC - IP Payload Input
+    .s_ip_tx_hdr_valid      (tx_ip_hdr_tvalid),
+    .s_ip_tx_hdr_rdy        (tx_ip_hdr_trdy),
+    .s_ip_tx_hdr_type       (8'h00),
+    .s_ip_tx_total_length   (tx_ip_total_length),
+    .s_ip_tx_protocol       (IP_PROTOCL), 
+    .s_ip_tx_src_ip_addr    (tx_src_ip_addr),
+    .s_ip_tx_dst_ip_addr    (tx_dst_ip_addr),
+    .s_eth_tx_src_mac_addr  (tx_src_mac_addr),
+    .s_eth_tx_dst_mac_addr  (tx_dst_mac_addr),
+    .s_eth_tx_type          (tx_eth_type),
+
+    // AXI Stream Payload Inputs
+    .s_tx_axis_tdata        (tx_axis_ip_tdata),
+    .s_tx_axis_tvalid       (tx_axis_ip_tvalid),
+    .s_tx_axis_tlast        (tx_axis_ip_tlast),
+    .s_tx_axis_trdy         (tx_axis_ip_trdy),
+
+    // Not Used because ETH_FRAME = 1
+    .m_eth_hdr_trdy         (),
+    .m_eth_hdr_tvalid       (),
+    .m_eth_src_mac_addr     (),
+    .m_eth_dst_mac_addr     (),
+    .m_eth_type             (),
+
+    // Tx Ethernet Frame Output
+    .m_tx_axis_tdata        (tx_axis_eth_tdata),
+    .m_tx_axis_tvalid       (tx_axis_eth_tvalid),
+    .m_tx_axis_tlast        (tx_axis_eth_tlast),
+    .m_tx_axis_trdy         (tx_axis_eth_trdy),
+
+    /* Not Used due to ETH_FRAME = 1 */
+    .s_eth_hdr_valid        (),
+    .s_eth_hdr_rdy          (),
+    .s_eth_rx_src_mac_addr  (),
+    .s_eth_rx_dst_mac_addr  (),
+    .s_eth_rx_type          (),
+
+    // Ethernet Frame Input
+    .s_rx_axis_tdata        (rx_axis_eth_tdata),
+    .s_rx_axis_tvalid       (rx_axis_eth_tvalid),
+    .s_rx_axis_tlast        (rx_axis_eth_tlast),
+    .s_rx_axis_trdy         (rx_axis_eth_trdy),
+
+    // De-encapsulated Frame Output
+    .m_ip_hdr_trdy          (rx_ip_hdr_trdy),
+    .m_ip_hdr_tvalid        (rx_ip_hdr_tvalid),
+    .m_ip_total_length      (rx_ip_total_length),
+    .m_ip_rx_src_ip_addr    (rx_src_ip_addr),
+    .m_ip_rx_dst_ip_addr    (rx_dst_ip_addr),
+    .m_eth_rx_src_mac_addr  (rx_src_mac_addr),
+    .m_eth_rx_dst_mac_addr  (rx_dst_mac_addr),
+    .m_eth_rx_type          (rx_eth_type),
+
+    // IP Frame Payload
+    .m_rx_axis_tdata        (rx_axis_ip_tdata),
+    .m_rx_axis_tvalid       (rx_axis_ip_tvalid),
+    .m_rx_axis_tlast        (rx_axis_ip_tlast),
+    .m_rx_axis_trdy         (rx_axis_ip_trdy),
+
+    // Status Flags
+    .bad_packet             ()
+);
+
+
+/******** Ethernet MAC Instantiation ********/
 
 
 ethernet_mac_fifo ethernet_mac(
@@ -274,16 +388,16 @@ ethernet_mac_fifo ethernet_mac(
     .rgmii_phy_txctl(rgmii_phy_txctl),
 
     /* TX FIFO AXI Interface */
-    .s_tx_axis_tdata(data_feedback_payload),             
-    .s_tx_axis_tvalid(data_feedback_rdy),                                 
-    .s_tx_axis_tlast(data_feedback_last),                         
-    .m_tx_axis_trdy(tx_fifo_rdy),                                 
+    .s_tx_axis_tdata(tx_axis_eth_tdata),             
+    .s_tx_axis_tvalid(tx_axis_eth_tvalid),                                 
+    .s_tx_axis_tlast(tx_axis_eth_tlast),                         
+    .m_tx_axis_trdy(tx_axis_eth_trdy),                                 
 
     /* Rx FIFO - AXI Interface*/
-    .m_rx_axis_tdata(rx_data),           
-    .m_rx_axis_tvalid(rx_data_valid),                                
-    .m_rx_axis_tlast(rx_data_last),                                
-    .s_rx_axis_trdy(data_feedback_tx_rdy)                                              
+    .m_rx_axis_tdata(rx_axis_eth_tdata),           
+    .m_rx_axis_tvalid(rx_axis_eth_tvalid),                                
+    .m_rx_axis_tlast(rx_axis_eth_tlast),                                
+    .s_rx_axis_trdy(rx_axis_eth_trdy)                                              
 );
 
 

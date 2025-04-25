@@ -225,7 +225,7 @@ always @(posedge i_clk) begin
                s_ip_hdr_rdy_reg <= 1'b0;
 
                if(ETH_FRAME) begin
-                  m_tx_axis_tdata_reg <= s_eth_tx_src_mac_addr[47:40]; 
+                  m_tx_axis_tdata_reg <= s_eth_tx_dst_mac_addr[47:40]; 
                   // If we are outputting an encapsulated ethernet frame, do not raise the hdr valid flag
                   // because the ethernet header data will be output on the AXI-Stream lines.
                   m_eth_hdr_tvalid_reg <= 1'b0;
@@ -246,19 +246,20 @@ always @(posedge i_clk) begin
             if(m_tx_axis_trdy & m_tx_axis_tvalid_reg) begin
 
                hdr_cntr <= hdr_cntr + 1;
-               
+
+
                case(hdr_cntr) 
-                  4'd0: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[39:32];
-                  4'd1: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[31:24];
-                  4'd2: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[23:16];  
-                  4'd3: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[15:8];
-                  4'd4: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[7:0];      
-                  4'd5: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[47:40];
-                  4'd6: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[39:32];
-                  4'd7: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[31:24];
-                  4'd8: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[23:16];  
-                  4'd9: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[15:8];
-                  4'd10: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[7:0];  
+                  4'd0: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[39:32];
+                  4'd1: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[31:24];
+                  4'd2: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[23:16];  
+                  4'd3: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[15:8];
+                  4'd4: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[7:0];      
+                  4'd5: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[47:40];
+                  4'd6: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[39:32];
+                  4'd7: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[31:24];
+                  4'd8: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[23:16];  
+                  4'd9: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[15:8];
+                  4'd10: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[7:0];  
                   4'd11: m_tx_axis_tdata_reg <= eth_type_reg[15:8];
                   4'd12: m_tx_axis_tdata_reg <= eth_type_reg[7:0];       
                   4'd13: begin
@@ -351,14 +352,12 @@ always @(posedge i_clk) begin
 
          end
          PAYLOAD : begin
-            //s_tx_axis_trdy_reg <= m_tx_axis_trdy;
             m_tx_axis_tvalid_reg <= 1'b1;
             m_eth_hdr_tvalid_reg <= (ETH_FRAME) ? 1'b0 : !hdr_latched;
 
 
             if(m_tx_axis_trdy & s_tx_axis_tvalid) begin
                m_tx_axis_tdata_reg <= s_tx_axis_tdata;
-               //m_tx_axis_tvalid_reg <= s_tx_axis_tvalid;
                m_tx_axis_tlast_reg <= s_tx_axis_tlast;
 
                //If we just sampled the final byte of data, return to the IDLE state on the next

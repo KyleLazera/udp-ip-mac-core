@@ -6,7 +6,7 @@
  *    7 Bytes     1 Byte   6 Bytes    6 Bytes     2 Bytes   46 - 1500 Bytes  Optional   4 Bytes  96-Bit Times
  *  ----------------------------------------------------------------------------------------------------
  *  |            |      |          |            |         |                |          |       |        |
- *  | Preamble   | SFD  | Dst Addr |  Src Addr  |  Length |    Payload     |  Padding |  CRC  |  IFG   |
+ *  | Preamble   | SFD  | Dst Addr |  Src Addr  |  Type   |    Payload     |  Padding |  CRC  |  IFG   |
  *  |            |      |          |            |         |                |          |       |        |
  *  ----------------------------------------------------------------------------------------------------
 */

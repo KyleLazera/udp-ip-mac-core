@@ -10,11 +10,10 @@
  * passed out of the module with the payload data.
  */
 
- //todo: Pull ethernet signals out in parallel for tx
-
  module ip
 #(
-    parameter AXI_STREAM_WIDTH = 8
+    parameter AXI_STREAM_WIDTH = 8,
+    parameter ETH_FRAME = 1
 )(
     input wire i_clk,
     input wire i_reset_n,
@@ -39,6 +38,13 @@
    input wire s_tx_axis_tlast,                                          // last byte of payload
    output wire s_tx_axis_trdy,                                          // Indicates IP tx is ready for payload data
 
+   /* Output ethernet signals - Needed if ETH_FRAME = 0 */
+   input wire m_eth_hdr_trdy,
+   output wire m_eth_hdr_tvalid,
+   output wire [47:0] m_eth_src_mac_addr,                               //Eth source mac address
+   output wire [47:0] m_eth_dst_mac_addr,                               //Eth destination mac address   
+   output wire [15:0] m_eth_type,   
+
    /* Tx Ethernet Frame Output */
    output wire [AXI_STREAM_WIDTH-1:0] m_tx_axis_tdata,                  // Packaged IP data (header & payload)
    output wire m_tx_axis_tvalid,                                        // valid signal for tdata
@@ -46,6 +52,13 @@
    input wire m_tx_axis_trdy,                                           // Back pressure from downstream module indciating it is ready
 
     /******************************************* RX From Ethernet MAC *************************************/
+
+    /* Ethernet Header Input - Only needed in ETH_FRAME = 0*/
+    input wire s_eth_hdr_valid,
+    output wire s_eth_hdr_rdy,
+    input wire [47:0] s_eth_rx_src_mac_addr,
+    input wire [47:0] s_eth_rx_dst_mac_addr,
+    input wire [15:0] s_eth_rx_type,
 
    /* Ethernet Frame Input - Input to eth_rx */
     input wire [AXI_STREAM_WIDTH-1:0] s_rx_axis_tdata,
@@ -56,6 +69,7 @@
     /* De-encapsulated Frame Output */
     input wire m_ip_hdr_trdy,
     output wire m_ip_hdr_tvalid,
+    output wire [15:0] m_ip_total_length,
     output wire [31:0] m_ip_rx_src_ip_addr,
     output wire [31:0] m_ip_rx_dst_ip_addr,
     output wire [47:0] m_eth_rx_src_mac_addr,
@@ -74,14 +88,32 @@
 
 /* TX Data Path */
 
-ipv4_tx#(.AXI_STREAM_WIDTH(AXI_STREAM_WIDTH))
+wire tx_eth_hdr_rdy;
+wire tx_eth_hdr_valid;
+wire [47:0] tx_eth_src_mac_addr;
+wire [47:0] tx_eth_dst_mac_addr;
+wire [15:0] tx_eth_type;
+
+generate
+    assign tx_eth_hdr_rdy = (ETH_FRAME) ? 1'b0 : m_eth_hdr_trdy;
+    assign m_eth_hdr_tvalid = (ETH_FRAME) ? 1'b0 : tx_eth_hdr_valid;
+    assign m_eth_src_mac_addr = (ETH_FRAME) ? 1'b0 : tx_eth_src_mac_addr;
+    assign m_eth_dst_mac_addr = (ETH_FRAME) ? 1'b0 : tx_eth_dst_mac_addr;
+    assign m_eth_type = (ETH_FRAME) ? 1'b0 : tx_eth_type;
+endgenerate
+
+ipv4_tx#(.AXI_STREAM_WIDTH(AXI_STREAM_WIDTH), .ETH_FRAME(ETH_FRAME))
 ip_tx(
     .i_clk(i_clk),
     .i_reset_n(i_reset_n),
+
+    /* Input AXI-Stream IP Payload */
     .s_tx_axis_tdata(s_tx_axis_tdata),
     .s_tx_axis_tvalid(s_tx_axis_tvalid),                      
     .s_tx_axis_tlast(s_tx_axis_tlast),                       
-    .s_tx_axis_trdy(s_tx_axis_trdy),                       
+    .s_tx_axis_trdy(s_tx_axis_trdy),  
+
+    /* Input IP/Ethernet Header Fields */
     .s_ip_tx_hdr_valid(s_ip_tx_hdr_valid),                     
     .s_ip_tx_hdr_rdy(s_ip_tx_hdr_rdy),                      
     .s_ip_tx_hdr_type(s_ip_tx_hdr_type),                
@@ -93,46 +125,60 @@ ip_tx(
     .s_eth_tx_dst_mac_addr(s_eth_tx_dst_mac_addr),          
     .s_eth_tx_type(s_eth_tx_type),  
 
+    /* Outpu AXI-Stream IP packet */
     .m_tx_axis_tdata(m_tx_axis_tdata),
     .m_tx_axis_tvalid(m_tx_axis_tvalid),                     
     .m_tx_axis_tlast(m_tx_axis_tlast),                      
-    .m_tx_axis_trdy(m_tx_axis_trdy),                        
-    .m_eth_hdr_trdy(),
-    .m_eth_hdr_tvalid(),
-    .m_eth_src_mac_addr(),            
-    .m_eth_dst_mac_addr(),            
-    .m_eth_type()                     
+    .m_tx_axis_trdy(m_tx_axis_trdy),  
+
+    /* Output ethernet header info - Only if ETH_FRAME = 0 */
+    .m_eth_hdr_trdy(tx_eth_hdr_rdy),
+    .m_eth_hdr_tvalid(tx_eth_hdr_valid),
+    .m_eth_src_mac_addr(tx_eth_src_mac_addr),            
+    .m_eth_dst_mac_addr(tx_eth_dst_mac_addr),            
+    .m_eth_type(tx_eth_type)                     
 );
 
 
 /* RX Data Path */
 
-wire [AXI_STREAM_WIDTH-1:0] rx_axis_tdata;
-wire rx_axis_tvalid;
-wire rx_axis_tlast;
-wire rx_axis_trdy;
-
-wire rx_eth_hdr_trdy;
-wire rx_eth_hdr_tvalid;
-wire [47:0] rx_eth_src_mac_addr;
-wire [47:0] rx_eth_dst_mac_addr;
+wire eth_hdr_tvalid;
+wire eth_hdr_trdy;
+wire [47:0] rx_src_mac_addr;
+wire [47:0] rx_dst_mac_addr;
 wire [15:0] rx_eth_type;
 
-ipv4_rx#(.AXI_STREAM_WIDTH(AXI_STREAM_WIDTH))
+// If ETH_FRAME is set, drive all the ethernet input signals low
+generate 
+    assign eth_hdr_tvalid = (ETH_FRAME) ? 1'b0 : s_eth_hdr_valid;
+    assign s_eth_hdr_rdy = (ETH_FRAME) ? 1'b0 : eth_hdr_trdy;
+    assign rx_src_mac_addr = (ETH_FRAME) ? 1'b0 : s_eth_rx_src_mac_addr;
+    assign rx_dst_mac_addr = (ETH_FRAME) ? 1'b0 : s_eth_rx_dst_mac_addr;
+    assign rx_eth_type =  (ETH_FRAME) ? 1'b0 : s_eth_rx_type;
+endgenerate
+
+ipv4_rx#(.AXI_DATA_WIDTH(AXI_STREAM_WIDTH), .ETH_FRAME(ETH_FRAME))
 ip_rx(
     .i_clk(i_clk),
     .i_reset_n(i_reset_n),
-    .s_eth_hdr_valid(rx_eth_hdr_tvalid),
-    .s_eth_hdr_rdy(rx_eth_hdr_trdy),
-    .s_eth_rx_src_mac_addr(rx_eth_src_mac_addr),
-    .s_eth_rx_dst_mac_addr(rx_eth_dst_mac_addr),
+
+    /* Ethernet Input Signals */
+    .s_eth_hdr_valid(eth_hdr_tvalid),
+    .s_eth_hdr_rdy(eth_hdr_trdy),
+    .s_eth_rx_src_mac_addr(rx_src_mac_addr),
+    .s_eth_rx_dst_mac_addr(rx_dst_mac_addr),
     .s_eth_rx_type(rx_eth_type),
-    .s_rx_axis_tdata(rx_axis_tdata),
-    .s_rx_axis_tvalid(rx_axis_tvalid),
-    .s_rx_axis_tlast(rx_axis_tlast),
-    .s_rx_axis_trdy(rx_axis_trdy),
+
+    /* AXI-Input Signals */
+    .s_rx_axis_tdata(s_rx_axis_tdata),
+    .s_rx_axis_tvalid(s_rx_axis_tvalid),
+    .s_rx_axis_tlast(s_rx_axis_tlast),
+    .s_rx_axis_trdy(s_rx_axis_trdy),
+
+    /* Output Signals */
     .m_ip_hdr_trdy(m_ip_hdr_trdy),
     .m_ip_hdr_tvalid(m_ip_hdr_tvalid),
+    .m_ip_total_length(m_ip_total_length),
     .m_ip_rx_src_ip_addr(m_ip_rx_src_ip_addr),
     .m_ip_rx_dst_ip_addr(m_ip_rx_dst_ip_addr),
     .m_eth_rx_src_mac_addr(m_eth_rx_src_mac_addr),
@@ -142,6 +188,8 @@ ip_rx(
     .m_rx_axis_tvalid(m_rx_axis_tvalid),
     .m_rx_axis_tlast(m_rx_axis_tlast),
     .m_rx_axis_trdy(m_rx_axis_trdy),
+
+    /* Status Signals */
     .bad_packet(bad_packet)     
 );
 

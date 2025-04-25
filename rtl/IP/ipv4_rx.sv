@@ -48,6 +48,7 @@ module ipv4_rx
     /* IP/Ethernet Frame Outputs */
     input wire m_ip_hdr_trdy,
     output wire m_ip_hdr_tvalid,
+    output wire [15:0] m_ip_total_length,
     output wire [31:0] m_ip_rx_src_ip_addr,
     output wire [31:0] m_ip_rx_dst_ip_addr,
     output wire [47:0] m_eth_rx_src_mac_addr,
@@ -126,6 +127,7 @@ reg [3:0] ip_hdr_version;
 reg [3:0] ip_hdr_length;
 reg [7:0] ip_hdr_type;
 reg [15:0] ip_hdr_total_length;
+reg [15:0] ip_hdr_total_length_reg;
 reg [15:0] ip_hdr_id;
 reg [2:0] ip_hdr_flags;
 reg [12:0] ip_hdr_frag_offset;
@@ -203,9 +205,9 @@ always @(posedge i_clk) begin
                     // Depending on the header counter, the input values will be associated with
                     // specific values of the ethernet header
                     if(hdr_cntr < 4'd6)
-                        eth_rx_src_mac_addr <= {eth_rx_src_mac_addr[39:0], s_rx_axis_tdata};
-                    else if(hdr_cntr < 4'd12)
                         eth_rx_dst_mac_addr <= {eth_rx_dst_mac_addr[39:0], s_rx_axis_tdata};
+                    else if(hdr_cntr < 4'd12)
+                        eth_rx_src_mac_addr <= {eth_rx_src_mac_addr[39:0], s_rx_axis_tdata};
                     else if(hdr_cntr < 4'd14) begin
                         eth_rx_type <= {eth_rx_type[7:0], s_rx_axis_tdata};
 
@@ -248,6 +250,7 @@ always @(posedge i_clk) begin
                         5'd6: begin
                             ip_hdr_flags <= s_rx_axis_tdata[7:5];
                             ip_hdr_frag_offset[12:8] <= s_rx_axis_tdata[4:0];
+                            ip_hdr_total_length_reg <= ip_hdr_total_length;
                             // Subtract the total length register from the number of header bytes
                             ip_hdr_total_length <= ip_hdr_total_length - (ip_hdr_length << 2); 
                         end
@@ -349,6 +352,7 @@ assign bad_packet = bad_pckt_reg;
 
 /* Output Ethernet/IP Header Info */
 assign m_ip_hdr_tvalid = m_ip_hdr_tvalid_reg;
+assign m_ip_total_length = ip_hdr_total_length_reg;
 assign m_ip_rx_src_ip_addr = ip_hdr_src_ip_addr;
 assign m_ip_rx_dst_ip_addr = ip_hdr_dst_ip_addr;
 assign m_eth_rx_src_mac_addr = eth_rx_src_mac_addr;
