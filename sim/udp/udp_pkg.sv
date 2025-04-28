@@ -29,7 +29,7 @@ class udp_agent;
     endfunction : gen_payload
 
     // Seperates the UDP packet into UDP header and UDP payload
-    protected function void de_encap_udp_hdr(ref udp_pkt_t rx_pckt);
+    function void de_encap_udp_hdr(ref udp_pkt_t rx_pckt);
 
         for(int i = 0; i < 8; i++) begin
             case(i)
@@ -43,8 +43,25 @@ class udp_agent;
                 7: rx_pckt.udp_checksum[7:0] = rx_pckt.udp_payload.pop_front();
             endcase
         end
-
     endfunction : de_encap_udp_hdr
+
+    function void encap_udp_data(ref udp_pkt_t tx_pckt);
+        logic [63:0] udp_hdr;
+
+        // Create UDP Header
+        udp_hdr = {
+            tx_pckt.src_port,
+            tx_pckt.dst_port,
+            tx_pckt.udp_length,
+            tx_pckt.udp_checksum
+        };
+
+        // Pre-pend the header to the payload
+        for(int i = 0; i < 8; i++) begin
+            tx_pckt.udp_payload.push_front(udp_hdr[((i+1)*8)-1 -: 8]);
+        end
+
+    endfunction : encap_udp_data
 
     function void gen_udp_pkt(ref udp_pkt_t tx_pkt);
         int payload_size = $urandom_range(10, 1472); 
@@ -54,9 +71,6 @@ class udp_agent;
     endfunction : gen_udp_pkt
 
     function void self_check(ref udp_pkt_t tx_pckt, ref udp_pkt_t rx_pckt);
-
-        //First de-encapsulate the recieved udp packet
-        de_encap_udp_hdr(rx_pckt);
 
         // Compare Each UDP header field from teh tx and px packets
         assert(tx_pckt.src_port == rx_pckt.src_port)
