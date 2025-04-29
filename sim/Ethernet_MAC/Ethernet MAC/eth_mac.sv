@@ -74,12 +74,20 @@ class eth_mac extends uvm_object;
     endfunction : pad_packet
     
     //Function that encapsulates teh data into an etehrnet frame
-    function void encapsulate_data(ref bit [7:0] driver_data[$]);
+    function void encapsulate_data(bit tx_packet, ref bit [7:0] driver_data[$]);
         
-        //int packet_size;
         logic [31:0] crc;
 
         pad_packet(driver_data);
+
+        if(tx_packet) begin
+            driver_data[15] = 8'hCA;               
+            driver_data[16] = 8'hFE;
+            driver_data[37] = 8'hDE;
+            driver_data[38] = 8'hAD;
+            driver_data[39] = 8'hBE;
+            driver_data[40] = 8'hEF;
+        end
 
         //Calculate the CRC for the Payload & append to the back
         crc = crc32_reference_model(driver_data);

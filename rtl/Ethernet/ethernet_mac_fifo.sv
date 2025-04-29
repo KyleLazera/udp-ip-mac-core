@@ -13,30 +13,36 @@ module ethernet_mac_fifo
     parameter TX_FIFO_DEPTH = 4096  
 )
 (
-    input wire i_clk,                                           //System clock to read data from rx and tx FIFO's - 100MHz
-    input wire clk_125,                                         //Used to drive the tx MAC and RGMII interface 
-    input wire clk90_125,                                       //Used to transmit signals on RGMII 
-    input wire i_reset_n,                                       //Active low synchronous reset
+    input wire i_clk,                                           // System clock to read data from rx and tx FIFO's - 100MHz
+    input wire clk_125,                                         // Used to drive the tx MAC and RGMII interface 
+    input wire clk90_125,                                       // Used to transmit signals on RGMII 
+    input wire i_reset_n,                                       // Active low synchronous reset
 
     /* External PHY Interface Signals */
-    input wire rgmii_phy_rxc,                                   //Recieved ethernet clock signal
-    input wire [RGMII_DATA_WIDTH-1:0] rgmii_phy_rxd,            //Receieved data from PHY
-    input wire rgmii_phy_rxctl,                                 //Control signal (dv ^ er) from PHY
-    output wire rgmii_phy_txc,                                  //Outgoing data clock signal
-    output wire [RGMII_DATA_WIDTH-1:0] rgmii_phy_txd,           //Outgoing ethernet packet data
-    output wire rgmii_phy_txctl,                                //Outgoing control signal (dv ^ er)    
+    input wire rgmii_phy_rxc,                                   // Recieved ethernet clock signal
+    input wire [RGMII_DATA_WIDTH-1:0] rgmii_phy_rxd,            // Receieved data from PHY
+    input wire rgmii_phy_rxctl,                                 // Control signal (dv ^ er) from PHY
+    output wire rgmii_phy_txc,                                  // Outgoing data clock signal
+    output wire [RGMII_DATA_WIDTH-1:0] rgmii_phy_txd,           // Outgoing ethernet packet data
+    output wire rgmii_phy_txctl,                                // Outgoing control signal (dv ^ er)    
 
     /* Tx FIFO - AXI interface*/
-    input wire [AXI_DATA_WIDTH-1:0] s_tx_axis_tdata,            //Tx word to send via ethernet  
-    input wire s_tx_axis_tvalid,                                //Write enable signal into the tx FIFO
-    input wire s_tx_axis_tlast,                                 //Indicates the final byte within a packet
-    output wire m_tx_axis_trdy,                                 //Indicates the tx FIFO is not full/has space to store data
+    input wire [AXI_DATA_WIDTH-1:0] s_tx_axis_tdata,            // Tx word to send via ethernet  
+    input wire s_tx_axis_tvalid,                                // Write enable signal into the tx FIFO
+    input wire s_tx_axis_tlast,                                 // Indicates the final byte within a packet
+    output wire m_tx_axis_trdy,                                 // Indicates the tx FIFO is not full/has space to store data
+
+    /* TX Packet - Computed Values*/
+    input wire s_hdr_tvalid,                                    // Indicates the calculated header values are valid
+    input wire [15:0] s_udp_hdr_length,                         // Calculated length of UDP packet
+    input wire [15:0] s_udp_hdr_checksum,                       // Calculated UDP checksum
+    input wire [15:0] s_ip_hdr_length,                          // Calculated Length of IP Packet
 
     /* Rx FIFO - AXI Interface*/
-    output wire [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata,            //Rx data receieved from ethernet MAC   
-    output reg m_rx_axis_tvalid,                                //Indicates rx FIFO is not empty and has data 
-    output wire m_rx_axis_tlast,                                 //Indicates last beat of transaction (final byte in packet)
-    input wire s_rx_axis_trdy                                    //Acts as a read enable signal to rx fifo   
+    output wire [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata,            // Rx data receieved from ethernet MAC   
+    output reg m_rx_axis_tvalid,                                 // Indicates rx FIFO is not empty and has data 
+    output wire m_rx_axis_tlast,                                 // Indicates last beat of transaction (final byte in packet)
+    input wire s_rx_axis_trdy                                    // Acts as a read enable signal to rx fifo   
 );
 
 /****************************************************************
@@ -84,6 +90,11 @@ tri_speed_eth_mac (
     .s_tx_axis_tvalid(tx_fifo_tvalid), 
     .s_tx_axis_tlast(tx_fifo_tlast),
     .s_tx_axis_trdy(tx_mac_trdy),
+    //TX FIFO - Header values
+    .s_hdr_tvalid(s_hdr_tvalid),                                    
+    .s_udp_hdr_length(s_udp_hdr_length),                         
+    .s_udp_hdr_checksum(s_udp_hdr_checksum),                       
+    .s_ip_hdr_length(s_ip_hdr_length),  
     //RX FIFO - AXI Interface
     .rgmii_rxc(rx_clk),
     .m_rx_axis_tdata(rx_mac_data),

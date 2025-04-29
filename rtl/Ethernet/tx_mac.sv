@@ -37,7 +37,13 @@ module tx_mac
 
     /* Pause Frame Signals */
     input wire rx_pause,                                    //Indicates the rx mac recieved a pause frame, and we need to wait before sending next packet  
-    input wire tx_pause,                                    //Signal indicating rx FIFO is almost overflowing and we need to transmit a pause frame                          
+    input wire tx_pause,                                    //Signal indicating rx FIFO is almost overflowing and we need to transmit a pause frame   
+
+    /* TX Packet - Computed Header Values*/
+    input wire s_hdr_tvalid,                                // Indicates the calculated header values are valid
+    input wire [15:0] s_udp_hdr_length,                     // Calculated length of UDP packet
+    input wire [15:0] s_udp_hdr_checksum,                   // Calculated UDP checksum
+    input wire [15:0] s_ip_hdr_length,                      // Calculated Length of IP Packet                       
     
     /* Configurations */
     input wire mii_select,                                  //Configures data rate (Double Data Rate (DDR) or Single Data Rate (SDR))    
@@ -48,7 +54,14 @@ module tx_mac
 localparam [7:0] ETH_HDR = 8'h55;               
 localparam [7:0] ETH_SFD = 8'hD5;  
 localparam [7:0] ETH_PAD = 8'h00;   
-localparam MIN_FRAME_WIDTH = 59;                            //46 byte minimum Payload + 12 Address Bytes + 2 Type/Length Bytes = 60 bytes         
+localparam MIN_FRAME_WIDTH = 59;                            //46 byte minimum Payload + 12 Address Bytes + 2 Type/Length Bytes = 60 bytes  
+
+localparam IP_LENGTH_OFFSET_0 = 15;
+localparam IP_LENGTH_OFFSET_1 = 16;
+localparam UDP_LENGTH_OFFSET_0 = 37;
+localparam UDP_LENGTH_OFFSET_1 = 38;
+localparam UDP_CHECKSUM_OFFSET_0 = 39;
+localparam UDP_CHECKSUM_OFFSET_1 = 40;
 
 /* FSM State Declarations */
 typedef enum{IDLE,                                  //State when no transactions are occuring
@@ -79,6 +92,10 @@ wire [DATA_WIDTH-1:0] crc_data_in;                  //Signal that drives the CRC
 reg sof;                                            //Start of frame signal                              
 wire crc_en, crc_reset;                             //CRC enable & reset   
 wire [31:0] crc_data_out;                           //Ouput from the CRC32 module
+
+reg [15:0] udp_length_reg = 16'b0;
+reg [15:0] udp_checksum_reg = 16'b0;
+reg [15:0] ip_length_reg = 16'b0;
 
 /* CRC32 Module Instantiation */
 crc32 #(.DATA_WIDTH(8)) 
@@ -188,6 +205,13 @@ always @(posedge clk) begin
                 PREAMBLE : begin
                     rgmii_dv_reg <= 1'b1;
 
+                    // Store the valid IP and UDP header data if the valid flag is raised
+                    if(s_hdr_tvalid) begin
+                        ip_length_reg <= s_ip_hdr_length;
+                        udp_length_reg <= s_udp_hdr_length;
+                        udp_checksum_reg <= s_udp_hdr_checksum;
+                    end
+
                     //If we have recieved out 6th byte of the preamble
                     if(byte_ctr == 3'd6) begin
                         tx_data_reg <= ETH_HDR;
@@ -218,9 +242,45 @@ always @(posedge clk) begin
 
                     //Only increment the packet counter if it is less than 60. Once min frame size has been surpassed
                     //packet counter is no longer needed
-                    if(pckt_size < (MIN_FRAME_WIDTH + 1)) 
+                    if(pckt_size < (MIN_FRAME_WIDTH + 1)) begin
                         pckt_size <= pckt_size + 1;                    
                     
+                        /////////////////////////////////////////////////////////////////////////////
+                        // To avoid having to buffer the payload in the IP/UDP stack to compute the 
+                        // total length and UDP checksum, the fields are computed in parallel to the 
+                        // data stream and the final values are appended here prior to transmission.
+                        /////////////////////////////////////////////////////////////////////////////
+                        if(pckt_size == IP_LENGTH_OFFSET_0) begin
+                            crc_in_data_reg <= ip_length_reg[15:8];
+                            tx_data_reg <= ip_length_reg[15:8];
+                        end
+                        
+                        if(pckt_size == IP_LENGTH_OFFSET_1) begin
+                            crc_in_data_reg <= ip_length_reg[7:0];
+                            tx_data_reg <= ip_length_reg[7:0];
+                        end
+                        
+                        if(pckt_size == UDP_LENGTH_OFFSET_0) begin
+                            crc_in_data_reg <= udp_length_reg[15:8];
+                            tx_data_reg <= udp_length_reg[15:8];
+                        end
+
+                        if(pckt_size == UDP_LENGTH_OFFSET_1) begin
+                            crc_in_data_reg <= udp_length_reg[7:0];
+                            tx_data_reg <= udp_length_reg[7:0];
+                        end
+
+                        if(pckt_size == UDP_CHECKSUM_OFFSET_0) begin
+                            crc_in_data_reg <= udp_checksum_reg[15:8];
+                            tx_data_reg <= udp_checksum_reg[15:8];
+                        end
+
+                        if(pckt_size == UDP_CHECKSUM_OFFSET_1) begin
+                            crc_in_data_reg <= udp_checksum_reg[7:0];
+                            tx_data_reg <= udp_checksum_reg[7:0];
+                        end      
+
+                    end
 
                     //If the last beat has arrived OR there is no more valid data in the FIFO
                     if(s_tx_axis_tlast) begin

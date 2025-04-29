@@ -13,6 +13,10 @@ class eth_mac_tx_seq extends eth_mac_base_seq;
     virtual task body();
         eth_mac_item tx_fifo = eth_mac_item::type_id::create("tx_fifo");
 
+        tx_fifo.udp_length = 16'hDEAD;
+        tx_fifo.udp_checksum = 16'hBEEF;
+        tx_fifo.ip_length = 16'hCAFE;
+
         set_packet_size(SMALL_AND_LARGE_PACKETS);
         generate_packet(tx_fifo.tx_data);
         //Send item to tx driver

@@ -76,7 +76,7 @@ virtual task main_phase(uvm_phase phase);
             tx_item_copy.tx_data = {<<8{tx_item_copy.tx_data}};
 
         //Encapsulate data before sending on RGMII
-        eth_mac_base.encapsulate_data(tx_item.tx_data); 
+        eth_mac_base.encapsulate_data(1'b0, tx_item.tx_data); 
 
         //Append a bad CRC Value to end of the Packet if we have teh configuration set to bad packet
         if(cfg.rx_bad_pckt & crc_er) begin

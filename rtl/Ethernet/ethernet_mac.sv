@@ -30,6 +30,12 @@ module ethernet_mac
     input wire s_tx_axis_tlast,                                 //Indicates last beat of transaction (final byte in packet)
     output wire s_tx_axis_trdy,                                 //Indicates to FIFO that it can read data (used to set rd_en for FIFIO)
 
+    /* TX Packet - Computed Header Values*/
+    input wire s_hdr_tvalid,                                    // Indicates the calculated header values are valid
+    input wire [15:0] s_udp_hdr_length,                         // Calculated length of UDP packet
+    input wire [15:0] s_udp_hdr_checksum,                       // Calculated UDP checksum
+    input wire [15:0] s_ip_hdr_length,                          // Calculated Length of IP Packet
+
     /* RX FIFO Interface */
     output wire rgmii_rxc,                                      //RX clock from rgmii used to drive data to rx fifo
     output wire [FIFO_DATA_WIDTH-1:0] m_rx_axis_tdata,          //Data to transmit to asynch FIFO
@@ -61,7 +67,7 @@ reg [1:0] link_speed_reg = 2'b10;
 // rx MAC. The reaosn the link_speed reg can tbe used for this is because this value is passed 
 // into the tx MAC which needs to run at 125MHz. This would cause a CDC problem.
 ///////////////////////////////////////////////////////////////////////////////////////////
-(* keep ="true"  *)reg mii_sel_reg = 1'b0;
+(* keep ="true" *)reg mii_sel_reg = 1'b0;
 wire [1:0] link_speed;
 wire mii_sel;
 
@@ -258,7 +264,13 @@ tx_mac
 
     // Pause Frame Signals 
     .rx_pause(rx_pause_flag_sync),                    
-    .tx_pause(),                                    
+    .tx_pause(),           
+
+    // IP/UDP Header Fields
+    .s_hdr_tvalid(s_hdr_tvalid),                                    
+    .s_udp_hdr_length(s_udp_hdr_length),                         
+    .s_udp_hdr_checksum(s_udp_hdr_checksum),                       
+    .s_ip_hdr_length(s_ip_hdr_length),                                          
 
     // Control signals(s)                            
     .mii_select(mii_sel),

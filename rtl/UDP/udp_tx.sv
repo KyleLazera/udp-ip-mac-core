@@ -14,6 +14,8 @@
  *  |                           Payload                             |
  *  +---------------+---------------+---------------+---------------+
  * 
+ * Currently the module does not utilize the checksum value as this will induce quite
+ * a few clock cycles of latency into the process.
  */
 
  module udp_tx

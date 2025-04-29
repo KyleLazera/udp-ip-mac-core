@@ -41,6 +41,11 @@ ethernet_mac_fifo #(
     .s_tx_axis_tvalid(eth_wr_if.m_tx_axis_tvalid),
     .s_tx_axis_tlast(eth_wr_if.m_tx_axis_tlast),
     .m_tx_axis_trdy(eth_wr_if.s_tx_axis_trdy),
+    /* Header Input */
+    .s_hdr_tvalid(eth_wr_if.hdr_tvalid),                                    
+    .s_udp_hdr_length(eth_wr_if.udp_length),                         
+    .s_udp_hdr_checksum(eth_wr_if.udp_checksum),                       
+    .s_ip_hdr_length(eth_wr_if.ip_length), 
     /* RX Signals */
     .m_rx_axis_tdata(eth_rd_if.m_rx_axis_tdata),
     .m_rx_axis_tvalid(eth_rd_if.m_rx_axis_tvalid),

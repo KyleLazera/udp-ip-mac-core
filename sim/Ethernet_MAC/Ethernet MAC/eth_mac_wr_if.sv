@@ -26,12 +26,22 @@ interface eth_mac_wr_if
     bit m_tx_axis_tvalid;                                //Write enable for the tx fifo
     bit m_tx_axis_tlast;                                 //Indicates last beat of transaction (final byte in packet)
     bit s_tx_axis_trdy;                                  //Indicates the FIFO is not full and can receieve data
+    //TX Packet Header Signals
+    bit hdr_tvalid;
+    bit [15:0] udp_length;
+    bit [15:0] udp_checksum;
+    bit [15:0] ip_length;
 
     /* BFM Tasks */
     
-    task tx_fifo_drive_data(bit [7:0] ref_fifo[$], bit last_packet);
+    task tx_fifo_drive_data(bit [7:0] ref_fifo[$], bit [15:0] udp_length_data, bit [15:0] udp_checksum_data, bit [15:0] ip_length_data, bit last_packet);
         int fifo_size = ref_fifo.size();
-    
+
+        hdr_tvalid <= 1'b1;
+        udp_length <= udp_length_data;
+        udp_checksum <= udp_checksum_data;
+        ip_length <= ip_length_data;
+
         // Begin driving data
         while (fifo_size > 0) begin
             m_tx_axis_tvalid <= 1'b1;
@@ -43,6 +53,8 @@ interface eth_mac_wr_if
     
             fifo_size--;
         end
+
+        hdr_tvalid <= 1'b0;
     
         // After the final valid transfer
         if (last_packet) begin

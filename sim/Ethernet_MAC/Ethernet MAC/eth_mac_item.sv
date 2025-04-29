@@ -7,6 +7,10 @@ class eth_mac_item extends uvm_sequence_item;
     bit[7:0] tx_data[$];
     bit[7:0] rx_data[$];
 
+    bit [15:0] udp_length;
+    bit [15:0] udp_checksum;
+    bit [15:0] ip_length;
+
     function new(string name = "eth_mac_item");
         super.new(name);
     endfunction : new
