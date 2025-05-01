@@ -1,7 +1,6 @@
 `include "udp_if.sv"
 `include "udp_pkg.sv"
 
-
 module udp_tx_tb;
 
 import udp_pkg::*;

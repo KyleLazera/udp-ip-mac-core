@@ -30,7 +30,6 @@
     input wire s_udp_hdr_tvalid,
     input wire [15:0] s_udp_src_port,
     input wire [15:0] s_udp_dst_port,
-    input wire [15:0] s_udp_hdr_checksum,
 
     /* Input AXI-Stream Payload */
     input wire [AXI_DATA_WIDTH-1:0] s_axis_tdata,
@@ -45,7 +44,8 @@
     input wire m_axis_trdy
  );
 
-localparam UDP_HDR_LENGTH = 16'h8;
+localparam logic [15:0] UDP_CHECKSUM_PLACEHOLDER = 16'hDEAD;
+localparam logic [15:0] UDP_LENGTH_PLACHOLDER = 16'hBEEF;
 
 /* State Declarations */
 
@@ -67,11 +67,6 @@ reg udp_hdr_tvalid_reg = 1'b0;
 reg s_udp_hdr_trdy_reg = 1'b0; 
 reg [15:0] udp_hdr_src_port_reg = 16'b0;
 reg [15:0] udp_hdr_dst_port_reg = 16'b0;
-reg [15:0] udp_hdr_checksum_reg = 16'b0;
-reg [15:0] udp_hdr_length;
-
-// UDP Header length is always 8 bytes
-assign udp_hdr_length = UDP_HDR_LENGTH;
 
 always @(posedge i_clk) begin
     if(!i_reset_n) begin
@@ -100,7 +95,6 @@ always @(posedge i_clk) begin
                     // Latch the UDP Input Header Data
                     udp_hdr_src_port_reg <= s_udp_src_port;
                     udp_hdr_dst_port_reg <= s_udp_dst_port;
-                    udp_hdr_checksum_reg <= s_udp_hdr_checksum;
                     s_udp_hdr_trdy_reg <= 1'b0;
                     
                     // Set the first byte to transmit as the source port
@@ -124,11 +118,11 @@ always @(posedge i_clk) begin
                         5'd1: axis_tdata_reg <= udp_hdr_src_port_reg[7:0];
                         5'd2: axis_tdata_reg <= udp_hdr_dst_port_reg[15:8];
                         5'd3: axis_tdata_reg <= udp_hdr_dst_port_reg[7:0];
-                        5'd4: axis_tdata_reg <= udp_hdr_length[15:8];
-                        5'd5: axis_tdata_reg <= udp_hdr_length[7:0];
-                        5'd6: axis_tdata_reg <= udp_hdr_checksum_reg[15:8];
+                        5'd4: axis_tdata_reg <= UDP_LENGTH_PLACHOLDER[15:8];
+                        5'd5: axis_tdata_reg <= UDP_LENGTH_PLACHOLDER[7:0];
+                        5'd6: axis_tdata_reg <= UDP_CHECKSUM_PLACEHOLDER[15:8];
                         5'd7: begin
-                            axis_tdata_reg <= udp_hdr_checksum_reg[7:0];
+                            axis_tdata_reg <= UDP_CHECKSUM_PLACEHOLDER[7:0];
                             axis_trdy_reg <= 1'b1;
 
                             state <= UDP_PAYLOAD;

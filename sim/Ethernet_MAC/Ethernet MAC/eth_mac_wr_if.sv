@@ -36,6 +36,10 @@ interface eth_mac_wr_if
     
     task tx_fifo_drive_data(bit [7:0] ref_fifo[$], bit [15:0] udp_length_data, bit [15:0] udp_checksum_data, bit [15:0] ip_length_data, bit last_packet);
         int fifo_size = ref_fifo.size();
+        //todo: Randomize these values
+        bit [15:0] udp_length_data = 16'hDEAD;
+        bit [15:0] udp_checksum_data = 16'hBEEF;
+        bit [15:0] ip_length_data = 16'hCAFE;
 
         hdr_tvalid <= 1'b1;
         udp_length <= udp_length_data;
