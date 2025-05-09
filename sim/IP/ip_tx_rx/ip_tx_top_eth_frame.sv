@@ -1,4 +1,4 @@
-`include "../common/ip_if.sv"
+`include "../common/ip_tx_if.sv"
 `include "ip_eth_frame.sv"
 
 module ip_tx_top_eth_frame;
@@ -16,7 +16,7 @@ ip_pckt_t tx_ip_pckt, rx_ip_pckt;
 ip_eth_frame ip_tx_inst;
 
 // AXI Stream Interface Declarations
-ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
+ip_tx_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
 
 always #5 clk_100 = ~clk_100;
 
@@ -41,8 +41,7 @@ ipv4_tx #(
    .s_tx_axis_trdy(ip_hdr_if.axi_tx.s_axis_trdy), 
    .s_ip_tx_hdr_type(ip_hdr_if.ip_tx_hdr_type),                  
    .s_ip_tx_hdr_valid(ip_hdr_if.ip_tx_hdr_valid),                  
-   .s_ip_tx_hdr_rdy(ip_hdr_if.ip_tx_hdr_rdy),                     
-   .s_ip_tx_total_length(ip_hdr_if.ip_tx_total_length),              
+   .s_ip_tx_hdr_rdy(ip_hdr_if.ip_tx_hdr_rdy),                                 
    .s_ip_tx_protocol(ip_hdr_if.ip_tx_protocol),                 
    .s_ip_tx_src_ip_addr(ip_hdr_if.ip_tx_src_ip_addr),             
    .s_ip_tx_dst_ip_addr(ip_hdr_if.ip_tx_dst_ip_addr), 
@@ -53,6 +52,9 @@ ipv4_tx #(
    .m_tx_axis_tvalid(ip_hdr_if.axi_rx.m_axis_tvalid),                
    .m_tx_axis_tlast(ip_hdr_if.axi_rx.m_axis_tlast),                  
    .m_tx_axis_trdy(ip_hdr_if.axi_rx.m_axis_trdy),
+   .m_ip_tx_hdr_tvalid(ip_hdr_if.m_ip_tx_hdr_tvalid),
+   .m_ip_tx_total_length(ip_hdr_if.m_ip_tx_total_length),
+   .m_ip_tx_checksum(ip_hdr_if.m_ip_tx_checksum),
    .m_eth_hdr_trdy(ip_hdr_if.eth_rx_hdr_trdy),
    .m_eth_hdr_tvalid(ip_hdr_if.eth_rx_hdr_tvalid),
    .m_eth_src_mac_addr(ip_hdr_if.eth_rx_src_mac_addr),                                
@@ -84,11 +86,15 @@ initial begin
         end
         begin 
             forever begin
-                ip_hdr_if.axi_rx.axis_read(rx_ip_pckt.payload);
+                ip_hdr_if.read_encap_data(rx_ip_pckt);
                 ->ip_tx_inst.rx_pckt_evt;              
             end
         end
     join_any
+
+    $display("///////////////////////////////////////////");
+    $display("Test Passed!");
+    $display("///////////////////////////////////////////");
 
     #1000;
 

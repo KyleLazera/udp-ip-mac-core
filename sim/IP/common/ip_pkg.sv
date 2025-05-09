@@ -131,8 +131,13 @@ class ip_agent;
         
         //Clear the data queues 
         tx_pckt.payload.delete();
+
+        // Generate and populate the IP/Ethernet Header for the packet
         generate_header_data(tx_pckt, payload_size);
+
+        // Randomize payload values
         generate_payload(tx_pckt.payload, payload_size);
+
     endfunction : generate_packet
 
     /* Takes IP header and payload and forms an IP packet */
@@ -161,13 +166,62 @@ class ip_agent;
 
     endfunction : encapsulate_ip_packet
 
+    function void de_encapsulate_eth_packet(ref ip_pckt_t eth_pckt);
+        logic [7:0] rx_byte;
+
+        // Isolate each ethernet header field
+        for(int i = 0; i < 14; i++) begin
+
+            rx_byte = eth_pckt.payload.pop_front();
+
+            if(i < 6)
+                eth_pckt.eth_hdr.dst_mac_addr = {eth_pckt.eth_hdr.dst_mac_addr[39:0], rx_byte};
+            else if(i < 12)
+                eth_pckt.eth_hdr.src_mac_addr = {eth_pckt.eth_hdr.src_mac_addr[39:0], rx_byte};
+            else
+                eth_pckt.eth_hdr.eth_type = {eth_pckt.eth_hdr.eth_type[7:0], rx_byte};
+        end
+    endfunction : de_encapsulate_eth_packet
+
     /* De-Encapsulate an IP Frame to isolate the payload*/ 
     function void de_encapsulate_ip_packet(ref ip_pckt_t ip_pckt);
-        //Pop off the front 20 bytes of the IP Packet
-        for(int i = 0; i < 20; i++)
-            ip_pckt.payload.pop_front(); 
+        logic[7:0] tx_byte;
 
-    endfunction : de_encapsulate_ip_packet 
+        // Iterate through the payload and isolate each IP header
+        for(int i = 0; i < 20; i++) begin
+
+            tx_byte = ip_pckt.payload.pop_front();
+
+            case(i)
+                0: begin
+                    ip_pckt.ip_hdr.version = tx_byte[7:4];
+                    ip_pckt.ip_hdr.length = tx_byte[3:0];
+                end
+                1: ip_pckt.ip_hdr.tos = tx_byte;
+                //2: ip_pckt.ip_hdr.total_length[15:8] = tx_byte;
+                //3: ip_pckt.ip_hdr.total_length[7:0] = tx_byte;
+                4: ip_pckt.ip_hdr.ip_hdr_id[15:8] = tx_byte;
+                5: ip_pckt.ip_hdr.ip_hdr_id[7:0] = tx_byte;
+                6: begin
+                    ip_pckt.ip_hdr.ip_hdr_flags = tx_byte[7:5];
+                    ip_pckt.ip_hdr.ip_hdr_frag_offset[12:8] = tx_byte[4:0];
+                end
+                7: ip_pckt.ip_hdr.ip_hdr_frag_offset[7:0] = tx_byte;
+                8: ip_pckt.ip_hdr.ip_hdr_ttl = tx_byte;
+                9: ip_pckt.ip_hdr.protocol = tx_byte;
+                //10: ip_pckt.ip_hdr.ip_hdr_checksum[15:8] = tx_byte;
+                //11: ip_pckt.ip_hdr.ip_hdr_checksum[7:0] = tx_byte;
+                12: ip_pckt.ip_hdr.src_ip_addr[31:24] = tx_byte;
+                13: ip_pckt.ip_hdr.src_ip_addr[23:16] = tx_byte;
+                14: ip_pckt.ip_hdr.src_ip_addr[15:8] = tx_byte;
+                15: ip_pckt.ip_hdr.src_ip_addr[7:0] = tx_byte;
+                16: ip_pckt.ip_hdr.dst_ip_addr[31:24] = tx_byte;
+                17: ip_pckt.ip_hdr.dst_ip_addr[23:16] = tx_byte;
+                18: ip_pckt.ip_hdr.dst_ip_addr[15:8] = tx_byte;
+                19: ip_pckt.ip_hdr.dst_ip_addr[7:0] = tx_byte;
+            endcase
+        end
+    endfunction : de_encapsulate_ip_packet
 
     /* Used to set configuration struct values based on probability to test edge cases */
     function void set_config();

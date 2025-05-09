@@ -5,6 +5,8 @@
 module ethernet_mac_fifo
 #(
     parameter FLOW_CONTROL = 1, 
+    parameter UDP_HEADER_INSERTION = 1,
+    parameter IP_HEADER_INSERTION = 1,
     /* These Parameters are not meant to be adjusted */
     parameter FIFO_DATA_WIDTH = 9,
     parameter AXI_DATA_WIDTH = 8,
@@ -37,6 +39,7 @@ module ethernet_mac_fifo
     input wire [15:0] s_udp_hdr_length,                         // Calculated length of UDP packet
     input wire [15:0] s_udp_hdr_checksum,                       // Calculated UDP checksum
     input wire [15:0] s_ip_hdr_length,                          // Calculated Length of IP Packet
+    input wire [15:0] s_ip_hdr_checksum,                        // Calculated IP Checksum Value
 
     /* Rx FIFO - AXI Interface*/
     output wire [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata,            // Rx data receieved from ethernet MAC   
@@ -70,6 +73,8 @@ Ethernet MAC Instantiation
 *****************************************************************/
 
 ethernet_mac#(
+    .UDP_HEADER_INSERTION(UDP_HEADER_INSERTION),
+    .IP_HEADER_INSERTION(IP_HEADER_INSERTION),
     .FIFO_DATA_WIDTH(8), 
     .RGMII_DATA_WIDTH(RGMII_DATA_WIDTH),
     .FLOW_CONTROL(FLOW_CONTROL)
@@ -95,6 +100,7 @@ tri_speed_eth_mac (
     .s_udp_hdr_length(s_udp_hdr_length),                         
     .s_udp_hdr_checksum(s_udp_hdr_checksum),                       
     .s_ip_hdr_length(s_ip_hdr_length),  
+    .s_ip_hdr_checksum(s_ip_hdr_checksum),
     //RX FIFO - AXI Interface
     .rgmii_rxc(rx_clk),
     .m_rx_axis_tdata(rx_mac_data),
@@ -160,7 +166,6 @@ axi_async_fifo #(
     .s_axis_tuser(1'b0),
     .s_axis_trdy(m_tx_axis_trdy)    
 );
-
 
 endmodule : ethernet_mac_fifo
 

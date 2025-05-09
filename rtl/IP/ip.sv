@@ -13,24 +13,25 @@
  module ip
 #(
     parameter AXI_STREAM_WIDTH = 8,
-    parameter ETH_FRAME = 1
+    parameter ETH_FRAME = 1                     // Determines whether the output of this module (on TX Data Path) is
+                                                // in the formatting on an ethernet frame (prepended with SRC, DST MAC
+                                                // addr & ethernet type) or not
 )(
     input wire i_clk,
     input wire i_reset_n,
 
     /******************************************* TX To Ethernet MAC *************************************/
 
-    /* IP Payload Input - Used for Tx*/
+    /* IP Input - Used for Tx*/
    input wire s_ip_tx_hdr_valid,                                        // Indicates the header inputs are valid
    output wire s_ip_tx_hdr_rdy,                                         // IP tx is ready for next header inputs
    input wire [7:0] s_ip_tx_hdr_type,                                   // Type of Service Field
-   input wire [15:0] s_ip_tx_total_length,                              // Total length of payload
    input wire [7:0] s_ip_tx_protocol,                                   // L4 protocol (UDP/TCP)
    input wire [31:0] s_ip_tx_src_ip_addr,                               // Source IP address
    input wire [31:0] s_ip_tx_dst_ip_addr,                               // Destination IP address
-   input wire [47:0] s_eth_tx_src_mac_addr,                             //Eth source mac address
-   input wire [47:0] s_eth_tx_dst_mac_addr,                             //Eth destination mac address   
-   input wire [15:0] s_eth_tx_type,                                     //Eth type  
+   input wire [47:0] s_eth_tx_src_mac_addr,                             // Eth source mac address
+   input wire [47:0] s_eth_tx_dst_mac_addr,                             // Eth destination mac address   
+   input wire [15:0] s_eth_tx_type,                                     // Eth type  
 
    /* AXI Stream Payload Inputs */
    input wire [AXI_STREAM_WIDTH-1:0] s_tx_axis_tdata,                   // Raw Payload data via AXI Stream
@@ -50,6 +51,11 @@
    output wire m_tx_axis_tvalid,                                        // valid signal for tdata
    output wire m_tx_axis_tlast,                                         // last byte of IP package
    input wire m_tx_axis_trdy,                                           // Back pressure from downstream module indciating it is ready
+
+   /* IP Header fields computed in parallel */
+   output wire m_ip_tx_hdr_tvalid,                                      // Indicates the ip total length & checsum fields are valid
+   output wire [15:0] m_ip_tx_total_length,
+   output wire [15:0] m_ip_tx_checksum,
 
     /******************************************* RX From Ethernet MAC *************************************/
 
@@ -116,8 +122,7 @@ ip_tx(
     /* Input IP/Ethernet Header Fields */
     .s_ip_tx_hdr_valid(s_ip_tx_hdr_valid),                     
     .s_ip_tx_hdr_rdy(s_ip_tx_hdr_rdy),                      
-    .s_ip_tx_hdr_type(s_ip_tx_hdr_type),                
-    .s_ip_tx_total_length(s_ip_tx_total_length),           
+    .s_ip_tx_hdr_type(s_ip_tx_hdr_type),                      
     .s_ip_tx_protocol(s_ip_tx_protocol),                
     .s_ip_tx_src_ip_addr(s_ip_tx_src_ip_addr),            
     .s_ip_tx_dst_ip_addr(s_ip_tx_dst_ip_addr),            
@@ -130,6 +135,11 @@ ip_tx(
     .m_tx_axis_tvalid(m_tx_axis_tvalid),                     
     .m_tx_axis_tlast(m_tx_axis_tlast),                      
     .m_tx_axis_trdy(m_tx_axis_trdy),  
+
+    /* Total Length & Checksum Calculation */
+    .m_ip_tx_hdr_tvalid(m_ip_tx_hdr_tvalid),                                     
+    .m_ip_tx_total_length(m_ip_tx_total_length),
+    .m_ip_tx_checksum(m_ip_tx_checksum),
 
     /* Output ethernet header info - Only if ETH_FRAME = 0 */
     .m_eth_hdr_trdy(tx_eth_hdr_rdy),

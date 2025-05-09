@@ -171,13 +171,13 @@ class ip_stack extends eth_mac;
     endfunction : calculate_ip_checksum
 
     /* Generate data for the IP/Ethernet Header. Certain fields are kept constant */
-    protected function automatic generate_ip_header(ref pckt_t tx_pckt, int payload_size);
+    protected function automatic generate_ip_header(ref pckt_t tx_pckt, input int payload_size);
 
         // Generate the IP Header and checksum
         tx_pckt.ip_hdr.version        = 4'd4; 
         tx_pckt.ip_hdr.length         = 4'd5;  
         tx_pckt.ip_hdr.tos            = 8'h00;
-        tx_pckt.ip_hdr.total_length   = payload_size + tx_pckt.ip_hdr.length*4;
+        tx_pckt.ip_hdr.total_length   = payload_size + (tx_pckt.ip_hdr.length*4);
         tx_pckt.ip_hdr.ip_hdr_id      = 0;
         tx_pckt.ip_hdr.ip_hdr_flags   = 0;
         tx_pckt.ip_hdr.ip_hdr_frag_offset= 0;
@@ -503,11 +503,26 @@ class ip_stack extends eth_mac;
 
     // This will generate an IP packet, encapsulated with ethernet headers + CRC32
     function void generate_packet(ref pckt_t tx_pckt);
-        int payload_size = $urandom_range(10, 1480); 
+        int payload_size = $urandom_range(10, 1480); //todo: Max size is 1480 
 
         // Create an IP packet that is encapsulated with ethernet mac addresses & ethernet type
         generate_payload(tx_pckt.payload, payload_size);
-        generate_ip_header(tx_pckt, payload_size);
+
+        ////////////////////////////////////////////////////////////////////////////////////
+        // Padding must be added to the ethernet payload if it is less than 60 bytes.
+        // The payload is appended with the IP Header (20 bytes) & the Ethernet Header
+        // (comprised of src MAC, dst MAC & eth type = 14 bytes). Therefore, the payload
+        // will already contain 14 + 20 = 34 bytes due to the ethernet and IP headers. 
+        // 60 - 34 = 24 bytes, therefore, to take into account the padding for the IP total
+        // length field, the payload size must be larger than or equal to 26 or else it is 
+        // set to 26.
+        ////////////////////////////////////////////////////////////////////////////////////
+        
+        if(payload_size >= 26)
+            generate_ip_header(tx_pckt, payload_size);
+        else
+            generate_ip_header(tx_pckt, 26);
+
         encap_ip_packet(tx_pckt);
 
         // Add the ethernet preamble + CRC32 to the packet

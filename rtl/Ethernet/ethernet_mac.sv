@@ -7,6 +7,8 @@
 
 module ethernet_mac
 #(
+    parameter UDP_HEADER_INSERTION = 1,
+    parameter IP_HEADER_INSERTION = 1, 
     parameter FIFO_DATA_WIDTH = 8,
     parameter RGMII_DATA_WIDTH = 4,
     parameter FLOW_CONTROL = 1
@@ -35,6 +37,7 @@ module ethernet_mac
     input wire [15:0] s_udp_hdr_length,                         // Calculated length of UDP packet
     input wire [15:0] s_udp_hdr_checksum,                       // Calculated UDP checksum
     input wire [15:0] s_ip_hdr_length,                          // Calculated Length of IP Packet
+    input wire [15:0] s_ip_hdr_checksum,
 
     /* RX FIFO Interface */
     output wire rgmii_rxc,                                      //RX clock from rgmii used to drive data to rx fifo
@@ -240,7 +243,9 @@ rgmii_phy_if rgmii_phy
 //TX MAC
 tx_mac 
 #(
-    .DATA_WIDTH(8)
+    .DATA_WIDTH(8),
+    .UDP_HEADER_INSERTION(UDP_HEADER_INSERTION),
+    .IP_HEADER_INSERTION(IP_HEADER_INSERTION)
 ) tx_mac_module
 (
     .clk(clk_125),                                 
@@ -270,7 +275,8 @@ tx_mac
     .s_hdr_tvalid(s_hdr_tvalid),                                    
     .s_udp_hdr_length(s_udp_hdr_length),                         
     .s_udp_hdr_checksum(s_udp_hdr_checksum),                       
-    .s_ip_hdr_length(s_ip_hdr_length),                                          
+    .s_ip_hdr_length(s_ip_hdr_length),   
+    .s_ip_hdr_checksum(s_ip_hdr_checksum),                                       
 
     // Control signals(s)                            
     .mii_select(mii_sel),

@@ -47,7 +47,11 @@
 module ipv4_tx
 #(
    parameter AXI_STREAM_WIDTH = 8,
-   parameter ETH_FRAME = 1                                              // Encapsulates IP frame within an ethernet frame
+   parameter ETH_FRAME = 1,                                             // Encapsulates IP frame within an ethernet frame
+   parameter STREAM_PAYLOAD = 1                                         // When STREAM_PAYLOAD=1, this indicates the payload is begin streamed from an
+                                                                        // up-stream module rather than being buffered by teh up-stream module. This means
+                                                                        // the total packet length will not be known immediately, and cannot be sent during
+                                                                        // the IP header phase along with the checksum.
 )(
    input wire i_clk,
    input wire i_reset_n,
@@ -62,7 +66,6 @@ module ipv4_tx
    input wire s_ip_tx_hdr_valid,                                        // Indicates the header inputs are valid
    output wire s_ip_tx_hdr_rdy,                                         // IP tx is ready for next header inputs
    input wire [7:0] s_ip_tx_hdr_type,                                   // Type of Service Field
-   input wire [15:0] s_ip_tx_total_length,                              // Total length of payload
    input wire [7:0] s_ip_tx_protocol,                                   // L4 protocol (UDP/TCP)
    input wire [31:0] s_ip_tx_src_ip_addr,                               // Source IP address
    input wire [31:0] s_ip_tx_dst_ip_addr,                               // Destination IP address
@@ -75,6 +78,11 @@ module ipv4_tx
    output wire m_tx_axis_tvalid,                                        // valid signal for tdata
    output wire m_tx_axis_tlast,                                         // last byte of IP package
    input wire m_tx_axis_trdy,                                           // Back pressure from downstream module indciating it is ready
+
+   /* IP Header Outputs */
+   output wire m_ip_tx_hdr_tvalid,                                      // Indicates the ip total length & checsum fields are valid
+   output wire [15:0] m_ip_tx_total_length,
+   output wire [15:0] m_ip_tx_checksum,
 
    /* Ethernet Header Outputs */
    input wire m_eth_hdr_trdy,
@@ -128,6 +136,8 @@ reg m_eth_hdr_tvalid_reg = 1'b0;
 
 /* Flag/Status Registers */
 reg hdr_latched = 1'b0;
+reg m_ip_tx_hdr_tvalid_reg = 1'b0;
+reg [15:0] pckt_cntr = 16'b0;
 reg [4:0] hdr_cntr = 5'b0;
 
 /* Checksum Calculation Logic */ 
@@ -185,7 +195,9 @@ always @(posedge i_clk) begin
 
       //Flag/Status Registers
       hdr_latched <= 1'b0;
+      m_ip_tx_hdr_tvalid_reg <= 1'b0;
       hdr_cntr <= 5'b0;
+      pckt_cntr <= 16'b0;
 
    end else begin
       // Default signals 
@@ -198,7 +210,8 @@ always @(posedge i_clk) begin
       // FSM
       case(state_reg)
          IDLE : begin
-            hdr_cntr <= 5'b0;   
+            hdr_cntr <= 5'b0;
+            pckt_cntr <= 16'b0;   
             s_ip_hdr_rdy_reg <= 1'b1;         
             m_eth_hdr_tvalid_reg <= 1'b0; 
 
@@ -209,12 +222,14 @@ always @(posedge i_clk) begin
             if(s_tx_axis_tvalid & s_ip_tx_hdr_valid & s_ip_hdr_rdy_reg) begin
                // Latch Header data
                ip_hdr_type <= s_ip_tx_hdr_type;
-               ip_hdr_total_length <= s_ip_tx_total_length;
+               //ip_hdr_total_length <= s_ip_tx_total_length;
                ip_hdr_protocol <= s_ip_tx_protocol;
                ip_hdr_src_ip_addr <= s_ip_tx_src_ip_addr;
                ip_hdr_dst_ip_addr <= s_ip_tx_dst_ip_addr;
+               
                //Initially set checksum to 0 - this is changed after it is calculated
                ip_hdr_checksum <= 16'b0;
+               m_ip_tx_hdr_tvalid_reg <= 1'b0;
                eth_type_reg <= s_eth_tx_type;
                eth_src_mac_addr_reg <= s_eth_tx_src_mac_addr;
                eth_dst_mac_addr_reg <= s_eth_tx_dst_mac_addr;
@@ -246,7 +261,6 @@ always @(posedge i_clk) begin
             if(m_tx_axis_trdy & m_tx_axis_tvalid_reg) begin
 
                hdr_cntr <= hdr_cntr + 1;
-
 
                case(hdr_cntr) 
                   4'd0: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[39:32];
@@ -282,12 +296,14 @@ always @(posedge i_clk) begin
                      checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_version, ip_hdr_length, ip_hdr_type});
                   end
                   5'd1: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_total_length[15:8];
-                     checksum_sum <= ip_checksum(checksum_sum, ip_hdr_total_length);            
+                     m_tx_axis_tdata_reg <= 8'hDE;
+                     //m_tx_axis_tdata_reg <= ip_hdr_total_length[15:8];
+                     //checksum_sum <= ip_checksum(checksum_sum, ip_hdr_total_length);            
                   end
                   5'd2: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_total_length[7:0];
-                     checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_flags, ip_hdr_frag_offset});
+                     m_tx_axis_tdata_reg <= 8'hAD;
+                     //m_tx_axis_tdata_reg <= ip_hdr_total_length[7:0];
+                     //checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_flags, ip_hdr_frag_offset});
                   end
                   5'd3: begin
                      m_tx_axis_tdata_reg <= ip_hdr_id[15:8];
@@ -314,10 +330,12 @@ always @(posedge i_clk) begin
                      ip_hdr_checksum <= ~checksum_sum;
                   end
                   5'd9: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_checksum[15:8];  
+                     m_tx_axis_tdata_reg <= 8'hBE;
+                     //m_tx_axis_tdata_reg <= ip_hdr_checksum[15:8];  
                   end 
                   5'd10: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_checksum[7:0]; 
+                     m_tx_axis_tdata_reg <= 8'hEF;
+                     //m_tx_axis_tdata_reg <= ip_hdr_checksum[7:0]; 
                   end                 
                   5'd11: begin
                      m_tx_axis_tdata_reg <= ip_hdr_src_ip_addr[31:24];                  
@@ -343,6 +361,7 @@ always @(posedge i_clk) begin
                   5'd18: begin
                      m_tx_axis_tdata_reg <= ip_hdr_dst_ip_addr[7:0]; 
                      s_tx_axis_trdy_reg <= 1'b1;
+                     pckt_cntr <= (ip_hdr_length << 2);
                      state_reg <= PAYLOAD;
                   end                                                                  
                endcase
@@ -365,8 +384,16 @@ always @(posedge i_clk) begin
                if(s_tx_axis_tlast & m_tx_axis_tvalid_reg) begin
                   s_tx_axis_trdy_reg <= 1'b0;
                   s_ip_hdr_rdy_reg <= 1'b1;
+
+                  // Output the delayed header fields
+                  ip_hdr_checksum <= ~ip_checksum(checksum_sum, (pckt_cntr+1));
+                  ip_hdr_total_length <= pckt_cntr + 1;
+                  m_ip_tx_hdr_tvalid_reg <= 1'b1;
+
                   state_reg <= IDLE;
                end
+
+               pckt_cntr <= pckt_cntr + 1;
             end   
 
             if(m_eth_hdr_trdy & m_eth_hdr_tvalid_reg) 
@@ -391,5 +418,10 @@ assign m_tx_axis_tlast = m_tx_axis_tlast_reg;
 //assign s_tx_axis_trdy = s_tx_axis_trdy_reg;
 assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy : 1'b0;
 assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
+
+/* IP Header Outputs */
+assign m_ip_tx_hdr_tvalid = m_ip_tx_hdr_tvalid_reg;
+assign m_ip_tx_total_length = ip_hdr_total_length;
+assign m_ip_tx_checksum = ip_hdr_checksum;
 
 endmodule 

@@ -279,6 +279,10 @@ reg tx_axis_ip_tvalid;
 reg tx_axis_ip_tlast;
 reg tx_axis_ip_trdy;
 
+wire ip_hdr_valid;
+wire [15:0] ip_checksum;
+wire [15:0] ip_length;
+
 // Loop back logic for the axi-stream payload data
 assign tx_axis_ip_tdata = rx_axis_ip_tdata;
 assign tx_axis_ip_tvalid = rx_axis_ip_tvalid;
@@ -309,7 +313,6 @@ ip #(.AXI_STREAM_WIDTH(8),
     .s_ip_tx_hdr_valid      (tx_ip_hdr_tvalid),
     .s_ip_tx_hdr_rdy        (tx_ip_hdr_trdy),
     .s_ip_tx_hdr_type       (8'h00),
-    .s_ip_tx_total_length   (tx_ip_total_length),
     .s_ip_tx_protocol       (IP_PROTOCL), 
     .s_ip_tx_src_ip_addr    (tx_src_ip_addr),
     .s_ip_tx_dst_ip_addr    (tx_dst_ip_addr),
@@ -335,6 +338,11 @@ ip #(.AXI_STREAM_WIDTH(8),
     .m_tx_axis_tvalid       (tx_axis_eth_tvalid),
     .m_tx_axis_tlast        (tx_axis_eth_tlast),
     .m_tx_axis_trdy         (tx_axis_eth_trdy),
+
+    // IP Header fields computed in parallel 
+    .m_ip_tx_hdr_tvalid     (ip_hdr_valid),                                     
+    .m_ip_tx_total_length   (ip_length),
+    .m_ip_tx_checksum       (ip_checksum),
 
     /* Not Used due to ETH_FRAME = 1 */
     .s_eth_hdr_valid        (),
@@ -373,7 +381,10 @@ ip #(.AXI_STREAM_WIDTH(8),
 /******** Ethernet MAC Instantiation ********/
 
 
-ethernet_mac_fifo ethernet_mac(
+ethernet_mac_fifo #(
+    .UDP_HEADER_INSERTION(0),
+    .IP_HEADER_INSERTION(1)
+) ethernet_mac (
     .i_clk(i_clk),
     .clk_125(clk_125),
     .clk90_125(clk90_125),
@@ -391,7 +402,14 @@ ethernet_mac_fifo ethernet_mac(
     .s_tx_axis_tdata(tx_axis_eth_tdata),             
     .s_tx_axis_tvalid(tx_axis_eth_tvalid),                                 
     .s_tx_axis_tlast(tx_axis_eth_tlast),                         
-    .m_tx_axis_trdy(tx_axis_eth_trdy),                                 
+    .m_tx_axis_trdy(tx_axis_eth_trdy),    
+
+    /* IP & UDP Header fields - Used for Late Insertion */
+    .s_hdr_tvalid(ip_hdr_valid),                                    
+    .s_udp_hdr_length(),                        
+    .s_udp_hdr_checksum(),                       
+    .s_ip_hdr_length(ip_length),                          
+    .s_ip_hdr_checksum(ip_checksum),                                                  
 
     /* Rx FIFO - AXI Interface*/
     .m_rx_axis_tdata(rx_axis_eth_tdata),           

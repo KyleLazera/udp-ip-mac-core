@@ -13,7 +13,13 @@
 
 module tx_mac
 #(
-    parameter DATA_WIDTH = 8
+    parameter DATA_WIDTH = 8,
+    parameter UDP_HEADER_INSERTION = 1,                     // When 1, this allows the Ethernet MAC to insert UDP header information into the 
+                                                            // UDP header. This means fields such as UDP checksum/length can be computed in parallel
+                                                            // with data stream, and can maintain low-latency of the network stack.
+    
+    parameter IP_HEADER_INSERTION = 1                       // Allows ethernet MAC to insert IP header information into the payload at the correct 
+                                                            // position.
 ) 
 (
     input wire clk, 
@@ -43,7 +49,8 @@ module tx_mac
     input wire s_hdr_tvalid,                                // Indicates the calculated header values are valid
     input wire [15:0] s_udp_hdr_length,                     // Calculated length of UDP packet
     input wire [15:0] s_udp_hdr_checksum,                   // Calculated UDP checksum
-    input wire [15:0] s_ip_hdr_length,                      // Calculated Length of IP Packet                       
+    input wire [15:0] s_ip_hdr_length,                      // Calculated Length of IP Packet 
+    input wire [15:0] s_ip_hdr_checksum,                      
     
     /* Configurations */
     input wire mii_select,                                  //Configures data rate (Double Data Rate (DDR) or Single Data Rate (SDR))    
@@ -56,8 +63,12 @@ localparam [7:0] ETH_SFD = 8'hD5;
 localparam [7:0] ETH_PAD = 8'h00;   
 localparam MIN_FRAME_WIDTH = 59;                            //46 byte minimum Payload + 12 Address Bytes + 2 Type/Length Bytes = 60 bytes  
 
-localparam IP_LENGTH_OFFSET_0 = 15;
-localparam IP_LENGTH_OFFSET_1 = 16;
+
+/* Header Location offsets - Used to Ethernet MAC insertion */
+localparam IP_LENGTH_OFFSET_0 = 16;
+localparam IP_LENGTH_OFFSET_1 = 17;
+localparam IP_CHECKSUM_OFFSET_0 = 24;
+localparam IP_CHECKSUM_OFFSET_1 = 25;
 localparam UDP_LENGTH_OFFSET_0 = 37;
 localparam UDP_LENGTH_OFFSET_1 = 38;
 localparam UDP_CHECKSUM_OFFSET_0 = 39;
@@ -96,6 +107,7 @@ wire [31:0] crc_data_out;                           //Ouput from the CRC32 modul
 reg [15:0] udp_length_reg = 16'b0;
 reg [15:0] udp_checksum_reg = 16'b0;
 reg [15:0] ip_length_reg = 16'b0;
+reg [15:0] ip_checksum_reg = 16'b0;
 
 /* CRC32 Module Instantiation */
 crc32 #(.DATA_WIDTH(8)) 
@@ -205,12 +217,21 @@ always @(posedge clk) begin
                 PREAMBLE : begin
                     rgmii_dv_reg <= 1'b1;
 
-                    // Store the valid IP and UDP header data if the valid flag is raised
-                    if(s_hdr_tvalid) begin
-                        ip_length_reg <= s_ip_hdr_length;
-                        udp_length_reg <= s_udp_hdr_length;
-                        udp_checksum_reg <= s_udp_hdr_checksum;
+                    if(UDP_HEADER_INSERTION) begin
+                        // Store the valid UDP header data if the valid flag is raised
+                        if(s_hdr_tvalid) begin
+                            udp_length_reg <= s_udp_hdr_length;
+                            udp_checksum_reg <= s_udp_hdr_checksum;
+                        end
                     end
+
+                    if(IP_HEADER_INSERTION) begin
+                        // Store the valid IP header data if the valid flag is raised
+                        if(s_hdr_tvalid) begin
+                            ip_length_reg <= s_ip_hdr_length;
+                            ip_checksum_reg <= s_ip_hdr_checksum;
+                        end
+                    end                   
 
                     //If we have recieved out 6th byte of the preamble
                     if(byte_ctr == 3'd6) begin
@@ -250,37 +271,53 @@ always @(posedge clk) begin
                         // total length and UDP checksum, the fields are computed in parallel to the 
                         // data stream and the final values are appended here prior to transmission.
                         /////////////////////////////////////////////////////////////////////////////
-                        if(pckt_size == IP_LENGTH_OFFSET_0) begin
-                            crc_in_data_reg <= ip_length_reg[15:8];
-                            tx_data_reg <= ip_length_reg[15:8];
-                        end
+
+                        if(UDP_HEADER_INSERTION) begin
+
+                            if(pckt_size == UDP_LENGTH_OFFSET_0) begin
+                                crc_in_data_reg <= udp_length_reg[15:8];
+                                tx_data_reg <= udp_length_reg[15:8];
+                            end
+
+                            if(pckt_size == UDP_LENGTH_OFFSET_1) begin
+                                crc_in_data_reg <= udp_length_reg[7:0];
+                                tx_data_reg <= udp_length_reg[7:0];
+                            end
+
+                            if(pckt_size == UDP_CHECKSUM_OFFSET_0) begin
+                                crc_in_data_reg <= udp_checksum_reg[15:8];
+                                tx_data_reg <= udp_checksum_reg[15:8];
+                            end
+
+                            if(pckt_size == UDP_CHECKSUM_OFFSET_1) begin
+                                crc_in_data_reg <= udp_checksum_reg[7:0];
+                                tx_data_reg <= udp_checksum_reg[7:0];
+                            end  
+                        end 
                         
-                        if(pckt_size == IP_LENGTH_OFFSET_1) begin
-                            crc_in_data_reg <= ip_length_reg[7:0];
-                            tx_data_reg <= ip_length_reg[7:0];
-                        end
-                        
-                        if(pckt_size == UDP_LENGTH_OFFSET_0) begin
-                            crc_in_data_reg <= udp_length_reg[15:8];
-                            tx_data_reg <= udp_length_reg[15:8];
-                        end
+                        if(IP_HEADER_INSERTION) begin
 
-                        if(pckt_size == UDP_LENGTH_OFFSET_1) begin
-                            crc_in_data_reg <= udp_length_reg[7:0];
-                            tx_data_reg <= udp_length_reg[7:0];
+                            if(pckt_size == IP_LENGTH_OFFSET_0) begin
+                                crc_in_data_reg <= ip_length_reg[15:8];
+                                tx_data_reg <= ip_length_reg[15:8];
+                            end
+
+                            if(pckt_size == IP_LENGTH_OFFSET_1) begin
+                                crc_in_data_reg <= ip_length_reg[7:0];
+                                tx_data_reg <= ip_length_reg[7:0];
+                            end
+
+                            if(pckt_size == IP_CHECKSUM_OFFSET_0) begin
+                                crc_in_data_reg <= ip_checksum_reg[15:8];
+                                tx_data_reg <= ip_checksum_reg[15:8];
+                            end
+
+                            if(pckt_size == IP_CHECKSUM_OFFSET_1) begin
+                                crc_in_data_reg <= ip_checksum_reg[7:0];
+                                tx_data_reg <= ip_checksum_reg[7:0];
+                            end                         
                         end
-
-                        if(pckt_size == UDP_CHECKSUM_OFFSET_0) begin
-                            crc_in_data_reg <= udp_checksum_reg[15:8];
-                            tx_data_reg <= udp_checksum_reg[15:8];
-                        end
-
-                        if(pckt_size == UDP_CHECKSUM_OFFSET_1) begin
-                            crc_in_data_reg <= udp_checksum_reg[7:0];
-                            tx_data_reg <= udp_checksum_reg[7:0];
-                        end      
-
-                    end
+                    end 
 
                     //If the last beat has arrived OR there is no more valid data in the FIFO
                     if(s_tx_axis_tlast) begin
