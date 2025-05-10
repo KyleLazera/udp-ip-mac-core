@@ -34,10 +34,20 @@ typedef struct {
   logic [31:0]         dst_ip_addr;
 } ip_hdr_t;
 
+// UDP Header Data Structure
+typedef struct{
+    logic [15:0] src_port;
+    logic [15:0] dst_port;
+    logic [15:0] udp_length;
+    logic [15:0] udp_checksum;
+    bit [7:0] udp_payload[$];
+}udp_hdr_t;
+
 // Network Package Data Structure 
 typedef struct{
     eth_hdr_t   eth_hdr;
     ip_hdr_t    ip_hdr;
+    udp_hdr_t   udp_hdr;
     bit [7:0]   payload[$];
 } pckt_t;
 
@@ -323,14 +333,10 @@ class ip_stack extends eth_mac;
         end
 
         tx_pckt.eth_hdr.src_mac_addr = tx_src_mac_addr;
-        //$display("TX SRC MAC ADDR: %0h", tx_pckt.eth_hdr.src_mac_addr);
         tx_pckt.eth_hdr.dst_mac_addr = tx_dst_mac_addr;
-        //$display("TX DST MAC ADDR: %0h", tx_pckt.eth_hdr.dst_mac_addr);
 
         rx_pckt.eth_hdr.src_mac_addr = rx_src_mac_addr;
-        //$display("RX SRC MAC ADDR: %0h", rx_pckt.eth_hdr.src_mac_addr);
         rx_pckt.eth_hdr.dst_mac_addr = rx_dst_mac_addr;
-        //$display("RX DST MAC ADDR: %0h", rx_pckt.eth_hdr.dst_mac_addr);
 
         // Isolate the Ethernet Type
         repeat(2) begin
@@ -502,8 +508,8 @@ class ip_stack extends eth_mac;
     endfunction : de_encap_ip
 
     // This will generate an IP packet, encapsulated with ethernet headers + CRC32
-    function void generate_packet(ref pckt_t tx_pckt);
-        int payload_size = $urandom_range(10, 1480); //todo: Max size is 1480 
+    virtual function void generate_packet(ref pckt_t tx_pckt);
+        int payload_size = $urandom_range(10, 1480);
 
         // Create an IP packet that is encapsulated with ethernet mac addresses & ethernet type
         generate_payload(tx_pckt.payload, payload_size);
@@ -530,7 +536,7 @@ class ip_stack extends eth_mac;
 
     endfunction : generate_packet
 
-    function void check_data(pckt_t tx_pckt, pckt_t rx_pckt);
+    virtual function void check_data(pckt_t tx_pckt, pckt_t rx_pckt);
 
         de_encap_ethernet(tx_pckt, rx_pckt);
         de_encap_ip(tx_pckt, rx_pckt);
@@ -606,5 +612,293 @@ class ip_stack extends eth_mac;
     endfunction : check_data
 
 endclass : ip_stack
+
+// L4 UDP class that inherits & builds on IP stack (L3)
+class udp_stack extends ip_stack;
+
+    /* Used to calculate the UDP checksumm based on header fields and payload */
+    protected function logic [15:0] calc_udp_checksum(pckt_t tx_pckt);
+        int payload_size = tx_pckt.payload.size();
+        logic [15:0] hdr_words [0:7];
+        logic [16:0] sum;
+        logic [7:0] reversed_payload[$];
+
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        // Once the payload is generated, it is "flipped" by the ethernet MAC class. The most significant
+        // byte will become the least signficiant and vice versa. This is because ethernet is a big endian
+        // protocol and sends it this way. To ensure the checksum is correctly calculated, the payload has 
+        // to be flipped to match this orientation.
+        ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+        for (int i = tx_pckt.payload.size() - 1; i >= 0; i--) begin
+            reversed_payload.push_back(tx_pckt.payload[i]);
+        end
+
+        //Separate the IP pseudo-header + UDP Header into 16 bit fields
+        hdr_words[0] = tx_pckt.ip_hdr.dst_ip_addr[31:16];
+        hdr_words[1] = tx_pckt.ip_hdr.dst_ip_addr[15:0];
+        hdr_words[2] = tx_pckt.ip_hdr.src_ip_addr[31:16];
+        hdr_words[3] = tx_pckt.ip_hdr.src_ip_addr[15:0];
+        hdr_words[4] = {8'h00, tx_pckt.ip_hdr.protocol};
+        hdr_words[5] = tx_pckt.udp_hdr.dst_port;
+        hdr_words[6] = tx_pckt.udp_hdr.src_port;
+        hdr_words[7] = tx_pckt.udp_hdr.udp_length;
+
+        // Calculate one's complement sum for the header words
+        sum = 0;
+        for (int i = 0; i < 8; i++) begin
+            sum += hdr_words[i];
+            if (sum > 16'hFFFF)
+                sum = (sum & 16'hFFFF) + 1; 
+        end 
+
+        // Sum payload words
+        for (int i = 0; i < payload_size; i += 2) begin
+            logic [15:0] word;      
+            
+            // If the size of teh payload is odd, padd the last word with 8'h00
+            if (i + 1 < payload_size)
+                word = {reversed_payload[i], reversed_payload[i+1]};
+            else
+                word = {reversed_payload[i], 8'h00};     
+            
+            sum += word;
+            if (sum > 16'hFFFF)
+                sum = (sum & 16'hFFFF) + 1;
+        end
+
+        calc_udp_checksum = ~sum;
+
+    endfunction  : calc_udp_checksum
+
+    /* Generate the UDP Header Values */
+    protected function void generate_udp_header(ref pckt_t tx_pckt, input int payload_size);
+        tx_pckt.udp_hdr.src_port = $urandom();
+        tx_pckt.udp_hdr.dst_port = $urandom();
+        tx_pckt.udp_hdr.udp_length = payload_size + 8; // UDP Header size in bytes is 8
+        tx_pckt.udp_hdr.udp_checksum = calc_udp_checksum(tx_pckt);
+    endfunction : generate_udp_header
+
+    protected function void encap_udp_header(ref pckt_t tx_pckt);
+        logic [63:0] udp_hdr;
+
+        udp_hdr = {
+            tx_pckt.udp_hdr.src_port,
+            tx_pckt.udp_hdr.dst_port,
+            tx_pckt.udp_hdr.udp_length,
+            tx_pckt.udp_hdr.udp_checksum
+        };
+
+        // Append UDP header to payload
+        for(int i = 0; i < 8; i++) begin
+            tx_pckt.payload.push_back(udp_hdr[((i+1)*8)-1 -: 8]); 
+        end
+
+    endfunction : encap_udp_header
+
+    /* Generate a UDP/IP/Ethernet Packet to transmit via RGMII */
+    function void generate_packet(ref pckt_t tx_pckt);
+        int payload_size = $urandom_range(10, 1472); 
+        $display("Payload Size: %0d", payload_size);
+
+        // Create an IP packet that is encapsulated with ethernet mac addresses & ethernet type
+        generate_payload(tx_pckt.payload, payload_size);
+
+        ////////////////////////////////////////////////////////////////////////////////////
+        // Padding must be added to the ethernet payload if it is less than 60 bytes.
+        // The payload is appended with the IP Header (20 bytes), the Ethernet Header
+        // (comprised of src MAC, dst MAC & eth type = 14 bytes) & the UDP header
+        // which is 8 bytes. Therefore, the payload will already contain 14 + 20 + 8 = 42 
+        // bytes due to the ethernet, IP  & UDP headers. 60 - 42 = 18 bytes, therefore, 
+        // if there is at least 18 bytes of data in the payload, no padding is needed. If the
+        // randomized payload is less than 18, then we set the variable "payload_size" to 18 anyway
+        // to ensure the calcualted UDP & IP length take into account the padding.
+        ////////////////////////////////////////////////////////////////////////////////////
+        
+        // Generate the IP Header
+        if(payload_size >= 18)
+            generate_ip_header(tx_pckt, (payload_size + 8));
+        else
+            generate_ip_header(tx_pckt, (18 + 8));
+
+        // Generate the UDP Header
+        if(payload_size >= 18)
+            generate_udp_header(tx_pckt, payload_size);
+        else 
+            generate_udp_header(tx_pckt, 18);
+
+        // Encapsulate the Payload with UDP Header
+        encap_udp_header(tx_pckt);
+
+        // Encapsulate the payload with IP headers
+        encap_ip_packet(tx_pckt);
+
+        // Add the ethernet preamble + CRC32 to the packet & flip the endianess
+        encapsulate_data(tx_pckt.payload);
+
+    endfunction : generate_packet
+
+    // De-encapsulate the UDP Header from the Payload and store it in the data structure fields for comparison
+    protected function void de_encap_udp(ref pckt_t tx_pckt, ref pckt_t rx_pckt);
+
+        // Remove & store the source port from each payload  
+        repeat(2) begin
+            logic [7:0] tx_byte, rx_byte;
+
+            tx_byte = tx_pckt.payload.pop_front();
+            rx_byte = rx_pckt.payload.pop_front();
+
+            tx_pckt.udp_hdr.src_port = {tx_pckt.udp_hdr.src_port[7:0], tx_byte};
+            rx_pckt.udp_hdr.src_port = {rx_pckt.udp_hdr.src_port[7:0], rx_byte};
+        end      
+
+        // Remove & store the destination port from each payload  
+        repeat(2) begin
+            logic [7:0] tx_byte, rx_byte;
+
+            tx_byte = tx_pckt.payload.pop_front();
+            rx_byte = rx_pckt.payload.pop_front();
+
+            tx_pckt.udp_hdr.dst_port = {tx_pckt.udp_hdr.dst_port[7:0], tx_byte};
+            rx_pckt.udp_hdr.dst_port = {rx_pckt.udp_hdr.dst_port[7:0], rx_byte};
+        end  
+
+        // Remove & store the UDP Length field
+        repeat(2) begin
+            logic [7:0] tx_byte, rx_byte;
+
+            tx_byte = tx_pckt.payload.pop_front();
+            rx_byte = rx_pckt.payload.pop_front();
+
+            tx_pckt.udp_hdr.udp_length = {tx_pckt.udp_hdr.udp_length[7:0], tx_byte};
+            rx_pckt.udp_hdr.udp_length = {rx_pckt.udp_hdr.udp_length[7:0], rx_byte};
+        end  
+
+        // Compare the lengths, since this is a loop back test, both lengths should be exactly the same
+        assert(rx_pckt.udp_hdr.udp_length == tx_pckt.udp_hdr.udp_length)
+            else begin
+                $display("Rx UDP Length %0d != Tx UDP Length %0d", rx_pckt.udp_hdr.udp_length, tx_pckt.udp_hdr.udp_length);
+                $finish;
+            end
+
+        // Remove & store the UDP Checksum field
+        repeat(2) begin
+            logic [7:0] tx_byte, rx_byte;
+
+            tx_byte = tx_pckt.payload.pop_front();
+            rx_byte = rx_pckt.payload.pop_front();
+
+            tx_pckt.udp_hdr.udp_checksum = {tx_pckt.udp_hdr.udp_checksum[7:0], tx_byte};
+            rx_pckt.udp_hdr.udp_checksum = {rx_pckt.udp_hdr.udp_checksum[7:0], rx_byte};
+        end  
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Compare the lengths, since this is a loop back test, the packets should be identifcal with just the source and destination
+        // ports flipped. Because teh checksum is calculated using 1's complement addition, the order with which the 16 bit words are
+        // input is therefore irrelevant to the output checksum, so teh checksum should be the same for both teh rx and tx packets.
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        assert(rx_pckt.udp_hdr.udp_checksum == tx_pckt.udp_hdr.udp_checksum)
+            else begin
+                $display("Rx UDP Checksum %0h != Tx UDP Checksum %0h", rx_pckt.udp_hdr.udp_checksum, tx_pckt.udp_hdr.udp_checksum);
+                $finish;
+            end   
+
+    endfunction : de_encap_udp
+
+    function void check_data(pckt_t tx_pckt, pckt_t rx_pckt);
+
+        de_encap_ethernet(tx_pckt, rx_pckt);
+        de_encap_ip(tx_pckt, rx_pckt);
+        de_encap_udp(tx_pckt, rx_pckt);
+
+        //Check the payload size
+        assert(tx_pckt.payload.size() == rx_pckt.payload.size()) $display("TX Packet Size  %0d == RX Packet Size %0d MATCH", tx_pckt.payload.size(), rx_pckt.payload.size());
+        else begin
+            $display("TX Packet Size  %0d != RX Packet Size %0d MISMATCH", tx_pckt.payload.size(), rx_pckt.payload.size());
+            $finish;
+        end
+
+        ///////////////////////////////////////////////////////////////////////
+        // Check the Ethernet Header Matches. Due to the loopback, the src MAC 
+        // for the tx packet should be equivelent to the dst MAC for rx packet 
+        // and vice versa. The ethernet type should be equivelent for both.
+        ///////////////////////////////////////////////////////////////////////
+
+        assert(tx_pckt.eth_hdr.dst_mac_addr == rx_pckt.eth_hdr.src_mac_addr) 
+            else begin
+                $display("Dst MAC for TX packet: %0h != Src MAC for RX packet: %0h MISMATCH", tx_pckt.eth_hdr.dst_mac_addr, rx_pckt.eth_hdr.src_mac_addr);
+                $finish;
+            end
+
+        assert(tx_pckt.eth_hdr.src_mac_addr == rx_pckt.eth_hdr.dst_mac_addr) 
+            else begin
+                $display("Src MAC for TX packet: %0h != Dst MAC for RX packet: %0h MISMATCH", tx_pckt.eth_hdr.src_mac_addr, rx_pckt.eth_hdr.dst_mac_addr);
+                $finish;
+            end
+
+        assert(tx_pckt.eth_hdr.eth_type == rx_pckt.eth_hdr.eth_type) 
+            else begin
+                $display("Eth Type for TX packet: %0h != Eth Type for RX packet: %0h MISMATCH", tx_pckt.eth_hdr.eth_type, rx_pckt.eth_hdr.eth_type);
+                $finish;
+            end
+
+        ///////////////////////////////////////////////////////////////////////
+        // Check each field of the IP header. All fields should be equivelent 
+        // except for the src IP address & destination IP address. Similarly to
+        // the ethernet comparison, due to the loopback from teh top module, the 
+        // src IP from the tx packet should be equievelent to the dst IP of the 
+        // rx packet and vice versa. All the fields that are supposed to match 
+        // are checked in the de_encap_ip function as they are removed from the 
+        // payload.
+        ///////////////////////////////////////////////////////////////////////
+
+        assert(tx_pckt.ip_hdr.src_ip_addr == rx_pckt.ip_hdr.dst_ip_addr) 
+            else begin 
+                $display("SRC IP for TX packet %0h != DST IP for RX packet %0h", tx_pckt.ip_hdr.src_ip_addr, rx_pckt.ip_hdr.dst_ip_addr);
+                $finish;
+            end
+
+        assert(tx_pckt.ip_hdr.dst_ip_addr == rx_pckt.ip_hdr.src_ip_addr) 
+            else begin 
+                $display("DST IP for TX packet %0h != SRC IP for RX packet %0h", tx_pckt.ip_hdr.dst_ip_addr, rx_pckt.ip_hdr.src_ip_addr);
+                $finish;
+            end
+
+        ////////////////////////////////////////////////////////////////////////////////////
+        // Compare the dst and src ports. Due to the loopback, the destination port of the 
+        // rx packet should equal to the source port of the tx packet and vice versa.
+        ////////////////////////////////////////////////////////////////////////////////////
+
+        assert(tx_pckt.udp_hdr.dst_port == rx_pckt.udp_hdr.src_port)
+            else begin
+                $display("Tx Dst port %0d != Rx Src Port %0d", tx_pckt.udp_hdr.dst_port, rx_pckt.udp_hdr.src_port);
+                $finish;
+            end
+
+        assert(rx_pckt.udp_hdr.dst_port == tx_pckt.udp_hdr.src_port)
+            else begin
+                $display("Rx Dst port %0d != Tx Src Port %0d", rx_pckt.udp_hdr.dst_port, tx_pckt.udp_hdr.src_port);
+                $finish;
+            end
+
+        // If the ethernet fields, IP fields & UDP fields were correct, check the remainder of the payload
+        foreach(tx_pckt.payload[i]) 
+            assert(tx_pckt.payload[i] == rx_pckt.payload[i])
+            else begin
+                $display("TX Payload [%0d] %0h != RX Payload [%0d] %0h", i, tx_pckt.payload[i], i, rx_pckt.payload[i]);
+                $finish;
+            end
+
+        // Clear both payloads
+        tx_pckt.payload.delete();
+        rx_pckt.payload.delete();
+
+        // Signal the event
+        ->check_complete;
+
+    endfunction : check_data
+
+endclass : udp_stack
 
 endpackage : network_stack

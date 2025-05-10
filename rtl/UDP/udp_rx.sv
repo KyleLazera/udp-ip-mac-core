@@ -93,7 +93,7 @@ always @(posedge i_clk) begin
             IDLE: begin
                 hdr_cntr <= 4'b0;
 
-                if(m_axis_trdy & s_udp_hdr_trdy & s_axis_tvalid) begin
+                if(/*m_axis_trdy &*/ s_udp_hdr_trdy & s_axis_tvalid) begin
                     axis_trdy_reg <= 1'b1;
                     state <= UDP_HDR;
                 end
@@ -101,7 +101,9 @@ always @(posedge i_clk) begin
             UDP_HDR: begin
                 axis_trdy_reg <= 1'b1;
 
-                if(m_axis_trdy & s_axis_tvalid) begin
+                // If the down-stream module has valid data, sample this data and store the initial
+                // bytes in the UDP header registers.
+                if(s_axis_trdy & s_axis_tvalid) begin
 
                     hdr_cntr <= hdr_cntr + 1;
 
@@ -115,9 +117,15 @@ always @(posedge i_clk) begin
                         4'd6: udp_hdr_checksum_reg[15:8] <= s_axis_tdata;
                         4'd7: begin
                             udp_hdr_checksum_reg[7:0] <= s_axis_tdata;
-                            udp_hdr_tvalid_reg <= 1'b1;
+                            udp_hdr_tvalid_reg <= 1'b1; 
+                        end
+                        4'd8: begin
+                            // Latch the first payload data
+                            axis_tdata_reg <= s_axis_tdata;
+                            axis_tvalid_reg <= s_axis_tvalid;
+                            axis_tlast_reg <= s_axis_tlast;                                                                     
 
-                            //Move to teh payload state
+                            // Move to the payload state
                             state <= UDP_PAYLOAD;
                         end
                     endcase

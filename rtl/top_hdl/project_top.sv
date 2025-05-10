@@ -254,10 +254,22 @@ reg [47:0] rx_src_mac_addr;
 reg [47:0] rx_dst_mac_addr;
 reg [15:0] rx_eth_type;
 
+reg rx_udp_hdr_rdy;
+reg rx_udp_hdr_tvalid;
+reg [15:0] rx_dst_port;
+reg [15:0] rx_src_port;
+reg [15:0] rx_udp_length;
+reg [15:0] rx_udp_checksum;
+
 reg [7:0] rx_axis_ip_tdata;
 reg rx_axis_ip_tvalid;
 reg rx_axis_ip_tlast;
 reg rx_axis_ip_trdy;
+
+reg [7:0] rx_axis_udp_tdata;
+reg rx_axis_udp_tvalid;
+reg rx_axis_udp_tlast;
+reg rx_axis_udp_trdy;
 
 /* TX AXI Signals from IP Stack */
 reg [7:0] tx_axis_eth_tdata;
@@ -274,20 +286,33 @@ reg [47:0] tx_src_mac_addr;
 reg [47:0] tx_dst_mac_addr;
 reg [15:0] tx_eth_type;
 
+reg tx_udp_hdr_rdy;
+reg tx_udp_hdr_tvalid;
+reg [15:0] tx_src_port;
+reg [15:0] tx_dst_port;
+
 reg [7:0] tx_axis_ip_tdata;
 reg tx_axis_ip_tvalid;
 reg tx_axis_ip_tlast;
 reg tx_axis_ip_trdy;
 
+reg [7:0] tx_axis_udp_tdata;
+reg tx_axis_udp_tvalid;
+reg tx_axis_udp_tlast;
+reg tx_axis_udp_trdy;
+
 wire ip_hdr_valid;
+wire udp_hdr_valid;
 wire [15:0] ip_checksum;
 wire [15:0] ip_length;
+wire [15:0] udp_length;
+wire [15:0] udp_checksum;
 
-// Loop back logic for the axi-stream payload data
-assign tx_axis_ip_tdata = rx_axis_ip_tdata;
-assign tx_axis_ip_tvalid = rx_axis_ip_tvalid;
-assign tx_axis_ip_tlast = rx_axis_ip_tlast;
-assign rx_axis_ip_trdy = tx_axis_ip_trdy;
+// Loop Back Logic for Payload
+assign tx_axis_udp_tdata = rx_axis_udp_tdata;
+assign tx_axis_udp_tvalid = rx_axis_udp_tvalid;
+assign tx_axis_udp_tlast = rx_axis_udp_tlast;
+assign rx_axis_udp_trdy = tx_axis_udp_trdy;
 
 // Header Data Loop back
 always @(posedge i_clk) begin
@@ -295,11 +320,79 @@ always @(posedge i_clk) begin
     rx_ip_hdr_trdy <= tx_ip_hdr_trdy;
     tx_ip_total_length <= rx_ip_total_length;
     tx_src_ip_addr <= SRC_IP;
+    tx_dst_port <= rx_src_port;
+    tx_src_port <= rx_dst_port;
     tx_dst_ip_addr <= rx_src_ip_addr;
     tx_src_mac_addr <= SRC_MAC;
     tx_dst_mac_addr <= rx_src_mac_addr;
     tx_eth_type <= ETH_TYPE;
+    tx_udp_hdr_tvalid <= rx_udp_hdr_tvalid;
+    rx_udp_hdr_rdy <= tx_udp_hdr_rdy;
 end
+
+
+
+/******** UDP Stack Instantiation ********/
+
+udp#(.AXI_DATA_WIDTH(8),
+     .UDP_CHECKSUM(1),
+     .MAX_PAYLOAD(1472)
+) udp_stack (
+
+    .i_clk(i_clk),
+    .i_reset_n(i_reset_n),
+    
+    /*********** TX Data Path ***********/
+
+    // UDP Field Inputs
+    .s_udp_tx_hdr_trdy(tx_udp_hdr_rdy),
+    .s_udp_tx_hdr_tvalid(tx_udp_hdr_tvalid),
+    .s_udp_tx_src_port(tx_src_port),
+    .s_udp_tx_dst_port(tx_dst_port),
+
+    //IP Field Inputs
+    .s_ip_tx_src_ip_addr(tx_src_ip_addr),                               
+    .s_ip_tx_dst_ip_addr(tx_dst_ip_addr), 
+    .s_ip_tx_protocol(IP_PROTOCL),  
+
+    // AXI-Stream Payload
+    .s_tx_axis_tdata(tx_axis_udp_tdata),
+    .s_tx_axis_tvalid(tx_axis_udp_tvalid),
+    .s_tx_axis_tlast(tx_axis_udp_tlast),
+    .s_tx_axis_trdy(tx_axis_udp_trdy),
+
+    // TX Data Path Output
+    .m_udp_tx_hdr_valid(udp_hdr_valid),
+    .m_udp_tx_length(udp_length),
+    .m_udp_tx_checksum(udp_checksum),
+
+    // UDP Packet Output
+    .m_tx_axis_tdata(tx_axis_ip_tdata),
+    .m_tx_axis_tvalid(tx_axis_ip_tvalid),
+    .m_tx_axis_tlast(tx_axis_ip_tlast),
+    .m_tx_axis_trdy(tx_axis_ip_trdy),
+
+    /*********** RX Data Path ***********/
+    
+    .s_rx_axis_tdata(rx_axis_ip_tdata),
+    .s_rx_axis_tvalid(rx_axis_ip_tvalid),
+    .s_rx_axis_tlast(rx_axis_ip_tlast),
+    .s_rx_axis_trdy(rx_axis_ip_trdy),
+
+    .m_rx_axis_tdata(rx_axis_udp_tdata),
+    .m_rx_axis_tvalid(rx_axis_udp_tvalid),
+    .m_rx_axis_tlast(rx_axis_udp_tlast),
+    .m_rx_axis_trdy(rx_axis_udp_trdy),
+
+    .s_udp_rx_hdr_trdy(rx_udp_hdr_rdy),
+    .s_udp_rx_hdr_tvalid(rx_udp_hdr_tvalid),
+    .s_udp_rx_src_port(rx_src_port),
+    .s_udp_rx_dst_port(rx_dst_port),
+    .s_udp_rx_length_port(rx_udp_length),
+    .s_udp_rx_hdr_checksum(rx_udp_checksum)
+);
+
+
 
 /******** IP Stack Instantiation ********/
 
@@ -309,8 +402,10 @@ ip #(.AXI_STREAM_WIDTH(8),
     .i_clk                  (i_clk),
     .i_reset_n              (i_reset_n),
 
+    /****************** TX Data Path ******************/
+
     // TX To Ethernet MAC - IP Payload Input
-    .s_ip_tx_hdr_valid      (tx_ip_hdr_tvalid),
+    .s_ip_tx_hdr_valid      (tx_udp_hdr_tvalid),
     .s_ip_tx_hdr_rdy        (tx_ip_hdr_trdy),
     .s_ip_tx_hdr_type       (8'h00),
     .s_ip_tx_protocol       (IP_PROTOCL), 
@@ -344,6 +439,8 @@ ip #(.AXI_STREAM_WIDTH(8),
     .m_ip_tx_total_length   (ip_length),
     .m_ip_tx_checksum       (ip_checksum),
 
+    /****************** RX Data Path ******************/
+
     /* Not Used due to ETH_FRAME = 1 */
     .s_eth_hdr_valid        (),
     .s_eth_hdr_rdy          (),
@@ -358,7 +455,7 @@ ip #(.AXI_STREAM_WIDTH(8),
     .s_rx_axis_trdy         (rx_axis_eth_trdy),
 
     // De-encapsulated Frame Output
-    .m_ip_hdr_trdy          (rx_ip_hdr_trdy),
+    .m_ip_hdr_trdy          (rx_udp_hdr_rdy),
     .m_ip_hdr_tvalid        (rx_ip_hdr_tvalid),
     .m_ip_total_length      (rx_ip_total_length),
     .m_ip_rx_src_ip_addr    (rx_src_ip_addr),
@@ -382,7 +479,7 @@ ip #(.AXI_STREAM_WIDTH(8),
 
 
 ethernet_mac_fifo #(
-    .UDP_HEADER_INSERTION(0),
+    .UDP_HEADER_INSERTION(1),
     .IP_HEADER_INSERTION(1)
 ) ethernet_mac (
     .i_clk(i_clk),
@@ -405,9 +502,9 @@ ethernet_mac_fifo #(
     .m_tx_axis_trdy(tx_axis_eth_trdy),    
 
     /* IP & UDP Header fields - Used for Late Insertion */
-    .s_hdr_tvalid(ip_hdr_valid),                                    
-    .s_udp_hdr_length(),                        
-    .s_udp_hdr_checksum(),                       
+    .s_hdr_tvalid(ip_hdr_valid & udp_hdr_valid),                                    
+    .s_udp_hdr_length(udp_length),                        
+    .s_udp_hdr_checksum(udp_checksum),                       
     .s_ip_hdr_length(ip_length),                          
     .s_ip_hdr_checksum(ip_checksum),                                                  
 

@@ -36,7 +36,7 @@ module udp#(
     output wire m_tx_axis_tlast,
     input wire m_tx_axis_trdy,
 
-    /********** UDP TX Signals **********/
+    /********** UDP RX Signals **********/
 
     /* Encapsulated UDP Input Payload - From IP*/
     input wire [AXI_DATA_WIDTH-1:0] s_rx_axis_tdata,
@@ -88,6 +88,7 @@ reg [15:0] ip_protocol = 8'b0;
 reg [15:0] udp_src_port = 16'b0;
 reg [15:0] udp_dst_port = 16'b0;
 reg [15:0] udp_pckt_length = 16'b0;
+reg [15:0] udp_checksum_reg = 16'b0;
 
 // Intermediary/Control Signals
 reg [1:0] state = IDLE;
@@ -177,7 +178,8 @@ always @(posedge i_clk) begin
             FINAL_CALC: begin
                 m_udp_hdr_valid_reg <= 1'b1;
                 pckt_cntr <= {PCKT_CNTR_WIDTH{1'b0}};
-                udp_checksum_sum <= ~udp_checksum(udp_checksum_sum, udp_pckt_length);
+                udp_checksum_reg <= ~udp_checksum(udp_checksum_sum, udp_pckt_length);
+                udp_checksum_sum <= 16'b0;
                 state <= IDLE;
             end
         endcase
@@ -187,7 +189,7 @@ end
 /* Checksum Output Fields */
 assign m_udp_tx_hdr_valid = m_udp_hdr_valid_reg;
 assign m_udp_tx_length = udp_pckt_length;
-assign m_udp_tx_checksum = udp_checksum_sum;
+assign m_udp_tx_checksum = udp_checksum_reg;
 
 /* UDP TX Module */
 

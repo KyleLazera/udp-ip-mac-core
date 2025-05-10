@@ -91,7 +91,7 @@ always @(posedge i_clk) begin
                 hdr_cntr <= 4'b0;
                 s_udp_hdr_trdy_reg <= 1'b1;
 
-                if(s_udp_hdr_tvalid & s_udp_hdr_trdy_reg & s_axis_tvalid) begin
+                if(s_udp_hdr_tvalid & s_udp_hdr_trdy_reg) begin
                     // Latch the UDP Input Header Data
                     udp_hdr_src_port_reg <= s_udp_src_port;
                     udp_hdr_dst_port_reg <= s_udp_dst_port;
@@ -109,7 +109,7 @@ always @(posedge i_clk) begin
             UDP_HDR: begin
                 axis_tvalid_reg <= 1'b1;
                 // Before sending more data, make sure the downstream module is ready
-                if(m_axis_trdy) begin
+                if(m_axis_trdy & m_axis_tvalid) begin
 
                     hdr_cntr <= hdr_cntr + 1;
 

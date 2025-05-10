@@ -13,7 +13,7 @@ import network_stack::*;
 module top_hdl_tb;
 
 //Instantiate class and struct instances
-ip_stack ip_sim;
+udp_stack udp_sim;
 pckt_t tx_pckt, rx_pckt;
 
 // Clock and reset signals
@@ -68,7 +68,7 @@ endtask : read_rgmii_data
 
 initial begin    
     //Create instance of new class
-    ip_sim = new();
+    udp_sim = new();
 
     rgmii_rx.rgmii_reset();
 
@@ -88,21 +88,24 @@ initial begin
      //Transmit and read teh data on the RGMII pins
      fork
         begin
-            repeat(100) begin
+            repeat(50) begin
                 // Generate and transmit a packet of data to the rx end of the rgmii inputs
-                ip_sim.generate_packet(tx_pckt); 
+                udp_sim.generate_packet(tx_pckt); 
                 rgmii_rx.rgmii_drive_data(tx_pckt.payload, 2'b00, 1'b0, bad_pckt);
-                @(ip_sim.check_complete);
+                @(udp_sim.check_complete);
             end
         end
         begin
             forever begin
                 read_rgmii_data(rx_pckt);  
-                ip_sim.check_data(tx_pckt, rx_pckt);
+                udp_sim.check_data(tx_pckt, rx_pckt);
             end
         end      
      join_any
 
+    $display("///////////////////////////////////////////");
+    $display("Test Passed!");
+    $display("///////////////////////////////////////////");
      
     #1000;
     

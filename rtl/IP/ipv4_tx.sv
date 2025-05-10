@@ -219,7 +219,7 @@ always @(posedge i_clk) begin
             // If the up-stream module has valid payload data & valid header data, latch the hdr data,
             // latch the first byte to be output to the downstream module, & move to the next state.
             //////////////////////////////////////////////////////////////////////////////////////////
-            if(s_tx_axis_tvalid & s_ip_tx_hdr_valid & s_ip_hdr_rdy_reg) begin
+            if(/*s_tx_axis_tvalid &*/ s_ip_tx_hdr_valid & s_ip_hdr_rdy_reg) begin
                // Latch Header data
                ip_hdr_type <= s_ip_tx_hdr_type;
                //ip_hdr_total_length <= s_ip_tx_total_length;
@@ -296,14 +296,10 @@ always @(posedge i_clk) begin
                      checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_version, ip_hdr_length, ip_hdr_type});
                   end
                   5'd1: begin
-                     m_tx_axis_tdata_reg <= 8'hDE;
-                     //m_tx_axis_tdata_reg <= ip_hdr_total_length[15:8];
-                     //checksum_sum <= ip_checksum(checksum_sum, ip_hdr_total_length);            
+                     m_tx_axis_tdata_reg <= 8'hDE;         
                   end
                   5'd2: begin
                      m_tx_axis_tdata_reg <= 8'hAD;
-                     //m_tx_axis_tdata_reg <= ip_hdr_total_length[7:0];
-                     //checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_flags, ip_hdr_frag_offset});
                   end
                   5'd3: begin
                      m_tx_axis_tdata_reg <= ip_hdr_id[15:8];
@@ -330,12 +326,10 @@ always @(posedge i_clk) begin
                      ip_hdr_checksum <= ~checksum_sum;
                   end
                   5'd9: begin
-                     m_tx_axis_tdata_reg <= 8'hBE;
-                     //m_tx_axis_tdata_reg <= ip_hdr_checksum[15:8];  
+                     m_tx_axis_tdata_reg <= 8'hBE;  
                   end 
                   5'd10: begin
                      m_tx_axis_tdata_reg <= 8'hEF;
-                     //m_tx_axis_tdata_reg <= ip_hdr_checksum[7:0]; 
                   end                 
                   5'd11: begin
                      m_tx_axis_tdata_reg <= ip_hdr_src_ip_addr[31:24];                  

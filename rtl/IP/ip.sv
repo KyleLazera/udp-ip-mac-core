@@ -194,6 +194,7 @@ ip_rx(
     .m_eth_rx_src_mac_addr(m_eth_rx_src_mac_addr),
     .m_eth_rx_dst_mac_addr(m_eth_rx_dst_mac_addr),
     .m_eth_rx_type(m_eth_rx_type), 
+    
     .m_rx_axis_tdata(m_rx_axis_tdata),
     .m_rx_axis_tvalid(m_rx_axis_tvalid),
     .m_rx_axis_tlast(m_rx_axis_tlast),

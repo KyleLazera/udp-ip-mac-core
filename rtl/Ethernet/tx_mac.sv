@@ -69,10 +69,10 @@ localparam IP_LENGTH_OFFSET_0 = 16;
 localparam IP_LENGTH_OFFSET_1 = 17;
 localparam IP_CHECKSUM_OFFSET_0 = 24;
 localparam IP_CHECKSUM_OFFSET_1 = 25;
-localparam UDP_LENGTH_OFFSET_0 = 37;
-localparam UDP_LENGTH_OFFSET_1 = 38;
-localparam UDP_CHECKSUM_OFFSET_0 = 39;
-localparam UDP_CHECKSUM_OFFSET_1 = 40;
+localparam UDP_LENGTH_OFFSET_0 = 38;
+localparam UDP_LENGTH_OFFSET_1 = 39;
+localparam UDP_CHECKSUM_OFFSET_0 = 40;
+localparam UDP_CHECKSUM_OFFSET_1 = 41;
 
 /* FSM State Declarations */
 typedef enum{IDLE,                                  //State when no transactions are occuring
