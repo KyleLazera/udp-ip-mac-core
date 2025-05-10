@@ -2,7 +2,7 @@
 
 /* This is an IPv4 Tranmission module that will be used to encapsulate data within an IP frame.
  * This module will recieve raw data as well as certain IP header fields in parallel for the encapsulation
- * and will output the data as an axi-stream data packet along with th ethernet header in parallel.
+ * and will output the data as an axi-stream data packet along with the ethernet header in parallel.
  * To achieve a lower-latency for the IP stack, the option to encapsulate the IP packet within the Ethernet Header is
  * available via the parameter ETH_FRAME.
  * For reference an IP frame is displayed below:
@@ -41,7 +41,7 @@
  * fields will not be used:
  *    IHL - This will be set to 5. If options are used this changes, but for now this is always 5
  *    Identification, Flags & Fragment Offset - These are not needed because we will limit the packet size to 1472 to meet ethernet MTU
- *    Time to Live - Mainly used when passing ethernet packets through routers to avod the packet getting stuck in a loop
+ *    Time to Live - Mainly used when passing ethernet packets through routers to avoid the packet getting stuck in a loop
  */
 
 module ipv4_tx
@@ -216,13 +216,12 @@ always @(posedge i_clk) begin
             m_eth_hdr_tvalid_reg <= 1'b0; 
 
             //////////////////////////////////////////////////////////////////////////////////////////
-            // If the up-stream module has valid payload data & valid header data, latch the hdr data,
-            // latch the first byte to be output to the downstream module, & move to the next state.
+            // If the up-stream module has valid header data, latch the hdr data and 
+            // the first byte to be output to the downstream module, & move to the next state.
             //////////////////////////////////////////////////////////////////////////////////////////
-            if(/*s_tx_axis_tvalid &*/ s_ip_tx_hdr_valid & s_ip_hdr_rdy_reg) begin
+            if(s_ip_tx_hdr_valid & s_ip_hdr_rdy_reg) begin
                // Latch Header data
                ip_hdr_type <= s_ip_tx_hdr_type;
-               //ip_hdr_total_length <= s_ip_tx_total_length;
                ip_hdr_protocol <= s_ip_tx_protocol;
                ip_hdr_src_ip_addr <= s_ip_tx_src_ip_addr;
                ip_hdr_dst_ip_addr <= s_ip_tx_dst_ip_addr;
@@ -288,6 +287,16 @@ always @(posedge i_clk) begin
          IP_HEADER: begin
             m_tx_axis_tvalid_reg <= 1'b1;
             
+            ////////////////////////////////////////////////////////////////////////////////////////////////
+            // The IP total length and checksum fields require the full length of the payload
+            // (including the IP header) to be known. To achieve this (without requiring a user to
+            // input the payload size) either a buffer would be needed to store the data and count 
+            // the bytes (adds quite a lot of latency) or the value is calculated in parallel with the 
+            // payload and is inserted at the end (ethernet MAC). The latter option is selected for this
+            // design, and therefore, the IP length and checksum fields are initially filled with temporary
+            // values DEAD & BEEF.
+            ////////////////////////////////////////////////////////////////////////////////////////////////
+
             if(m_tx_axis_trdy & m_tx_axis_tvalid_reg) begin
                // Based on the header counter, determine which field of the header to transmit downstream
                case(hdr_cntr)
@@ -368,7 +377,7 @@ always @(posedge i_clk) begin
             m_tx_axis_tvalid_reg <= 1'b1;
             m_eth_hdr_tvalid_reg <= (ETH_FRAME) ? 1'b0 : !hdr_latched;
 
-
+            // Make sure AXI Handshake is active
             if(m_tx_axis_trdy & s_tx_axis_tvalid) begin
                m_tx_axis_tdata_reg <= s_tx_axis_tdata;
                m_tx_axis_tlast_reg <= s_tx_axis_tlast;
@@ -409,7 +418,12 @@ assign m_tx_axis_tdata = m_tx_axis_tdata_reg;
 assign m_tx_axis_tvalid = m_tx_axis_tvalid_reg;
 assign m_tx_axis_tlast = m_tx_axis_tlast_reg;
 
-//assign s_tx_axis_trdy = s_tx_axis_trdy_reg;
+/////////////////////////////////////////////////////////////////////////////////////////////
+// If we are in the PAYLOAD state, we need to propogate the trdy value from the down-stream
+// module to the up-stream module. This is needed to make sure the up-stream module is not
+// sending data while the down-stream module is not ready.
+/////////////////////////////////////////////////////////////////////////////////////////////
+
 assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy : 1'b0;
 assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
 

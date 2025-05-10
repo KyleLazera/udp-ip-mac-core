@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 /* This module recieves ethernet payload data as well as ethernet header data
- * in parallel with one another. It passes through the ethernet headers, and inspects
- * the IP payload to determine if the packet is good or bad. This module checks for 
- * the following things:
+ * in parallel with one another or via AXI-Stream depending on ETH_FRAME. It passes through 
+ * the ethernet headers, and inspects the IP payload to determine if the packet is good or bad. 
+ * This module checks for the following:
  *  1) IP Payload size = total length field 
  *  2) Checksum field is recalculated based on recieved inputs to see if there is a match
  *  3) IP Version = IPv4
@@ -27,7 +27,8 @@
 module ipv4_rx
 #(
     parameter AXI_DATA_WIDTH = 8,
-    parameter ETH_FRAME = 1 
+    parameter ETH_FRAME = 1                                     // If ETH_FRAME=1, the AXI-Stream payload contains the 
+                                                                // Ethernet header frame 
 )(
     input wire i_clk,
     input wire i_reset_n,
@@ -48,7 +49,6 @@ module ipv4_rx
     /* IP/Ethernet Frame Outputs */
     input wire m_ip_hdr_trdy,
     output wire m_ip_hdr_tvalid,
-    output wire [15:0] m_ip_total_length,
     output wire [31:0] m_ip_rx_src_ip_addr,
     output wire [31:0] m_ip_rx_dst_ip_addr,
     output wire [47:0] m_eth_rx_src_mac_addr,
@@ -127,7 +127,6 @@ reg [3:0] ip_hdr_version;
 reg [3:0] ip_hdr_length;
 reg [7:0] ip_hdr_type;
 reg [15:0] ip_hdr_total_length;
-reg [15:0] ip_hdr_total_length_reg;
 reg [15:0] ip_hdr_id;
 reg [2:0] ip_hdr_flags;
 reg [12:0] ip_hdr_frag_offset;
@@ -250,7 +249,6 @@ always @(posedge i_clk) begin
                         5'd6: begin
                             ip_hdr_flags <= s_rx_axis_tdata[7:5];
                             ip_hdr_frag_offset[12:8] <= s_rx_axis_tdata[4:0];
-                            ip_hdr_total_length_reg <= ip_hdr_total_length;
                             // Subtract the total length register from the number of header bytes
                             ip_hdr_total_length <= ip_hdr_total_length - (ip_hdr_length << 2); 
                         end
@@ -352,7 +350,6 @@ assign bad_packet = bad_pckt_reg;
 
 /* Output Ethernet/IP Header Info */
 assign m_ip_hdr_tvalid = m_ip_hdr_tvalid_reg;
-assign m_ip_total_length = ip_hdr_total_length_reg;
 assign m_ip_rx_src_ip_addr = ip_hdr_src_ip_addr;
 assign m_ip_rx_dst_ip_addr = ip_hdr_dst_ip_addr;
 assign m_eth_rx_src_mac_addr = eth_rx_src_mac_addr;

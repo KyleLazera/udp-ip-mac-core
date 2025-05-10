@@ -14,8 +14,12 @@
  *  |                           Payload                             |
  *  +---------------+---------------+---------------+---------------+
  * 
- * Currently the module does not utilize the checksum value as this will induce quite
- * a few clock cycles of latency into the process.
+ * Similarly to the IP Module, the UDP module also requires the total size of the payload
+ * (including the UDP header). Rather than buffering the data first to calculate the size,
+ * this module counts the total number of bytes in line with the payload, and outputs the 
+ * calculated checksum & length fields in parallel. These values are then recieved by the 
+ * ethernet MAC and inserted into the correct location of the network packet. This ensures 
+ * the TX data path for the UDP module only induces 1 clock cycle delay.
  */
 
  module udp_tx
@@ -32,16 +36,16 @@
     input wire [15:0] s_udp_dst_port,
 
     /* Input AXI-Stream Payload */
-    input wire [AXI_DATA_WIDTH-1:0] s_axis_tdata,
-    input wire s_axis_tvalid,
-    input wire s_axis_tlast,
-    output wire s_axis_trdy,
+    input wire [AXI_DATA_WIDTH-1:0] s_tx_axis_tdata,
+    input wire s_tx_axis_tvalid,
+    input wire s_tx_axis_tlast,
+    output wire s_tx_axis_trdy,
 
     /* AXI-Stream Output Data */
-    output wire [AXI_DATA_WIDTH-1:0] m_axis_tdata,
-    output wire m_axis_tvalid,
-    output wire m_axis_tlast,
-    input wire m_axis_trdy
+    output wire [AXI_DATA_WIDTH-1:0] m_tx_axis_tdata,
+    output wire m_tx_axis_tvalid,
+    output wire m_tx_axis_tlast,
+    input wire m_tx_axis_trdy
  );
 
 localparam logic [15:0] UDP_CHECKSUM_PLACEHOLDER = 16'hDEAD;
@@ -109,7 +113,7 @@ always @(posedge i_clk) begin
             UDP_HDR: begin
                 axis_tvalid_reg <= 1'b1;
                 // Before sending more data, make sure the downstream module is ready
-                if(m_axis_trdy & m_axis_tvalid) begin
+                if(m_tx_axis_trdy & m_tx_axis_tvalid) begin
 
                     hdr_cntr <= hdr_cntr + 1;
 
@@ -134,11 +138,11 @@ always @(posedge i_clk) begin
                 axis_tvalid_reg <= 1'b1;
                 axis_trdy_reg <= 1'b1;
 
-                if(s_axis_tvalid & m_axis_trdy) begin
-                    axis_tdata_reg <= s_axis_tdata;
-                    axis_tlast_reg <= s_axis_tlast;
+                if(s_tx_axis_tvalid & m_tx_axis_trdy) begin
+                    axis_tdata_reg <= s_tx_axis_tdata;
+                    axis_tlast_reg <= s_tx_axis_tlast;
 
-                    if(s_axis_tlast & axis_tvalid_reg) begin
+                    if(s_tx_axis_tlast & axis_tvalid_reg) begin
                         axis_trdy_reg <= 1'b0;
                         state <= IDLE;
                     end
@@ -149,10 +153,13 @@ always @(posedge i_clk) begin
 end
 
 /* Output Logic */
+
 assign s_udp_hdr_trdy = s_udp_hdr_trdy_reg;
-assign s_axis_trdy = (state == UDP_PAYLOAD) ? m_axis_trdy : axis_trdy_reg;
-assign m_axis_tdata = axis_tdata_reg;
-assign m_axis_tvalid = axis_tvalid_reg;
-assign m_axis_tlast = axis_tlast_reg;
+assign s_tx_axis_trdy = (state == UDP_PAYLOAD) ? m_tx_axis_trdy : axis_trdy_reg;
+
+// Master AXI-Stream Outputs
+assign m_tx_axis_tdata = axis_tdata_reg;
+assign m_tx_axis_tvalid = axis_tvalid_reg;
+assign m_tx_axis_tlast = axis_tlast_reg;
 
 endmodule

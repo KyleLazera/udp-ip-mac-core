@@ -1,13 +1,39 @@
 `timescale 1ns / 1ps
 
 /* This is the top-level module for the IP encapsulation/de-encap process. It contains
- * 2 seperate data paths: transmission and reception.
- * Transmission Data Path: IP Payload along with various IP header and ethernet header fields
- * are passed into the module, which then passes the data through ip_tx and ip_eth_tx to form
- * a full frame ready to be transmitted to the ethernet MAC via AXI-Stream.
- * Reception Data Path: Frames are recieved via AXI-Stream and are then de-encapsulated. The header
- * fields for both the IP and Ethernet, specifically, addresses and ethernet type are also 
- * passed out of the module with the payload data.
+ * 2 seperate data paths: Transmission (TX) to Ethernet MAC and reception (RX) from Ethernet MAC.
+ *
+ * Transmission Data Path: IP Payload along with various IP header fields and ethernet header fields
+ * are passed into the module, which encapsulates the payload within an IP/Ethernet frame according 
+ * to the following:
+ * 
+ * +-------------------------------+-------------------------------+
+ * |              Destination MAC Address (6 bytes)                |
+ * +-------------------------------+-------------------------------+
+ * |               Source MAC Address (6 bytes)                    |
+ * +-------------------------------+-------------------------------+
+ * |         EtherType = 0x0800 (IPv4) (2 bytes)                   |
+ * +-------------------------------+-------------------------------+
+ * |Version|  IHL  |  Type(TOS)  |         Total Length            |
+ * +---------------+---------------+-------------------------------+
+ * |         Identification        |Flags|     Fragment Offset     |
+ * +-------------------------------+-------------------------------+
+ * | Time to Live  |   Protocol   |      Header Checksum           |
+ * +-------------------------------+-------------------------------+
+ * |               Source IP Address (4 bytes)                     |
+ * +-------------------------------+-------------------------------+
+ * |            Destination IP Address (4 bytes)                   |
+ * +-------------------------------+-------------------------------+
+ * |                            Payload                            |
+ * +-------------------------------+-------------------------------+
+ *
+ * Reception Data Path: Network Frames are recieved via AXI-Stream in the format seen above. The IP module
+ * is responsible for de-encapsulating the Destination and Source MAC address and ethernet type (if ETH_FRAME = 1),
+ * as well as the IP header fields. It outputs these fields in-parallel with the payload data.
+ * 
+ * Note: To achieve lower-latency processing, the IP Length and IP checksum fields are calculated and driven
+ * to the ethernet MAC in parallel with the actual network frame. These values are then inserted into
+ * the final packet by the ethernet MAC, remvoing the need to buffer the data.
  */
 
  module ip
@@ -29,6 +55,8 @@
    input wire [7:0] s_ip_tx_protocol,                                   // L4 protocol (UDP/TCP)
    input wire [31:0] s_ip_tx_src_ip_addr,                               // Source IP address
    input wire [31:0] s_ip_tx_dst_ip_addr,                               // Destination IP address
+
+   /* Ethernet Input - Used with above hdr tvalid/trdy */
    input wire [47:0] s_eth_tx_src_mac_addr,                             // Eth source mac address
    input wire [47:0] s_eth_tx_dst_mac_addr,                             // Eth destination mac address   
    input wire [15:0] s_eth_tx_type,                                     // Eth type  
@@ -53,7 +81,7 @@
    input wire m_tx_axis_trdy,                                           // Back pressure from downstream module indciating it is ready
 
    /* IP Header fields computed in parallel */
-   output wire m_ip_tx_hdr_tvalid,                                      // Indicates the ip total length & checsum fields are valid
+   output wire m_ip_tx_hdr_tvalid,                                      // Indicates the ip total length & checksum fields are valid
    output wire [15:0] m_ip_tx_total_length,
    output wire [15:0] m_ip_tx_checksum,
 
@@ -75,7 +103,6 @@
     /* De-encapsulated Frame Output */
     input wire m_ip_hdr_trdy,
     output wire m_ip_hdr_tvalid,
-    output wire [15:0] m_ip_total_length,
     output wire [31:0] m_ip_rx_src_ip_addr,
     output wire [31:0] m_ip_rx_dst_ip_addr,
     output wire [47:0] m_eth_rx_src_mac_addr,
@@ -107,6 +134,8 @@ generate
     assign m_eth_dst_mac_addr = (ETH_FRAME) ? 1'b0 : tx_eth_dst_mac_addr;
     assign m_eth_type = (ETH_FRAME) ? 1'b0 : tx_eth_type;
 endgenerate
+
+/******* IP TX Module Instantiation *******/
 
 ipv4_tx#(.AXI_STREAM_WIDTH(AXI_STREAM_WIDTH), .ETH_FRAME(ETH_FRAME))
 ip_tx(
@@ -149,7 +178,6 @@ ip_tx(
     .m_eth_type(tx_eth_type)                     
 );
 
-
 /* RX Data Path */
 
 wire eth_hdr_tvalid;
@@ -166,6 +194,8 @@ generate
     assign rx_dst_mac_addr = (ETH_FRAME) ? 1'b0 : s_eth_rx_dst_mac_addr;
     assign rx_eth_type =  (ETH_FRAME) ? 1'b0 : s_eth_rx_type;
 endgenerate
+
+/******* IP RX Module Instantiation *******/
 
 ipv4_rx#(.AXI_DATA_WIDTH(AXI_STREAM_WIDTH), .ETH_FRAME(ETH_FRAME))
 ip_rx(
@@ -188,7 +218,6 @@ ip_rx(
     /* Output Signals */
     .m_ip_hdr_trdy(m_ip_hdr_trdy),
     .m_ip_hdr_tvalid(m_ip_hdr_tvalid),
-    .m_ip_total_length(m_ip_total_length),
     .m_ip_rx_src_ip_addr(m_ip_rx_src_ip_addr),
     .m_ip_rx_dst_ip_addr(m_ip_rx_dst_ip_addr),
     .m_eth_rx_src_mac_addr(m_eth_rx_src_mac_addr),

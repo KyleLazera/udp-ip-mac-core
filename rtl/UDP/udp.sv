@@ -1,8 +1,14 @@
 `timescale 1ns / 1ps
 
+/*
+ * This module is the top-level UDP module, and is responsible for computing the UDP checksum
+ * & the Payload size in-line with the UDP payload (For the TX Data Path). Once the module computes
+ * these values, it also outputs them so they can be used by the Ethernet MAC for Insertion before 
+ * transmitting the packet.
+ */
+
 module udp#(
     parameter AXI_DATA_WIDTH = 8,
-    parameter UDP_CHECKSUM = 1,         //Determines whether the optional checksum calculation is computed wihtin the UDP module
     parameter MAX_PAYLOAD = 1472
 )(
     input wire i_clk,
@@ -197,18 +203,24 @@ udp_tx#(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))
 tx_udp(
     .i_clk(i_clk),
     .i_reset_n(i_reset_n),
+
+    /* UDP Header Inputs */
     .s_udp_hdr_trdy(s_udp_tx_hdr_trdy),
     .s_udp_hdr_tvalid(s_udp_tx_hdr_tvalid),
     .s_udp_src_port(s_udp_tx_src_port),
     .s_udp_dst_port(s_udp_tx_dst_port),
-    .s_axis_tdata(s_tx_axis_tdata),
-    .s_axis_tvalid(s_tx_axis_tvalid),
-    .s_axis_tlast(s_tx_axis_tlast),
-    .s_axis_trdy(s_tx_axis_trdy),
-    .m_axis_tdata(m_tx_axis_tdata),
-    .m_axis_tvalid(m_tx_axis_tvalid),
-    .m_axis_tlast(m_tx_axis_tlast),
-    .m_axis_trdy(m_tx_axis_trdy)
+
+    /* UDP Payload Inputs */
+    .s_tx_axis_tdata(s_tx_axis_tdata),
+    .s_tx_axis_tvalid(s_tx_axis_tvalid),
+    .s_tx_axis_tlast(s_tx_axis_tlast),
+    .s_tx_axis_trdy(s_tx_axis_trdy),
+
+    /* Encapsulated UDP Frame Output */
+    .m_tx_axis_tdata(m_tx_axis_tdata),
+    .m_tx_axis_tvalid(m_tx_axis_tvalid),
+    .m_tx_axis_tlast(m_tx_axis_tlast),
+    .m_tx_axis_trdy(m_tx_axis_trdy)
 );
 
 /* UDP RX Module */
@@ -217,20 +229,26 @@ udp_rx#(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))
 rx_udp(
     .i_clk(i_clk),
     .i_reset_n(i_reset_n),
-    .s_axis_tdata(s_rx_axis_tdata),
-    .s_axis_tvalid(s_rx_axis_tvalid),
-    .s_axis_tlast(s_rx_axis_tlast),
-    .s_axis_trdy(s_rx_axis_trdy),
-    .m_axis_tdata(m_rx_axis_tdata),
-    .m_axis_tvalid(m_rx_axis_tvalid),
-    .m_axis_tlast(m_rx_axis_tlast),
-    .m_axis_trdy(m_rx_axis_trdy),
-    .s_udp_hdr_trdy(s_udp_rx_hdr_trdy),
-    .s_udp_hdr_tvalid(s_udp_rx_hdr_tvalid),
-    .s_udp_src_port(s_udp_rx_src_port),
-    .s_udp_dst_port(s_udp_rx_dst_port),
-    .s_udp_length_port(s_udp_rx_length_port),
-    .s_udp_hdr_checksum(s_udp_rx_hdr_checksum)
+
+    /* RX UDP Frame */
+    .s_rx_axis_tdata(s_rx_axis_tdata),
+    .s_rx_axis_tvalid(s_rx_axis_tvalid),
+    .s_rx_axis_tlast(s_rx_axis_tlast),
+    .s_rx_axis_trdy(s_rx_axis_trdy),
+
+    /* RX UDP Payload */
+    .m_rx_axis_tdata(m_rx_axis_tdata),
+    .m_rx_axis_tvalid(m_rx_axis_tvalid),
+    .m_rx_axis_tlast(m_rx_axis_tlast),
+    .m_rx_axis_trdy(m_rx_axis_trdy),
+
+    /* RX UDP Header Fields */
+    .m_udp_hdr_trdy(s_udp_rx_hdr_trdy),
+    .m_udp_hdr_tvalid(s_udp_rx_hdr_tvalid),
+    .m_udp_src_port(s_udp_rx_src_port),
+    .m_udp_dst_port(s_udp_rx_dst_port),
+    .m_udp_length_port(s_udp_rx_length_port),
+    .m_udp_hdr_checksum(s_udp_rx_hdr_checksum)
 );
 
 

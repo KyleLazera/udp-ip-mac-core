@@ -1,7 +1,5 @@
 `timescale 1ns/1ps
 
-//Top level project that instantiates the ethernet MAC Core 
-
 module ethernet_mac_project_top #(
     parameter RGMII_DATA_WIDTH = 4
 )
@@ -331,11 +329,9 @@ always @(posedge i_clk) begin
 end
 
 
-
 /******** UDP Stack Instantiation ********/
 
 udp#(.AXI_DATA_WIDTH(8),
-     .UDP_CHECKSUM(1),
      .MAX_PAYLOAD(1472)
 ) udp_stack (
 
@@ -457,7 +453,6 @@ ip #(.AXI_STREAM_WIDTH(8),
     // De-encapsulated Frame Output
     .m_ip_hdr_trdy          (rx_udp_hdr_rdy),
     .m_ip_hdr_tvalid        (rx_ip_hdr_tvalid),
-    .m_ip_total_length      (rx_ip_total_length),
     .m_ip_rx_src_ip_addr    (rx_src_ip_addr),
     .m_ip_rx_dst_ip_addr    (rx_dst_ip_addr),
     .m_eth_rx_src_mac_addr  (rx_src_mac_addr),
