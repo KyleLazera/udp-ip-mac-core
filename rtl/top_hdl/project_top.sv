@@ -313,7 +313,7 @@ assign tx_axis_udp_tlast = rx_axis_udp_tlast;
 assign rx_axis_udp_trdy = tx_axis_udp_trdy;
 
 // Header Data Loop back
-always @(posedge i_clk) begin
+always @(posedge clk_200) begin
     tx_ip_hdr_tvalid <= rx_ip_hdr_tvalid;
     rx_ip_hdr_trdy <= tx_ip_hdr_trdy;
     tx_ip_total_length <= rx_ip_total_length;
@@ -335,7 +335,7 @@ udp#(.AXI_DATA_WIDTH(8),
      .MAX_PAYLOAD(1472)
 ) udp_stack (
 
-    .i_clk(i_clk),
+    .i_clk(clk_200),
     .i_reset_n(i_reset_n),
     
     /*********** TX Data Path ***********/
@@ -395,7 +395,7 @@ udp#(.AXI_DATA_WIDTH(8),
 ip #(.AXI_STREAM_WIDTH(8), 
      .ETH_FRAME(1)
 ) ip_stack (
-    .i_clk                  (i_clk),
+    .i_clk                  (clk_200),
     .i_reset_n              (i_reset_n),
 
     /****************** TX Data Path ******************/
@@ -477,7 +477,7 @@ ethernet_mac_fifo #(
     .UDP_HEADER_INSERTION(1),
     .IP_HEADER_INSERTION(1)
 ) ethernet_mac (
-    .i_clk(i_clk),
+    .i_clk(clk_200),
     .clk_125(clk_125),
     .clk90_125(clk90_125),
     .i_reset_n(i_reset_n),

@@ -104,11 +104,6 @@ reg sof;                                            //Start of frame signal
 wire crc_en, crc_reset;                             //CRC enable & reset   
 wire [31:0] crc_data_out;                           //Ouput from the CRC32 module
 
-reg [15:0] udp_length_reg = 16'b0;
-reg [15:0] udp_checksum_reg = 16'b0;
-reg [15:0] ip_length_reg = 16'b0;
-reg [15:0] ip_checksum_reg = 16'b0;
-
 /* CRC32 Module Instantiation */
 crc32 #(.DATA_WIDTH(8)) 
 crc_module(.i_byte(crc_data_in),
@@ -160,6 +155,81 @@ always@(posedge clk) begin
         endcase
     end
 end
+
+//////////////////////////////////////////////////////////////////////
+// The late insertion UDP/IP Headers must be passed through a double flop
+// synchronizer since they are coming from outside of the 125MHz clock 
+// domain.
+//////////////////////////////////////////////////////////////////////
+
+reg [15:0] udp_length_reg = 16'b0;
+reg [15:0] udp_checksum_reg = 16'b0;
+reg [15:0] ip_length_reg = 16'b0;
+reg [15:0] ip_checksum_reg = 16'b0;
+
+wire s_hdr_tvalid_sync;
+wire [15:0] s_udp_hdr_length_sync;                     
+wire [15:0] s_udp_hdr_checksum_sync;                   
+wire [15:0] s_ip_hdr_length_sync;                     
+wire [15:0] s_ip_hdr_checksum_sync; 
+
+cdc_signal_sync#(
+    .PIPELINE(0),
+    .WIDTH(1)
+) hdr_tvalid_sync (
+    .i_dst_clk(clk),
+    .i_signal(s_hdr_tvalid),
+    .o_signal_sync(s_hdr_tvalid_sync)
+);
+
+generate 
+    if(IP_HEADER_INSERTION) begin
+
+        // IP Length CDC
+        cdc_signal_sync#(
+            .PIPELINE(0),
+            .WIDTH(16)
+        ) ip_length_sync (
+            .i_dst_clk(clk),
+            .i_signal(s_ip_hdr_length),
+            .o_signal_sync(s_ip_hdr_length_sync)
+        );
+
+        // IP Checksum CDC
+        cdc_signal_sync#(
+            .PIPELINE(0),
+            .WIDTH(16)
+        ) ip_checksum_sync (
+            .i_dst_clk(clk),
+            .i_signal(s_ip_hdr_checksum),
+            .o_signal_sync(s_ip_hdr_checksum_sync)
+        );
+
+    end
+
+    if(UDP_HEADER_INSERTION) begin
+        
+        // UDP Length CDC
+        cdc_signal_sync#(
+            .PIPELINE(0),
+            .WIDTH(16)
+        ) ip_length_sync (
+            .i_dst_clk(clk),
+            .i_signal(s_udp_hdr_length),
+            .o_signal_sync(s_udp_hdr_length_sync)
+        );
+
+        // UDP Length CDC
+        cdc_signal_sync#(
+            .PIPELINE(0),
+            .WIDTH(16)
+        ) ip_checksum_sync (
+            .i_dst_clk(clk),
+            .i_signal(s_udp_hdr_checksum),
+            .o_signal_sync(s_udp_hdr_checksum_sync)
+        );
+    end
+endgenerate
 
 /* Packet Encapsulation Logic */
 always @(posedge clk) begin
@@ -219,17 +289,17 @@ always @(posedge clk) begin
 
                     if(UDP_HEADER_INSERTION) begin
                         // Store the valid UDP header data if the valid flag is raised
-                        if(s_hdr_tvalid) begin
-                            udp_length_reg <= s_udp_hdr_length;
-                            udp_checksum_reg <= s_udp_hdr_checksum;
+                        if(s_hdr_tvalid_sync) begin
+                            udp_length_reg <= s_udp_hdr_length_sync;
+                            udp_checksum_reg <= s_udp_hdr_checksum_sync;
                         end
                     end
 
                     if(IP_HEADER_INSERTION) begin
                         // Store the valid IP header data if the valid flag is raised
-                        if(s_hdr_tvalid) begin
-                            ip_length_reg <= s_ip_hdr_length;
-                            ip_checksum_reg <= s_ip_hdr_checksum;
+                        if(s_hdr_tvalid_sync) begin
+                            ip_length_reg <= s_ip_hdr_length_sync;
+                            ip_checksum_reg <= s_ip_hdr_checksum_sync;
                         end
                     end                   
 

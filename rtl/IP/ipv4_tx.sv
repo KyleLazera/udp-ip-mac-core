@@ -99,6 +99,7 @@ localparam [15:0] IPv4_IDENTIFICATION = 16'd0;
 localparam [2:0] IPv4_FLAGS = 3'd0;
 localparam [12:0] IPv4_FRAG_OFFSET = 13'd0;
 localparam [7:0] IPv4_TTL = 8'd64;
+localparam [16:0] IPv4_HDR_BYTES = 16'd20;
 
 /* State Encoding */
 localparam [1:0] IDLE = 2'b00;
@@ -364,7 +365,7 @@ always @(posedge i_clk) begin
                   5'd18: begin
                      m_tx_axis_tdata_reg <= ip_hdr_dst_ip_addr[7:0]; 
                      s_tx_axis_trdy_reg <= 1'b1;
-                     pckt_cntr <= (ip_hdr_length << 2);
+                     pckt_cntr <= IPv4_HDR_BYTES + 1;
                      state_reg <= PAYLOAD;
                   end                                                                  
                endcase
@@ -389,8 +390,8 @@ always @(posedge i_clk) begin
                   s_ip_hdr_rdy_reg <= 1'b1;
 
                   // Output the delayed header fields
-                  ip_hdr_checksum <= ~ip_checksum(checksum_sum, (pckt_cntr+1));
-                  ip_hdr_total_length <= pckt_cntr + 1;
+                  ip_hdr_checksum <= ~ip_checksum(checksum_sum, pckt_cntr);
+                  ip_hdr_total_length <= pckt_cntr;
                   m_ip_tx_hdr_tvalid_reg <= 1'b1;
 
                   state_reg <= IDLE;

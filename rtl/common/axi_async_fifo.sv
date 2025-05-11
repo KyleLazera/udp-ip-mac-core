@@ -3,7 +3,6 @@
 /* todo:
 * - Add safety mechanism for FIFO depth being a power of 2
 * - Add packet dropping mechanism/almost empty or full flags
-* - Handle resets by implement a reset strategy
 */
 
 
@@ -204,7 +203,7 @@ end
 
 /** Pointer Synchronization Logic **/
 
-//Synchronization from read domain into write domain (read -> Write)
+//Synchronization from read domain into write domain (read -> write)
 sync_r2w #(
     .ADDR_WIDTH(FIFO_ADDR_WIDTH)
 ) read_to_write_sync(
