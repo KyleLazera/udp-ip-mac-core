@@ -18,3 +18,4 @@ set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of [get_cells -hierar
 set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of [get_cells -hierarchical -filter {NAME =~ *rd_ptr_0_reg*}]] -to [get_pins -filter {REF_PIN_NAME == D} -of [get_cells -hierarchical -filter {NAME =~ *rd_ptr_1_reg*}]] 1.800
 
 
+

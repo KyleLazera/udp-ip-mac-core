@@ -18,3 +18,4 @@ add_cells_to_pblock [get_pblocks pblock_tx_fifo] [get_cells -quiet [list etherne
 resize_pblock [get_pblocks pblock_tx_fifo] -add {SLICE_X6Y54:SLICE_X11Y59}
 resize_pblock [get_pblocks pblock_tx_fifo] -add {RAMB18_X0Y22:RAMB18_X0Y23}
 resize_pblock [get_pblocks pblock_tx_fifo] -add {RAMB36_X0Y11:RAMB36_X0Y11}
+

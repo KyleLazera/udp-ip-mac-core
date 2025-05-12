@@ -76,16 +76,6 @@ localparam HDR_CHECKSUM = 2'b01;
 localparam PAYLOAD_CHECKSUM = 2'b10;
 localparam FINAL_CALC = 2'b11;
 
-// UDP Checksum is the same as the IP checksum algorithm
-function [15:0] udp_checksum(input [15:0] sum, input [15:0] hdr_field);
-   //Intermediary sum
-   reg [16:0] int_sum;
-   begin
-      int_sum = sum + hdr_field;
-      udp_checksum = int_sum[15:0] + int_sum[16]; 
-   end 
-endfunction : udp_checksum
-
 // IP & UDP Header fields used for checksum Calculation
 reg m_udp_hdr_valid_reg = 1'b0;
 reg [31:0] ip_src_addr = 16'b0;
@@ -99,15 +89,17 @@ reg [15:0] udp_checksum_reg = 16'b0;
 // Intermediary/Control Signals
 reg [1:0] state = IDLE;
 reg [PCKT_CNTR_WIDTH-1:0] pckt_cntr = {PCKT_CNTR_WIDTH{1'b0}};
-reg [15:0] udp_checksum_sum = 16'b0;
-reg [AXI_DATA_WIDTH-1:0] udp_checksum_value = 8'b0;
 
-// Packet Size Counter
+// Checksum Signals 
+reg [AXI_DATA_WIDTH-1:0] udp_checksum_value = 8'b0;
+(* use_dsp="yes" *) reg [16:0] int_checksum_sum = 17'b0;
+(* use_dsp="yes" *) wire [15:0] udp_checksum_sum = int_checksum_sum[15:0] + int_checksum_sum[16];
+
+// Packet Size Counter/Checksum Calculator FSM
 always @(posedge i_clk) begin
     if(!i_reset_n) begin
         state <= IDLE;
         pckt_cntr <= {PCKT_CNTR_WIDTH{1'b0}};
-        udp_checksum_sum <= 16'b0;
         m_udp_hdr_valid_reg <= 1'b0;
     end else begin
         case(state)
@@ -122,7 +114,6 @@ always @(posedge i_clk) begin
                     udp_src_port <= s_udp_tx_src_port;
                     udp_dst_port <= s_udp_tx_dst_port;
 
-                    udp_checksum_sum <= 16'b0;
                     m_udp_hdr_valid_reg <= 1'b0;
                     pckt_cntr <= {PCKT_CNTR_WIDTH{1'b0}};
                     //Move to the Header State
@@ -136,14 +127,13 @@ always @(posedge i_clk) begin
                 // While the tx UDP module drives the UDP header values, calculate the UDP checksum value
                 // for the IP pseudo-header + the UDP header values we know
                 case(pckt_cntr)
-                    'd0: udp_checksum_sum <= udp_checksum(udp_checksum_sum, ip_src_addr[31:16]);
-                    'd1: udp_checksum_sum <= udp_checksum(udp_checksum_sum, ip_src_addr[15:0]);
-                    'd2: udp_checksum_sum <= udp_checksum(udp_checksum_sum, ip_dst_addr[31:16]);
-                    'd3: udp_checksum_sum <= udp_checksum(udp_checksum_sum, ip_dst_addr[15:0]);
-                    'd4: udp_checksum_sum <= udp_checksum(udp_checksum_sum, ip_protocol);
-                    'd5: udp_checksum_sum <= udp_checksum(udp_checksum_sum, udp_src_port);
-                    'd6: begin
-                        udp_checksum_sum <= udp_checksum(udp_checksum_sum, udp_dst_port);
+                    'd0: int_checksum_sum <= ip_src_addr[31:16] + ip_src_addr[15:0];
+                    'd1: int_checksum_sum <= udp_checksum_sum + ip_dst_addr[31:16];
+                    'd2: int_checksum_sum <= udp_checksum_sum + ip_dst_addr[15:0];
+                    'd3: int_checksum_sum <= udp_checksum_sum + ip_protocol;
+                    'd4: int_checksum_sum <= udp_checksum_sum + udp_src_port;
+                    'd5: begin
+                        int_checksum_sum <= udp_checksum_sum + udp_dst_port;
                         pckt_cntr <= UDP_HEADER_LENGTH;
                         state <= PAYLOAD_CHECKSUM;
                     end
@@ -151,41 +141,41 @@ always @(posedge i_clk) begin
             end
             PAYLOAD_CHECKSUM: begin
 
+                // AXI-Stream handshake 
                 if(s_tx_axis_trdy & s_tx_axis_tvalid) begin
 
-                    // Odd Counter (lsb == 0)
+                    pckt_cntr <= pckt_cntr + 1;
+
+                    // Odd Byte Recieved (lsb == 0)
                     if(pckt_cntr[0] == 1'b0) begin
 
                         // If the last byte is recieved and the packet size is odd, add padding to the 
                         // input checksum value (to make a 16-bit field)
-                        if(s_tx_axis_tvalid & s_tx_axis_trdy & s_tx_axis_tlast) begin
-                            udp_checksum_sum <= udp_checksum(udp_checksum_sum, {s_tx_axis_tdata, 8'h00});
-                            udp_pckt_length <= pckt_cntr + 1;
-                            state <= FINAL_CALC;
+                        if(s_tx_axis_tlast) begin
+                            int_checksum_sum <= udp_checksum_sum + {s_tx_axis_tdata, 8'h00};
                         end else begin
                             udp_checksum_value <= s_tx_axis_tdata;
                         end
-                    // Even Counter (lsb == 1)
-                    end else begin
-                        udp_checksum_sum <= udp_checksum(udp_checksum_sum, {udp_checksum_value, s_tx_axis_tdata});
-
-                        if(s_tx_axis_tvalid & s_tx_axis_trdy & s_tx_axis_tlast) begin
-                            udp_pckt_length <= pckt_cntr + 1;
-                            state <= FINAL_CALC;
-                        end
-                    end
-
-                    // If we have valid data being transmitted, count this byte
-                    if(s_tx_axis_tvalid & s_tx_axis_trdy & !s_tx_axis_tlast) 
-                        pckt_cntr <= pckt_cntr + 1;
+                    end 
+                    
+                    // Even Byte Recieved (lsb == 1)
+                    if(pckt_cntr[0] == 1'b1) 
+                        int_checksum_sum <= udp_checksum_sum + {udp_checksum_value, s_tx_axis_tdata};
+                    
+                    // If last byte is recieved, move to the final state
+                    if(s_tx_axis_tlast) 
+                        state <= FINAL_CALC;
                 end
-        
             end
             FINAL_CALC: begin
                 m_udp_hdr_valid_reg <= 1'b1;
                 pckt_cntr <= {PCKT_CNTR_WIDTH{1'b0}};
-                udp_checksum_reg <= ~udp_checksum(udp_checksum_sum, udp_pckt_length);
-                udp_checksum_sum <= 16'b0;
+                
+                // Set the checksum and Length values
+                udp_checksum_reg <= ~(udp_checksum_sum + pckt_cntr);
+                udp_pckt_length <= pckt_cntr;
+                
+                // Move back to IDLE
                 state <= IDLE;
             end
         endcase

@@ -28,3 +28,4 @@ set_property -dict {PACKAGE_PIN W12 IOSTANDARD LVCMOS25} [get_ports {rgmii_phy_t
 set_property -dict {PACKAGE_PIN W11 IOSTANDARD LVCMOS25} [get_ports {rgmii_phy_txd[2]}]
 set_property -dict {PACKAGE_PIN Y11 IOSTANDARD LVCMOS25} [get_ports {rgmii_phy_txd[3]}]
 
+

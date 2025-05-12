@@ -18,3 +18,4 @@ set_output_delay -clock rgmii_phy_txc -clock_fall -min -add_delay 1.000 [get_por
 set_output_delay -clock rgmii_phy_txc -min 1.000 [get_ports rgmii_phy_txctl]
 set_output_delay -clock rgmii_phy_txc -clock_fall -min -add_delay 1.000 [get_ports rgmii_phy_txctl]
 
+
