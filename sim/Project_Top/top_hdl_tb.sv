@@ -88,7 +88,7 @@ initial begin
      //Transmit and read teh data on the RGMII pins
      fork
         begin
-            repeat(50) begin
+            repeat(100) begin
                 // Generate and transmit a packet of data to the rx end of the rgmii inputs
                 udp_sim.generate_packet(tx_pckt); 
                 rgmii_rx.rgmii_drive_data(tx_pckt.payload, 2'b00, 1'b0, bad_pckt);

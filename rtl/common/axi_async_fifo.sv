@@ -51,12 +51,11 @@ reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey_sync;
 /* BRAM Instantiation */
 (* ram_style="block" *) reg [FIFO_WORD_SIZE-1:0] bram [0:FIFO_DEPTH-1]; 
 
-
 reg s_frame_commit = 1'b0;
 reg s_axis_trdy_out = 1'b0;
 
-wire full;
-wire empty;
+reg full;
+reg empty;
 
 /* Reset Logic */
 
@@ -116,9 +115,23 @@ cdc_signal_sync#(
 assign full = (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
 assign empty = (rd_ptr_grey == wr_ptr_grey_sync);
 
+/*always @(posedge s_aclk) begin
+    if(!s_sresetn | !m2s_reset_sync)
+        full <= 1'b0;
+    else    
+        full <= (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
+end
+
+always @(posedge m_aclk) begin
+    if(!m_sresetn | !s2m_reset_sync)
+        empty <= 1'b1;
+    else
+        empty <= (rd_ptr_grey == wr_ptr_grey_sync);
+end*/
+
 /* Writing Logic */
 
-wire [FIFO_ADDR_WIDTH:0] wr_ptr_binary_next = wr_ptr_binary + !full;
+wire [FIFO_ADDR_WIDTH:0] wr_ptr_binary_next = wr_ptr_binary + 1;
 
 always @(posedge s_aclk) begin
     if(!s_sresetn | !m2s_reset_sync) begin
@@ -130,10 +143,13 @@ always @(posedge s_aclk) begin
     end else begin
         s_frame_commit <= 1'b0;
 
-        if(s_axis_tvalid & s_axis_trdy) begin
+        // AXI-Stream handshake signaling valid data/slave is ready 
+        if(s_axis_tvalid & s_axis_trdy & !full) begin
             bram[wr_ptr_binary[FIFO_ADDR_WIDTH-1:0]] <= {s_axis_tdata, s_axis_tlast};
-            wr_ptr_binary <= wr_ptr_binary_next; 
-            wr_ptr_grey <=  (wr_ptr_binary_next >> 1) ^ wr_ptr_binary_next;         
+            
+            // If the FIFO is not full, increment the write pointer
+            wr_ptr_binary <= wr_ptr_binary_next;
+            wr_ptr_grey <=  (wr_ptr_binary_next >> 1) ^ wr_ptr_binary_next;      
         end
 
         //If it is the last packet and it is not a bad packet; udpate the commited pointer
@@ -163,7 +179,7 @@ integer i;
 
 /* Reading Logic */
 
-wire [FIFO_ADDR_WIDTH:0] rd_ptr_binary_next = rd_ptr_binary + !empty;
+wire [FIFO_ADDR_WIDTH:0] rd_ptr_binary_next = rd_ptr_binary + 1;
 
 always @(posedge m_aclk) begin
     if(!m_sresetn | !s2m_reset_sync) begin
@@ -194,9 +210,10 @@ always @(posedge m_aclk) begin
             //Read data into the pipe from the BRAM
             m_axis_tdata_pipe[0] <= bram[rd_ptr_binary[FIFO_ADDR_WIDTH-1:0]];
             m_axis_tvalid_pipe[0] <= ~empty;
-            //Update the read pointer
+            
+            //Update the read pointer if the FIFO is not empty
             rd_ptr_binary <= rd_ptr_binary_next;
-            rd_ptr_grey <= (rd_ptr_binary_next >> 1) ^ rd_ptr_binary_next;        
+            rd_ptr_grey <= (rd_ptr_binary_next >> 1) ^ rd_ptr_binary_next;   
         end
     end
 end

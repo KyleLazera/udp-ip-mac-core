@@ -17,9 +17,10 @@ interface axi_stream_tx_bfm #(
      * after sending a frame & keeps tuser low for the entire duration*/
     task axis_transmit_basic(bit [7:0] data[$]);
 
-        //Raise tvalid & tuser flag to indicate we are ready to transmit
+        //Raise tvalid flag to indicate we are ready to transmit
         @(posedge s_aclk);
         s_axis_tvalid <= 1'b1;
+        s_axis_tdata <= data.pop_front;
         s_axis_tuser <= 1'b0;
 
         //Wait for the trdy flag to go high
@@ -28,8 +29,11 @@ interface axi_stream_tx_bfm #(
 
         //Transmit data on each clock edge
         while(data.size() != 0) begin
-            s_axis_tdata <= data.pop_front;
-            s_axis_tlast <= (data.size() == 0);
+            // AXI-Stream Handshake
+            if(s_axis_tvalid & s_axis_trdy) begin
+                s_axis_tdata <= data.pop_front;
+                s_axis_tlast <= (data.size() == 0);
+            end
             @(posedge s_aclk);
         end
         

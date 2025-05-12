@@ -19,7 +19,7 @@ interface axi_stream_rx_bfm #(
         m_axis_trdy <= 1'b1;
         @(posedge m_aclk);
 
-        //Wait for the trdy flag to go high
+        //Wait for the tvalid flag to go high
         while(!m_axis_tvalid)
             @(posedge m_aclk);
 

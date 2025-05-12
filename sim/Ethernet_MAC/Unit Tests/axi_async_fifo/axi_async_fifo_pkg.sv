@@ -14,7 +14,7 @@ bit [7:0] ref_frame[$];
 
 // Used to generate a random frame of varying size
 function void generate_frame();
-    int pckt_size = $urandom_range(50, 100);
+    int pckt_size = $urandom_range(10, 500);
 
     //Clear current frame
     tx_frame.delete();

@@ -84,7 +84,7 @@ reg [15:0] ip_protocol = 8'b0;
 reg [15:0] udp_src_port = 16'b0;
 reg [15:0] udp_dst_port = 16'b0;
 reg [15:0] udp_pckt_length = 16'b0;
-reg [15:0] udp_checksum_reg = 16'b0;
+reg [16:0] udp_checksum_reg = 17'b0;
 
 // Intermediary/Control Signals
 reg [1:0] state = IDLE;
@@ -94,6 +94,22 @@ reg [PCKT_CNTR_WIDTH-1:0] pckt_cntr = {PCKT_CNTR_WIDTH{1'b0}};
 reg [AXI_DATA_WIDTH-1:0] udp_checksum_value = 8'b0;
 (* use_dsp="yes" *) reg [16:0] int_checksum_sum = 17'b0;
 (* use_dsp="yes" *) wire [15:0] udp_checksum_sum = int_checksum_sum[15:0] + int_checksum_sum[16];
+
+reg [16:0] src_ip_checksum_precompute = 17'b0;
+reg [16:0] dst_ip_checksum_precompute = 17'b0;
+reg [16:0] udp_port_checksum_precompute = 17'b0;
+
+reg [15:0] src_ip_checksum_carry = 16'b0;
+reg [15:0] dst_ip_checksum_carry = 16'b0;
+reg [15:0] udp_port_checksum_carry = 16'b0;
+
+reg [16:0] ip_addr_checksum_precompute = 17'b0;
+reg [16:0] port_protocol_checksum_precompute = 17'b0;
+
+reg [15:0] ip_addr_checksum_carry = 16'b0;
+reg [15:0] port_protocol_checksum_carry = 16'b0;
+
+reg [16:0] pseudo_hdr_checksum = 17'b0;
 
 // Packet Size Counter/Checksum Calculator FSM
 always @(posedge i_clk) begin
@@ -118,15 +134,48 @@ always @(posedge i_clk) begin
                     pckt_cntr <= {PCKT_CNTR_WIDTH{1'b0}};
                     //Move to the Header State
                     state <= HDR_CHECKSUM;
+
+                    // Precompute 16-bit words for the UDP checksum
+                    src_ip_checksum_precompute <= s_ip_tx_src_ip_addr[31:16] + s_ip_tx_src_ip_addr[15:0];
+                    dst_ip_checksum_precompute <= s_ip_tx_dst_ip_addr[31:16] + s_ip_tx_dst_ip_addr[15:0];
+                    udp_port_checksum_precompute <= s_udp_tx_src_port + s_udp_tx_dst_port;
                 end
             end
             HDR_CHECKSUM: begin
 
                 pckt_cntr <= pckt_cntr + 1;
 
+                case(pckt_cntr)
+                    'd0: begin
+                        // Wrap the carry for each pre-computed UDP Checksum value
+                        src_ip_checksum_carry <= src_ip_checksum_precompute[15:0] + src_ip_checksum_precompute[16];
+                        dst_ip_checksum_carry <= dst_ip_checksum_precompute[15:0] + dst_ip_checksum_precompute[16];
+                        udp_port_checksum_carry <= udp_port_checksum_precompute[15:0] + udp_port_checksum_precompute[16];
+                    end
+                    'd1: begin
+                        ip_addr_checksum_precompute <= src_ip_checksum_carry + dst_ip_checksum_carry;
+                        port_protocol_checksum_precompute <= udp_port_checksum_carry + ip_protocol;
+                    end
+                    'd2: begin
+                        ip_addr_checksum_carry <= ip_addr_checksum_precompute[15:0] + ip_addr_checksum_precompute[16];
+                        port_protocol_checksum_carry <= port_protocol_checksum_precompute[15:0] + port_protocol_checksum_precompute[16];
+                    end
+                    'd3: begin
+                        //pseudo_hdr_checksum <= ip_addr_checksum_carry + port_protocol_checksum_carry;
+                        int_checksum_sum <= ip_addr_checksum_carry + port_protocol_checksum_carry;
+                    end
+                    /*'d4: begin
+                        //int_checksum_sum <= pseudo_hdr_checksum[15:0] + pseudo_hdr_checksum[16];
+                    end*/
+                    'd4: begin
+                        pckt_cntr <= UDP_HEADER_LENGTH;
+                        state <= PAYLOAD_CHECKSUM;
+                    end
+                endcase
+
                 // While the tx UDP module drives the UDP header values, calculate the UDP checksum value
                 // for the IP pseudo-header + the UDP header values we know
-                case(pckt_cntr)
+                /*case(pckt_cntr)
                     'd0: int_checksum_sum <= ip_src_addr[31:16] + ip_src_addr[15:0];
                     'd1: int_checksum_sum <= udp_checksum_sum + ip_dst_addr[31:16];
                     'd2: int_checksum_sum <= udp_checksum_sum + ip_dst_addr[15:0];
@@ -137,7 +186,7 @@ always @(posedge i_clk) begin
                         pckt_cntr <= UDP_HEADER_LENGTH;
                         state <= PAYLOAD_CHECKSUM;
                     end
-                endcase
+                endcase*/
             end
             PAYLOAD_CHECKSUM: begin
 
@@ -172,7 +221,7 @@ always @(posedge i_clk) begin
                 pckt_cntr <= {PCKT_CNTR_WIDTH{1'b0}};
                 
                 // Set the checksum and Length values
-                udp_checksum_reg <= ~(udp_checksum_sum + pckt_cntr);
+                udp_checksum_reg <= udp_checksum_sum + pckt_cntr;
                 udp_pckt_length <= pckt_cntr;
                 
                 // Move back to IDLE
@@ -185,7 +234,8 @@ end
 /* Checksum Output Fields */
 assign m_udp_tx_hdr_valid = m_udp_hdr_valid_reg;
 assign m_udp_tx_length = udp_pckt_length;
-assign m_udp_tx_checksum = udp_checksum_reg;
+assign m_udp_tx_checksum = ~(udp_checksum_reg[15:0] + udp_checksum_reg[16]);
+//assign m_udp_tx_checksum = udp_checksum_reg;
 
 /* UDP TX Module */
 
