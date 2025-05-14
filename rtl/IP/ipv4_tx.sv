@@ -417,7 +417,6 @@ always @(posedge i_clk) begin
                   s_ip_hdr_rdy_reg <= 1'b1;
 
                   // Output the delayed header fields
-                  //ip_hdr_checksum <= ~ip_checksum(checksum_sum, pckt_cntr);
                   ip_hdr_checksum <= ~(ip_checksum_sum + pckt_cntr);
                   ip_hdr_total_length <= pckt_cntr;
                   m_ip_tx_hdr_tvalid_reg <= 1'b1;
