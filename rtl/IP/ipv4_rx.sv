@@ -92,31 +92,6 @@ reg latched_hdr = 1'b0;
 /* Checksum Calculation Logic */ 
 reg [15:0] checksum_sum = 16'b0;
 
-////////////////////////////////////////////////////////////////////////
-// The IP Header checksum is calculated by first dividing the IP Header into
-// 16 bit fields. Each 16 bit field is added together, however, if there is a 
-// carry out, the carry is added back to the lsb of the 16-bit sum. An example
-// is provided below using 8 bit values:
-//
-// Operand 1:   10011001
-// Operand 2:  +11101101
-// Result:     110000110
-//
-// Because the result has a carry out of 1, we add this back to the Result:
-//
-// Operand 1:   10000110
-// Operand 2:  +       1
-// Result:      10000111
-//////////////////////////////////////////////////////////////////////// 
-function [15:0] ip_checksum(input [15:0] sum, input [15:0] hdr_field);
-   //Intermediary sum
-   reg [16:0] int_sum;
-   begin
-      int_sum = sum + hdr_field;
-      ip_checksum = int_sum[15:0] + int_sum[16]; 
-   end 
-endfunction : ip_checksum
-
 /* Ethernet Header Data Path Registers */
 reg eth_hdr_rdy_reg = 1'b0;
 reg [47:0] eth_rx_src_mac_addr = 48'd0;
@@ -151,7 +126,6 @@ always @(posedge i_clk) begin
         bad_pckt_reg <= 1'b0;
         latched_hdr <= 1'b0;
         hdr_cntr <= 5'b0;
-        checksum_sum <= 16'b0;
     end else begin
         // Default Values
         eth_hdr_rdy_reg <= 1'b0;
@@ -177,7 +151,6 @@ always @(posedge i_clk) begin
                     
                     if(s_rx_axis_tvalid) begin
                         s_rx_axis_trdy_reg <= 1'b1;
-                        checksum_sum <= 16'b0;
                         hdr_cntr <= 5'b0;
                         state <= ETH_HDR;
                     end
@@ -193,7 +166,6 @@ always @(posedge i_clk) begin
 
                         s_rx_axis_trdy_reg <= 1'b1;
                         eth_hdr_rdy_reg <= 1'b0;
-                        checksum_sum <= 16'b0;
                         hdr_cntr <= 5'b0;
                         state <= IP_HDR;
                     end
@@ -274,29 +246,23 @@ always @(posedge i_clk) begin
                         5'd18: ip_hdr_dst_ip_addr[15:8] <= s_rx_axis_tdata;
                         5'd19: ip_hdr_dst_ip_addr[7:0] <= s_rx_axis_tdata;   
                         5'd20: begin
-                            // Make sure the checksum is correct 
-                            //if(checksum_sum == 16'hffff) begin
-                                s_rx_axis_trdy_reg <= m_rx_axis_trdy;
-                                m_ip_hdr_tvalid_reg <= 1'b1;
+                            s_rx_axis_trdy_reg <= m_rx_axis_trdy;
+                            m_ip_hdr_tvalid_reg <= 1'b1;
 
-                                //Store the first raw payload data
-                                m_rx_axis_tdata_reg <= s_rx_axis_tdata;
-                                m_rx_axis_tvalid_reg <= s_rx_axis_tvalid;
-                                m_rx_axis_tlast_reg <= s_rx_axis_tlast;  
+                            //Store the first raw payload data
+                            m_rx_axis_tdata_reg <= s_rx_axis_tdata;
+                            m_rx_axis_tvalid_reg <= s_rx_axis_tvalid;
+                            m_rx_axis_tlast_reg <= s_rx_axis_tlast;  
                                 
-                                // Decrement the payload byte counter
-                                ip_hdr_total_length <= ip_hdr_total_length - 1'b1;  
+                            // Decrement the payload byte counter
+                            ip_hdr_total_length <= ip_hdr_total_length - 1'b1;  
 
-                                // If the packet only contained IP/ethernet header info, return to IDLE
-                                if(s_rx_axis_tlast & s_rx_axis_tvalid)
-                                    state <= IDLE; 
-                                else                    
-                                    state <= PAYLOAD;         
+                            // If the packet only contained IP/ethernet header info, return to IDLE
+                            if(s_rx_axis_tlast & s_rx_axis_tvalid)
+                                state <= IDLE; 
+                            else                    
+                                state <= PAYLOAD;         
 
-                            /*end else begin
-                                bad_pckt_reg <= 1'b1;
-                                state <= WAIT;
-                            end*/
                         end                                    
                     endcase            
                 end

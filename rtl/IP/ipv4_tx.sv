@@ -146,33 +146,6 @@ reg [4:0] hdr_cntr = 5'b0;
 reg [16:0] int_checksum_sum = 16'b0;
 reg [15:0] ip_checksum_sum = 16'b0;
 reg [15:0] checksum_pckt_diff = 16'b0;
-//(* use_dsp="yes" *) wire [15:0] ip_checksum_sum = int_checksum_sum[15:0] + int_checksum_sum[16];
-
-////////////////////////////////////////////////////////////////////////
-// The IP Header checksum is calculated by first dividing the IP Header into
-// 16 bit fields. Each 16 bit field is added together, however, if there is a 
-// carry out, the carry is added back to the lsb of the 16-bit sum. An example
-// is provided below using 8 bit values:
-//
-// Operand 1:   10011001
-// Operand 2:  +11101101
-// Result:     110000110
-//
-// Because the result has a carry out of 1, we add this back to the Result:
-//
-// Operand 1:   10000110
-// Operand 2:  +       1
-// Result:      10000111
-//////////////////////////////////////////////////////////////////////// 
-function [15:0] ip_checksum(input [15:0] sum, input [15:0] hdr_field);
-   //Intermediary sum
-   reg [16:0] int_sum;
-   begin
-      int_sum = sum + hdr_field;
-      ip_checksum = int_sum[15:0] + int_sum[16]; 
-   end 
-endfunction : ip_checksum
-
 
 /*  Assign IP Header Constants */
 assign ip_hdr_version = IPv4_VERSION;
@@ -268,7 +241,7 @@ always @(posedge i_clk) begin
 
             // Before transmitting data, ensure the down-stream module has the trdy
             // flag set, indicating it is ready to recieve data.
-            if(m_tx_axis_trdy & m_tx_axis_tvalid_reg) begin
+            if(m_tx_axis_trdy_reg & m_tx_axis_tvalid_reg) begin
 
                hdr_cntr <= hdr_cntr + 1;
 
@@ -308,7 +281,7 @@ always @(posedge i_clk) begin
             // values DEAD & BEEF.
             ////////////////////////////////////////////////////////////////////////////////////////////////
 
-            if(m_tx_axis_trdy & m_tx_axis_tvalid_reg) begin
+            if(m_tx_axis_trdy_reg & m_tx_axis_tvalid_reg) begin
                // Based on the header counter, determine which field of the header to transmit downstream
                case(hdr_cntr)
                   5'd0: begin
@@ -394,7 +367,7 @@ always @(posedge i_clk) begin
             m_eth_hdr_tvalid_reg <= (ETH_FRAME) ? 1'b0 : !hdr_latched;
 
             // Make sure AXI Handshake is active
-            if(m_tx_axis_trdy & s_tx_axis_tvalid) begin
+            if(m_tx_axis_trdy_reg & s_tx_axis_tvalid) begin
                m_tx_axis_tdata_reg <= s_tx_axis_tdata;
                m_tx_axis_tlast_reg <= s_tx_axis_tlast;
 
@@ -445,7 +418,6 @@ assign m_tx_axis_tlast = m_tx_axis_tlast_reg;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy_reg : 1'b0;
-//assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy : 1'b0;
 assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
 
 /* IP Header Outputs */
