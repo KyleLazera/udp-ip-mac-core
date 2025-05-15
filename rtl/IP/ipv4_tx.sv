@@ -131,6 +131,7 @@ reg [1:0] state_reg = IDLE;
 reg [AXI_STREAM_WIDTH-1:0] m_tx_axis_tdata_reg = 8'b0;
 reg m_tx_axis_tvalid_reg = 1'b0; 
 reg m_tx_axis_tlast_reg = 1'b0;     
+reg m_tx_axis_trdy_reg = 1'b0;
 reg s_tx_axis_trdy_reg = 1'b0;
 reg s_ip_hdr_rdy_reg = 1'b0;
 reg m_eth_hdr_tvalid_reg = 1'b0;
@@ -211,6 +212,8 @@ always @(posedge i_clk) begin
       m_tx_axis_tlast_reg <= 1'b0;      
       s_ip_hdr_rdy_reg <= 1'b0;
       m_eth_hdr_tvalid_reg <= 1'b1;   
+
+      m_tx_axis_trdy_reg <= m_tx_axis_trdy;
 
       // FSM
       case(state_reg)
@@ -311,49 +314,38 @@ always @(posedge i_clk) begin
                   5'd0: begin
                      m_tx_axis_tdata_reg <= ip_hdr_type;
                      int_checksum_sum <= {ip_hdr_version, ip_hdr_length, ip_hdr_type} + {ip_hdr_ttl, ip_hdr_protocol};
-                     //checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_version, ip_hdr_length, ip_hdr_type});
                   end
                   5'd1: begin
                      m_tx_axis_tdata_reg <= 8'hDE;   
                      ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];   
-                     //int_checksum_sum <= ip_checksum_sum + ip_hdr_src_ip_addr[31:16];
                   end
                   5'd2: begin
                      m_tx_axis_tdata_reg <= 8'hAD;
                      int_checksum_sum <= ip_checksum_sum + ip_hdr_src_ip_addr[31:16];
-                     //int_checksum_sum <= ip_checksum_sum + ip_hdr_src_ip_addr[15:0];
                   end
                   5'd3: begin
                      m_tx_axis_tdata_reg <= ip_hdr_id[15:8];
                      ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
-                     //int_checksum_sum <= ip_checksum_sum + ip_hdr_dst_ip_addr[31:16];
-                     //checksum_sum <= ip_checksum(checksum_sum, {ip_hdr_ttl, ip_hdr_protocol});
                   end
                   5'd4: begin
                      m_tx_axis_tdata_reg <= ip_hdr_id[7:0];
-                     int_checksum_sum <= ip_checksum_sum + ip_hdr_src_ip_addr[15:0];
-                     //int_checksum_sum <= ip_checksum_sum + ip_hdr_dst_ip_addr[15:0];
-                     //checksum_sum <= ip_checksum(checksum_sum, ip_hdr_src_ip_addr[31:16]);               
+                     int_checksum_sum <= ip_checksum_sum + ip_hdr_src_ip_addr[15:0];             
                   end   
                   5'd5: begin
                      m_tx_axis_tdata_reg <= {ip_hdr_flags, ip_hdr_frag_offset[12:8]};
                      ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
-                     //checksum_sum <= ip_checksum(checksum_sum, ip_hdr_src_ip_addr[15:0]); 
                   end
                   5'd6: begin
                      m_tx_axis_tdata_reg <= ip_hdr_frag_offset[7:0];
                      int_checksum_sum <= ip_checksum_sum + ip_hdr_dst_ip_addr[31:16];
-                     //checksum_sum <= ip_checksum(checksum_sum, ip_hdr_dst_ip_addr[31:16]);
                   end
                   5'd7: begin
                      m_tx_axis_tdata_reg <= ip_hdr_ttl;
                      ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
-                     //checksum_sum <= ip_checksum(checksum_sum, ip_hdr_dst_ip_addr[15:0]);
                   end
                   5'd8: begin
                      m_tx_axis_tdata_reg <= ip_hdr_protocol;
                      int_checksum_sum <= ip_checksum_sum + ip_hdr_dst_ip_addr[15:0];
-                     //ip_hdr_checksum <= ~checksum_sum;
                   end
                   5'd9: begin
                      m_tx_axis_tdata_reg <= 8'hBE;  
@@ -452,7 +444,8 @@ assign m_tx_axis_tlast = m_tx_axis_tlast_reg;
 // sending data while the down-stream module is not ready.
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy : 1'b0;
+assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy_reg : 1'b0;
+//assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy : 1'b0;
 assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
 
 /* IP Header Outputs */

@@ -60,7 +60,9 @@ class ip_eth_frame extends ip_agent;
 
     endfunction : check_ethernet_hdr
 
-    function void check_ip_hdr(ref ip_pckt_t tx_pckt, ref ip_pckt_t rx_pckt);
+    function void check_ip_hdr(ref ip_pckt_t tx_pckt, ref ip_pckt_t rx_pckt, input bit tx_ip);
+
+        if(tx_ip) begin
 
         assert(tx_pckt.ip_hdr.version == rx_pckt.ip_hdr.version) 
             else begin
@@ -116,6 +118,8 @@ class ip_eth_frame extends ip_agent;
                 $finish;
             end  
 
+        end
+
         assert(tx_pckt.ip_hdr.src_ip_addr == rx_pckt.ip_hdr.src_ip_addr) 
             else begin 
                 $display("TX IP SRC Addr %0h != RX IP SRC Addr %0h MISMATCH", tx_pckt.ip_hdr.src_ip_addr, rx_pckt.ip_hdr.src_ip_addr);
@@ -136,7 +140,6 @@ class ip_eth_frame extends ip_agent;
         // Wait for the tx packet to be recieved
         @(tx_pckt_evt);
 
-        // Do not wait for the RX data event if IP Version is not IPv4 or if the bad checksum flag is raised
         if(tx_pckt.ip_hdr.version != 4'd4) begin
             $display("//////////////////////////////////////");
             $display("IP Version != IPv4 - Packet Dropped");
@@ -146,7 +149,7 @@ class ip_eth_frame extends ip_agent;
         end 
         else if(ip_cfg.bad_checksum == 1'b1) begin
             $display("//////////////////////////////////////");
-            $display("Back Checksum - Packet Dropped");
+            $display("Bad Checksum - Packet Dropped");
             $display("//////////////////////////////////////");
             ->scb_complete;
             return;   
@@ -162,29 +165,17 @@ class ip_eth_frame extends ip_agent;
         // Wait for the RX packet to be recieved
         @(rx_pckt_evt); 
 
-        de_encapsulate_eth_packet(rx_pckt);
-        de_encapsulate_ip_packet(rx_pckt);
-
-        /*if(tx_ip) begin
-            encap_eth_ip_packet(tx_pckt);
-        end 
-        // If we are testing the RX IP Module - de-encapsulate the tx data before comparing with the rx_data
-        else begin
+        if(tx_ip) begin
+            de_encapsulate_eth_packet(rx_pckt);
+            de_encapsulate_ip_packet(rx_pckt);
+        end else
             de_encap_packet(tx_pckt);
-        end*/
-
-        // Make sure the calculated total size & checksum is accurate
-        /*assert(tx_pckt.ip_hdr.total_length == rx_pckt.ip_hdr.total_length)
-            else begin
-                $display("Tx Total Length Field: %0d != Rx Total Length Field: %0d MISMATCH", tx_pckt.ip_hdr.total_length, rx_pckt.ip_hdr.total_length); 
-                $stop;
-            end*/
 
         // Compare the Ethernet Headers of teh tx and rx packet
         check_ethernet_hdr(tx_pckt, rx_pckt);
 
         // Compare the IP Headers of the tx and rx packets
-        check_ip_hdr(tx_pckt, rx_pckt);
+        check_ip_hdr(tx_pckt, rx_pckt, tx_ip);
 
         // Compare payload wihtin packets
         foreach(rx_pckt.payload[i]) begin

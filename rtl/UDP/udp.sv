@@ -96,8 +96,8 @@ reg s_tx_udp_trdy;
 
 // Checksum Signals 
 reg [AXI_DATA_WIDTH-1:0] udp_checksum_value = 8'b0;
-(* use_dsp="yes" *) reg [16:0] int_checksum_sum = 17'b0;
-(* use_dsp="yes" *) reg [15:0] checksum_sum_carry = 16'b0;
+reg [16:0] int_checksum_sum = 17'b0;
+reg [15:0] checksum_sum_carry = 16'b0;
 
 reg [16:0] src_ip_checksum_precompute = 17'b0;
 reg [16:0] dst_ip_checksum_precompute = 17'b0;
@@ -126,7 +126,8 @@ reg [15:0] udp_hdr_checksum_carry = 16'b0;
 // are added, any carry out must be folded back and added to the result.
 // 
 // Since addition is associative, the checksum of the pseudo-header and UDP header can be
-// precomputed in parallel with the payload sum, improving timing and reducing latency.
+// precomputed in parallel with the payload sum. This means that the UDP checksum algorithm can be
+// pipelined more, and therefore improve timing.
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 always @(posedge i_clk) begin
@@ -146,6 +147,7 @@ always @(posedge i_clk) begin
         ip_addr_checksum_carry <= ip_addr_checksum_precompute[15:0] + ip_addr_checksum_precompute[16];
         port_protocol_checksum_carry <= port_protocol_checksum_precompute[15:0] + port_protocol_checksum_precompute[16];
 
+        // Calculate the psuedo-header UDP checksum
         pseudo_hdr_checksum <= ip_addr_checksum_carry + port_protocol_checksum_carry;
         pseudo_hdr_checksum_carry <= pseudo_hdr_checksum[15:0] + pseudo_hdr_checksum[16];
     end
@@ -230,8 +232,10 @@ always @(posedge i_clk) begin
             udp_port_checksum_precompute <= s_udp_tx_src_port + s_udp_tx_dst_port;
         end
 
+        /* Checksum Calculation State Machine */
         case(state)
             CHECKSUM_ACCUMULATE: begin
+                
                 // If the AXI-Stream handshake is valid, sample the UDP payload data 
                 if(s_tx_axis_trdy & s_tx_axis_tvalid) begin
 
@@ -242,8 +246,10 @@ always @(posedge i_clk) begin
                         checksum_sum_carry <= int_checksum_sum[15:0] + int_checksum_sum[16];
                         udp_checksum_value <= s_tx_axis_tdata;
 
-                        if(s_tx_axis_tlast)
+                        if(s_tx_axis_tlast) begin
+                            hdr_latched <= 1'b0;
                             state <= ODD_LAST_BYTE;
+                        end
 
                     end
 
@@ -251,21 +257,22 @@ always @(posedge i_clk) begin
                     if(pckt_cntr[0] == 1'b1) begin
                         int_checksum_sum <= checksum_sum_carry + {udp_checksum_value, s_tx_axis_tdata};
 
-                        // Only move to the next state on an even value - this allows us to calculate the 
-                        // checksum of the last byte (require 16 bit values)
-                        if(s_tx_axis_tlast) 
+                        if(s_tx_axis_tlast) begin
+                            hdr_latched <= 1'b0;
                             state <= HEADER_SUM_COMBINE;
+                        end
 
                     end
                 end
             end
+            // If teh last byte triggered an odd packet size, add a padding (8'h00) byte to the UDP byte
+            // to make it 16 bits
             ODD_LAST_BYTE: begin
                 int_checksum_sum <= checksum_sum_carry + {udp_checksum_value, 8'h00};
                 state <= HEADER_SUM_COMBINE;
             end
             // Add precomputed pseudo-header checksum and packet length
             HEADER_SUM_COMBINE: begin
-                hdr_latched <= 1'b0;
                 udp_hdr_checksum <= pseudo_hdr_checksum_carry + pckt_cntr;
                 checksum_sum_carry <= int_checksum_sum[15:0] + int_checksum_sum[16];
                 state <= SUM_MERGE;

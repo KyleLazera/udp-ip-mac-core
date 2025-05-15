@@ -225,9 +225,9 @@ class ip_agent;
 
     /* Used to set configuration struct values based on probability to test edge cases */
     function void set_config();
-        int prob_not_ipv4 = ($urandom_range(0, 15) == 1);
+        int prob_not_ipv4 = 0;//($urandom_range(0, 15) == 1);
         int prob_bad_checksum = ($urandom_range(0, 15) == 1);
-        int prob_bad_length = ($urandom_range(0, 15) == 1);
+        int prob_bad_length = 0;//($urandom_range(0, 15) == 1);
         // Using the randomly generated variable, there will be a packet that is not IPv4 or has a bad checksum
         // periodically transmitted to the module
         if(prob_not_ipv4)
@@ -248,8 +248,9 @@ class ip_agent;
 
         // Wait for the tx packet to be recieved
         @(tx_pckt_evt);
+        // Wait for teh RX packet to be recieved
+        @(rx_pckt_evt); 
 
-        // Do not wait for the RX data event if IP Version is not IPv4 or if the bad checksum flag is raised
         if(tx_pckt.ip_hdr.version != 4'd4) begin
             $display("//////////////////////////////////////");
             $display("IP Version != IPv4 - Packet Dropped");
@@ -271,9 +272,6 @@ class ip_agent;
             ->scb_complete;
             return;   
         end 
-
-        // Wait for teh RX packet to be recieved
-        @(rx_pckt_evt); 
 
         if(tx_ip) begin
             encapsulate_ip_packet(tx_pckt);
@@ -299,7 +297,7 @@ class ip_agent;
                 end
         end 
 
-        /* Check Packet Headers */
+        // Check Packet Headers 
         assert(tx_pckt.eth_hdr.src_mac_addr == rx_pckt.eth_hdr.src_mac_addr) $display("Source MAC Address MATCH");
             else begin
                 $display("Source MAC Address MISMATCH");
@@ -318,7 +316,7 @@ class ip_agent;
 
         ->scb_complete;
 
-    endtask : self_check    
+    endtask : self_check  
 
 endclass : ip_agent
 

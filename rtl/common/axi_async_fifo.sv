@@ -1,10 +1,5 @@
 `timescale 1ns / 1ps
 
-/* todo:
-* - Add safety mechanism for FIFO depth being a power of 2
-* - Add packet dropping mechanism/almost empty or full flags
-*/
-
 
 module axi_async_fifo
 #(
@@ -38,27 +33,27 @@ module axi_async_fifo
 
 /* Write Domain Pointers */
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_binary = {FIFO_ADDR_WIDTH{1'b0}};
+reg [FIFO_ADDR_WIDTH:0] wr_ptr_binary_next = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_packet_commit = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_packet_commit_grey = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] rd_ptr_grey_sync;
-
 /* Read Domain Pointers */
 reg [FIFO_ADDR_WIDTH:0] rd_ptr_binary = {FIFO_ADDR_WIDTH{1'b0}};
+reg [FIFO_ADDR_WIDTH:0] rd_ptr_binary_next = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] rd_ptr_grey = {FIFO_ADDR_WIDTH{1'b0}};
 reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey_sync;
 
 /* BRAM Instantiation */
 (* ram_style="block" *) reg [FIFO_WORD_SIZE-1:0] bram [0:FIFO_DEPTH-1]; 
 
+/* Data-Path Registers */
 reg s_frame_commit = 1'b0;
 reg s_axis_trdy_out = 1'b0;
-
 reg full;
 reg empty;
 
 /* Reset Logic */
-
 reg [2:0] s_reset_sync = 3'b0;
 reg [2:0] m_reset_sync = 3'b0;
 
@@ -118,7 +113,7 @@ assign empty = (rd_ptr_grey == wr_ptr_grey_sync);
 /*always @(posedge s_aclk) begin
     if(!s_sresetn | !m2s_reset_sync)
         full <= 1'b0;
-    else    
+    else
         full <= (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
 end
 
@@ -131,11 +126,10 @@ end*/
 
 /* Writing Logic */
 
-wire [FIFO_ADDR_WIDTH:0] wr_ptr_binary_next = wr_ptr_binary + 1;
-
 always @(posedge s_aclk) begin
     if(!s_sresetn | !m2s_reset_sync) begin
         wr_ptr_binary <= {FIFO_ADDR_WIDTH{1'b0}};
+        wr_ptr_binary_next <= {{(FIFO_ADDR_WIDTH-1){1'b0}}, 1'b1};
         wr_ptr_packet_commit <= {FIFO_ADDR_WIDTH{1'b0}};
         wr_ptr_packet_commit_grey <= {FIFO_ADDR_WIDTH{1'b0}};
         wr_ptr_grey <= {FIFO_ADDR_WIDTH{1'b0}};
@@ -148,6 +142,7 @@ always @(posedge s_aclk) begin
             bram[wr_ptr_binary[FIFO_ADDR_WIDTH-1:0]] <= {s_axis_tdata, s_axis_tlast};
             
             // If the FIFO is not full, increment the write pointer
+            wr_ptr_binary_next <= wr_ptr_binary_next + 1;
             wr_ptr_binary <= wr_ptr_binary_next;
             wr_ptr_grey <=  (wr_ptr_binary_next >> 1) ^ wr_ptr_binary_next;      
         end
@@ -179,11 +174,10 @@ integer i;
 
 /* Reading Logic */
 
-wire [FIFO_ADDR_WIDTH:0] rd_ptr_binary_next = rd_ptr_binary + 1;
-
 always @(posedge m_aclk) begin
     if(!m_sresetn | !s2m_reset_sync) begin
         rd_ptr_binary <= {FIFO_ADDR_WIDTH{1'b0}};
+        rd_ptr_binary_next <= {{(FIFO_ADDR_WIDTH-1){1'b0}}, 1'b1};
         rd_ptr_grey <= {FIFO_ADDR_WIDTH{1'b0}};        
     end else begin
 
@@ -212,8 +206,9 @@ always @(posedge m_aclk) begin
             m_axis_tvalid_pipe[0] <= ~empty;
             
             //Update the read pointer if the FIFO is not empty
+            rd_ptr_binary_next <= rd_ptr_binary_next + 1;
             rd_ptr_binary <= rd_ptr_binary_next;
-            rd_ptr_grey <= (rd_ptr_binary_next >> 1) ^ rd_ptr_binary_next;   
+            rd_ptr_grey <= (rd_ptr_binary_next >> 1) ^ rd_ptr_binary_next;  
         end
     end
 end

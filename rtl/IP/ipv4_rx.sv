@@ -78,6 +78,8 @@ localparam [2:0] WAIT = 3'b100;
 /* Data Path Registers */
 reg [2:0] state = IDLE;
 reg [15:0] ip_checksum_fields;
+reg [16:0] int_checksum_sum = 17'b0;
+reg [15:0] checksum_carry_sum = 16'b0;
 reg [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata_reg = {AXI_DATA_WIDTH-1{1'b0}};
 reg m_rx_axis_tvalid_reg = 1'b0;
 reg m_rx_axis_tlast_reg = 1'b0;
@@ -161,6 +163,9 @@ always @(posedge i_clk) begin
         case(state)
             IDLE: begin
 
+                checksum_carry_sum <= 16'b0;
+                int_checksum_sum <= 17'b0;
+
                 ////////////////////////////////////////////////////////////////////////////////////////
                 // If ETH_FRAME is set, the AXI data recieved will be directly passed from the ethernet MAC
                 // therefore, it will be formatted with the src MAC, dst MAC and ethernet type in front 
@@ -221,15 +226,18 @@ always @(posedge i_clk) begin
             IP_HDR: begin
                 s_rx_axis_trdy_reg <= 1'b1;
 
+                // AXI-Stream valid handshake
                 if(s_rx_axis_trdy_reg & s_rx_axis_tvalid) begin
 
                     hdr_cntr <= hdr_cntr + 1'b1;
                     
-                    // Pass the 16 bit field into the checksum on every 2nd cntr iteration
-                    if(hdr_cntr[0] == 1'b0)
+                    // If the number of bytes recieved is even, stage the byte to form a 16-bit word
+                    // and calculate the carry for any current intermediary sums.
+                    if(hdr_cntr[0] == 1'b0) begin
                         ip_checksum_fields <= {ip_checksum_fields[7:0], s_rx_axis_tdata};
-                    else 
-                        checksum_sum <= ip_checksum(checksum_sum, {ip_checksum_fields[7:0], s_rx_axis_tdata});
+                        checksum_carry_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
+                    end else 
+                        int_checksum_sum <= checksum_carry_sum + {ip_checksum_fields[7:0], s_rx_axis_tdata};
 
                     // Iterate through each byte of the IP header and store the values in the data registers
                     case(hdr_cntr)
@@ -267,7 +275,7 @@ always @(posedge i_clk) begin
                         5'd19: ip_hdr_dst_ip_addr[7:0] <= s_rx_axis_tdata;   
                         5'd20: begin
                             // Make sure the checksum is correct 
-                            if(checksum_sum == 16'hffff) begin
+                            //if(checksum_sum == 16'hffff) begin
                                 s_rx_axis_trdy_reg <= m_rx_axis_trdy;
                                 m_ip_hdr_tvalid_reg <= 1'b1;
 
@@ -285,10 +293,10 @@ always @(posedge i_clk) begin
                                 else                    
                                     state <= PAYLOAD;         
 
-                            end else begin
+                            /*end else begin
                                 bad_pckt_reg <= 1'b1;
                                 state <= WAIT;
-                            end
+                            end*/
                         end                                    
                     endcase            
                 end
@@ -296,6 +304,12 @@ always @(posedge i_clk) begin
             PAYLOAD: begin
                 m_rx_axis_tvalid_reg <= 1'b1;
                 m_ip_hdr_tvalid_reg <= 1'b1;
+
+                // Verify Checksum
+                if(checksum_carry_sum != 16'hFFFF) begin
+                    bad_pckt_reg <= 1'b1;
+                    state <= WAIT;
+                end
 
                 // Once the downstream module has read the header data, we can lower the hdr_valid signal
                 if(latched_hdr || (m_ip_hdr_trdy & m_ip_hdr_tvalid)) begin

@@ -14,18 +14,20 @@ interface axi_stream_rx_bfm #(
 
     task axis_read(ref bit [7:0] data[$]);
 
-        //Raise trdy flag to indicate we are redy to read data
+        //Raise trdy flag 
         @(posedge m_aclk);
         m_axis_trdy <= 1'b1;
         @(posedge m_aclk);
 
-        //Wait for the tvalid flag to go high
+        //If tvalid flag is not high, wait until it is
         while(!m_axis_tvalid)
             @(posedge m_aclk);
 
         //Sample data on each clock edge
-        while(!m_axis_tlast & (m_axis_tvalid & m_axis_trdy)) begin
-            data.push_back(m_axis_tdata);
+        while(!m_axis_tlast & m_axis_tvalid) begin
+            if(m_axis_trdy)
+                data.push_back(m_axis_tdata);
+
             @(posedge m_aclk);
         end
         

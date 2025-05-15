@@ -74,6 +74,7 @@ initial begin
 
     test.test_sanity();
     test.write_read();
+    test.write_full();
 
     #100;
 

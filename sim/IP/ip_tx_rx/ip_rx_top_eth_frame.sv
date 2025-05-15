@@ -1,5 +1,5 @@
 
-`include "../common/ip_if.sv"
+`include "../common/ip_rx_if.sv"
 `include "ip_eth_frame.sv"
 
 /* Tests the ipv4_rx module with ETH_FRAME parameter set, therefore, the AXI-Stream data contains the IP
@@ -19,7 +19,7 @@ ip_pckt_t tx_ip_pckt, rx_ip_pckt;
 ip_eth_frame ip_rx_inst;
 
 //IP Header Interface
-ip_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
+ip_rx_if ip_hdr_if(.i_clk(clk_100), .i_resetn(reset_n));
 
 always #5 clk_100 = ~clk_100;
 
@@ -58,7 +58,7 @@ ipv4_rx #(
     .m_rx_axis_tvalid(ip_hdr_if.axi_rx.m_axis_tvalid),
     .m_rx_axis_tlast(ip_hdr_if.axi_rx.m_axis_tlast),
     .m_rx_axis_trdy(ip_hdr_if.axi_rx.m_axis_trdy),
-    .bad_packet()        
+    .bad_packet(ip_hdr_if.bad_packet)        
 );
  
 
@@ -78,8 +78,8 @@ initial begin
                 ip_rx_inst.self_check(.tx_pckt(tx_ip_pckt), .rx_pckt(rx_ip_pckt), .tx_ip(1'b0)); 
         end
         begin 
-            repeat(50) begin
-                ip_rx_inst.set_config();                
+            repeat(100) begin
+                ip_rx_inst.set_config();   
                 // Generate a full IP Packet & ethernet header and transmit to the IP rx module
                 ip_rx_inst.generate_packet(tx_ip_pckt);
                 ip_rx_inst.encap_eth_ip_packet(tx_ip_pckt);                

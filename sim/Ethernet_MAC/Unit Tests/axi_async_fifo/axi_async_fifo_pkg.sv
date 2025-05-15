@@ -28,7 +28,7 @@ function void generate_frame();
 endfunction : generate_frame
 
 function void scoreboard();
-        
+    
     //Self Checking logic 
     foreach(rx_frame[i]) begin
         bit [7:0] rx_byte = ref_frame.pop_front();

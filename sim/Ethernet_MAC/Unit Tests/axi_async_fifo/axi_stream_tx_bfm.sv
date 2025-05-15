@@ -32,10 +32,15 @@ interface axi_stream_tx_bfm #(
             // AXI-Stream Handshake
             if(s_axis_tvalid & s_axis_trdy) begin
                 s_axis_tdata <= data.pop_front;
-                s_axis_tlast <= (data.size() == 0);
+                s_axis_tlast <= (data.size() == 0); 
             end
             @(posedge s_aclk);
         end
+
+        // In the instance where s_trdy was low when sending the last byte
+        // we need to wait until s_trdy is valid
+        while(!s_axis_trdy)
+            @(posedge s_aclk);
         
         s_axis_tvalid <= 1'b0;
         s_axis_tlast <= 1'b0;

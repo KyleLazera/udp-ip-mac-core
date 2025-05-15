@@ -15,7 +15,7 @@ resize_pblock [get_pblocks pblock_rx_fifo] -add {RAMB36_X0Y12:RAMB36_X0Y14}
 # Create a PBlock for the TX FIFO
 create_pblock pblock_tx_fifo
 add_cells_to_pblock [get_pblocks pblock_tx_fifo] [get_cells -quiet [list ethernet_mac/tx_fifo]]
-resize_pblock [get_pblocks pblock_tx_fifo] -add {SLICE_X6Y54:SLICE_X9Y59}
+resize_pblock [get_pblocks pblock_tx_fifo] -add {SLICE_X6Y54:SLICE_X11Y59}
 resize_pblock [get_pblocks pblock_tx_fifo] -add {RAMB18_X0Y22:RAMB18_X0Y23}
 resize_pblock [get_pblocks pblock_tx_fifo] -add {RAMB36_X0Y11:RAMB36_X0Y11}
 
