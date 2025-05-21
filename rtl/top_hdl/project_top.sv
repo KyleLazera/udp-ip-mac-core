@@ -52,7 +52,10 @@ wire mmcm_clk_feeback;
 wire mmcm_clk_125;
 wire mmcm_clk90_125;
 wire mmcm_clk_200;
+wire mmcm_clk_333;
+
 wire clk_200;
+wire clk_333;
 wire clk_125;
 wire clk90_125;
 
@@ -66,7 +69,10 @@ MMCME2_BASE #(
     .CLKOUT1_PHASE(90),
     .CLKOUT2_DIVIDE(5),
     .CLKOUT2_DUTY_CYCLE(0.5),
-    .CLKOUT2_PHASE(0),    
+    .CLKOUT2_PHASE(0),
+    .CLKOUT3_DIVIDE(3),
+    .CLKOUT3_DUTY_CYCLE(0.5),
+    .CLKOUT3_PHASE(0),    
     .CLKFBOUT_MULT_F(10),
     .CLKFBOUT_PHASE(0),
     .DIVCLK_DIVIDE(1),
@@ -86,7 +92,7 @@ clk_mmcm_inst (
     .CLKOUT1B(),
     .CLKOUT2(mmcm_clk_200),
     .CLKOUT2B(),
-    .CLKOUT3(),
+    .CLKOUT3(mmcm_clk_333),
     .CLKOUT3B(),
     .CLKOUT4(),
     .CLKOUT5(),
@@ -117,6 +123,12 @@ BUFG
 clk_200_bufg_inst (
     .I(mmcm_clk_200),
     .O(clk_200)
+);
+
+BUFG
+clk_333_bufg_inst (
+    .I(mmcm_clk_333),
+    .O(clk_333)
 );
 
 /****************************************************************
@@ -313,7 +325,7 @@ assign tx_axis_udp_tlast = rx_axis_udp_tlast;
 assign rx_axis_udp_trdy = tx_axis_udp_trdy;
 
 // Header Data Loop back
-always @(posedge clk_200) begin
+always @(posedge clk_333) begin
     tx_ip_hdr_tvalid <= rx_ip_hdr_tvalid;
     rx_ip_hdr_trdy <= tx_ip_hdr_trdy;
     tx_ip_total_length <= rx_ip_total_length;
@@ -335,7 +347,7 @@ udp#(.AXI_DATA_WIDTH(8),
      .MAX_PAYLOAD(1472)
 ) udp_stack (
 
-    .i_clk(clk_200),
+    .i_clk(clk_333),
     .i_reset_n(i_reset_n),
     
     /*********** TX Data Path ***********/
@@ -395,7 +407,7 @@ udp#(.AXI_DATA_WIDTH(8),
 ip #(.AXI_STREAM_WIDTH(8), 
      .ETH_FRAME(1)
 ) ip_stack (
-    .i_clk                  (clk_200),
+    .i_clk                  (clk_333),
     .i_reset_n              (i_reset_n),
 
     /****************** TX Data Path ******************/
@@ -477,7 +489,7 @@ ethernet_mac_fifo #(
     .UDP_HEADER_INSERTION(1),
     .IP_HEADER_INSERTION(1)
 ) ethernet_mac (
-    .i_clk(clk_200),
+    .i_clk(clk_333),
     .clk_125(clk_125),
     .clk90_125(clk90_125),
     .i_reset_n(i_reset_n),

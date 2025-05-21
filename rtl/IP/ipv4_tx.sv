@@ -121,6 +121,9 @@ reg [15:0] ip_hdr_checksum;
 reg [31:0] ip_hdr_src_ip_addr;                                 
 reg [31:0] ip_hdr_dst_ip_addr;   
 
+reg [159:0] ip_hdr;
+reg [111:0] eth_hdr;
+
 /* Data Path Ethernet Header Registers */
 reg [15:0] eth_type_reg;
 reg [47:0] eth_src_mac_addr_reg;
@@ -145,7 +148,23 @@ reg [4:0] hdr_cntr = 5'b0;
 /* Checksum Calculation Logic */ 
 reg [16:0] int_checksum_sum = 16'b0;
 reg [15:0] ip_checksum_sum = 16'b0;
-reg [15:0] checksum_pckt_diff = 16'b0;
+reg [15:0] checksum_pckt_diff;
+reg fold_checksum_carry = 1'b0;
+
+reg [16:0] ip_checksum_precompute = 17'b0;
+reg [15:0] ip_checksum_carry = 16'b0;
+
+reg [16:0] src_ip_checksum_precompute = 17'b0;
+reg [15:0] src_ip_checksum_carry = 16'b0;
+
+reg [16:0] dst_ip_checksum_precompute = 17'b0;
+reg [15:0] dst_ip_checksum_carry = 16'b0;
+
+reg [16:0] ip_addr_checksum_precompute = 17'b0;
+reg [15:0] ip_addr_checksum_carry = 16'b0;
+
+reg [16:0] ip_hdr_checksum_precompute = 17'b0;
+reg [15:0] ip_hdr_checksum_carry = 16'b0;
 
 /*  Assign IP Header Constants */
 assign ip_hdr_version = IPv4_VERSION;
@@ -154,6 +173,27 @@ assign ip_hdr_id = IPv4_IDENTIFICATION;
 assign ip_hdr_flags = IPv4_FLAGS;
 assign ip_hdr_frag_offset = IPv4_FRAG_OFFSET;
 assign ip_hdr_ttl = IPv4_TTL;
+
+/* IP Checksum Logic */
+always @(posedge i_clk) begin
+
+   src_ip_checksum_precompute <= ip_hdr_src_ip_addr[31:16] + ip_hdr_src_ip_addr[15:0]; 
+   dst_ip_checksum_precompute <= ip_hdr_dst_ip_addr[31:16] + ip_hdr_dst_ip_addr[15:0];
+   ip_checksum_precompute <= {ip_hdr_version, ip_hdr_length, ip_hdr_type} + {ip_hdr_ttl, ip_hdr_protocol};
+
+   src_ip_checksum_carry <= src_ip_checksum_precompute[15:0] + src_ip_checksum_precompute[16];
+   dst_ip_checksum_carry <= dst_ip_checksum_precompute[15:0] + dst_ip_checksum_precompute[16];
+   ip_checksum_carry <= ip_checksum_precompute[15:0] + ip_checksum_precompute[16];
+
+   ip_addr_checksum_precompute <= src_ip_checksum_carry + dst_ip_checksum_carry;
+
+   ip_addr_checksum_carry <= ip_addr_checksum_precompute[15:0] + ip_addr_checksum_precompute[16];
+
+   ip_hdr_checksum_precompute <= ip_addr_checksum_carry + ip_checksum_carry;
+
+   ip_checksum_sum <= ip_hdr_checksum_precompute[15:0] + ip_hdr_checksum_precompute[16];
+
+end
 
 /* IP Packet Encapsulation Block */
 
@@ -166,11 +206,13 @@ always @(posedge i_clk) begin
       m_tx_axis_tvalid_reg <= 1'b0; 
       m_tx_axis_tlast_reg <= 1'b0;  
       s_ip_hdr_rdy_reg <= 1'b0;
-      m_eth_hdr_tvalid_reg <= 1'b0;      
+      m_eth_hdr_tvalid_reg <= 1'b0; 
+      ip_hdr <= 160'b0;     
+      eth_hdr <= 112'b0;
 
-      // Checksum Registers      
+      /* Checksum Registers */    
       int_checksum_sum <= 17'b0;
-      ip_checksum_sum <= 16'b0;
+      //ip_checksum_sum <= 16'b0;
 
       //Flag/Status Registers
       hdr_latched <= 1'b0;
@@ -213,23 +255,50 @@ always @(posedge i_clk) begin
                eth_type_reg <= s_eth_tx_type;
                eth_src_mac_addr_reg <= s_eth_tx_src_mac_addr;
                eth_dst_mac_addr_reg <= s_eth_tx_dst_mac_addr;
-
-               // Reset checksum reg & handshaking signals
+               
+               /* Reset checksum reg & handshaking signals */
                int_checksum_sum <= 17'b0;
-               ip_checksum_sum <= 16'b0;
-               checksum_pckt_diff <= 16'b0;
+               //ip_checksum_sum <= 16'b0;
 
                m_tx_axis_tvalid_reg <= 1'b1;
                s_ip_hdr_rdy_reg <= 1'b0;
 
+               // Create IP header
+               ip_hdr <= {
+                  ip_hdr_version, ip_hdr_length, s_ip_tx_hdr_type,
+                  16'hDEAD, ip_hdr_id, ip_hdr_flags, ip_hdr_frag_offset,
+                  ip_hdr_ttl, s_ip_tx_protocol, 16'hBEEF, s_ip_tx_src_ip_addr,
+                  s_ip_tx_dst_ip_addr
+               };
+              
+
                if(ETH_FRAME) begin
-                  m_tx_axis_tdata_reg <= s_eth_tx_dst_mac_addr[47:40]; 
+                  //////////////////////////////////////////////////////////////////////////////////////////////
+                  // To improve the overall latency of the design, drive the first byte of the ethernet header
+                  // in this state, and create an adjusted ethernet header (shifted to the left by 8 bits)
+                  //////////////////////////////////////////////////////////////////////////////////////////////
+                  
+                  m_tx_axis_tdata_reg <= s_eth_tx_dst_mac_addr[47:40];
+                  eth_hdr <= {s_eth_tx_dst_mac_addr[39:0], s_eth_tx_src_mac_addr, s_eth_tx_type, 8'h00};                 
+                  
                   // If we are outputting an encapsulated ethernet frame, do not raise the hdr valid flag
                   // because the ethernet header data will be output on the AXI-Stream lines.
                   m_eth_hdr_tvalid_reg <= 1'b0;
                   state_reg <= ETH_HEADER;
                end else begin
+                  
+                  //////////////////////////////////////////////////////////////////////////////////////////////
+                  // To improve the overall latency of teh design, drive the first byte of the IP header
+                  // in this state, and create an adjusted IP header (shifted to the left by 8 bits), similar to
+                  // the ethernet header.
+                  //////////////////////////////////////////////////////////////////////////////////////////////                                  
                   m_tx_axis_tdata_reg <= {ip_hdr_version, ip_hdr_length}; 
+                  ip_hdr <= {
+                     s_ip_tx_hdr_type, 16'hDEAD, ip_hdr_id, ip_hdr_flags,
+                     ip_hdr_frag_offset, ip_hdr_ttl, s_ip_tx_protocol, 
+                     16'hBEEF, s_ip_tx_src_ip_addr, s_ip_tx_dst_ip_addr, 8'h00};                  
+                  
+                  
                   m_eth_hdr_tvalid_reg <= 1'b1;
                   state_reg <= IP_HEADER;
                end    
@@ -245,26 +314,13 @@ always @(posedge i_clk) begin
 
                hdr_cntr <= hdr_cntr + 1;
 
-               case(hdr_cntr) 
-                  4'd0: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[39:32];
-                  4'd1: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[31:24];
-                  4'd2: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[23:16];  
-                  4'd3: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[15:8];
-                  4'd4: m_tx_axis_tdata_reg <= eth_dst_mac_addr_reg[7:0];      
-                  4'd5: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[47:40];
-                  4'd6: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[39:32];
-                  4'd7: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[31:24];
-                  4'd8: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[23:16];  
-                  4'd9: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[15:8];
-                  4'd10: m_tx_axis_tdata_reg <= eth_src_mac_addr_reg[7:0];  
-                  4'd11: m_tx_axis_tdata_reg <= eth_type_reg[15:8];
-                  4'd12: m_tx_axis_tdata_reg <= eth_type_reg[7:0];       
-                  4'd13: begin
-                      m_tx_axis_tdata_reg <= {ip_hdr_version, ip_hdr_length};       
-                      hdr_cntr <= 5'b0;
-                      state_reg <= IP_HEADER;
-                  end
-               endcase
+               m_tx_axis_tdata_reg <= eth_hdr[111 -: 8];
+               eth_hdr <= eth_hdr << 8;
+
+               if(hdr_cntr == 5'd12) begin    
+                  hdr_cntr <= 5'b0;  
+                  state_reg <= IP_HEADER;
+               end
             end
 
          end
@@ -282,87 +338,23 @@ always @(posedge i_clk) begin
             ////////////////////////////////////////////////////////////////////////////////////////////////
 
             if(m_tx_axis_trdy_reg & m_tx_axis_tvalid_reg) begin
-               // Based on the header counter, determine which field of the header to transmit downstream
-               case(hdr_cntr)
-                  5'd0: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_type;
-                     int_checksum_sum <= {ip_hdr_version, ip_hdr_length, ip_hdr_type} + {ip_hdr_ttl, ip_hdr_protocol};
-                  end
-                  5'd1: begin
-                     m_tx_axis_tdata_reg <= 8'hDE;   
-                     ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];   
-                  end
-                  5'd2: begin
-                     m_tx_axis_tdata_reg <= 8'hAD;
-                     int_checksum_sum <= ip_checksum_sum + ip_hdr_src_ip_addr[31:16];
-                  end
-                  5'd3: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_id[15:8];
-                     ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
-                  end
-                  5'd4: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_id[7:0];
-                     int_checksum_sum <= ip_checksum_sum + ip_hdr_src_ip_addr[15:0];             
-                  end   
-                  5'd5: begin
-                     m_tx_axis_tdata_reg <= {ip_hdr_flags, ip_hdr_frag_offset[12:8]};
-                     ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
-                  end
-                  5'd6: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_frag_offset[7:0];
-                     int_checksum_sum <= ip_checksum_sum + ip_hdr_dst_ip_addr[31:16];
-                  end
-                  5'd7: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_ttl;
-                     ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
-                  end
-                  5'd8: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_protocol;
-                     int_checksum_sum <= ip_checksum_sum + ip_hdr_dst_ip_addr[15:0];
-                  end
-                  5'd9: begin
-                     m_tx_axis_tdata_reg <= 8'hBE;  
-                     ip_checksum_sum <= int_checksum_sum[15:0] + int_checksum_sum[16];
-                  end 
-                  5'd10: begin
-                     m_tx_axis_tdata_reg <= 8'hEF;
-                     // Pre-compute the difference for the packet size
-                     checksum_pckt_diff <= 16'hFFFF - ip_checksum_sum;
-                  end                 
-                  5'd11: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_src_ip_addr[31:24];                  
-                  end
-                  5'd12: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_src_ip_addr[23:16];                                   
-                  end    
-                  5'd13: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_src_ip_addr[15:8]; 
-                  end 
-                  5'd14: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_src_ip_addr[7:0];
-                  end 
-                  5'd15: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_dst_ip_addr[31:24]; 
-                  end 
-                  5'd16: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_dst_ip_addr[23:16]; 
-                  end  
-                  5'd17: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_dst_ip_addr[15:8]; 
-                  end 
-                  5'd18: begin
-                     m_tx_axis_tdata_reg <= ip_hdr_dst_ip_addr[7:0]; 
-                     s_tx_axis_trdy_reg <= 1'b1;
-                     pckt_cntr <= IPv4_HDR_BYTES + 1;
-                     state_reg <= PAYLOAD;
-                  end                                                                  
-               endcase
+
+               m_tx_axis_tdata_reg <= ip_hdr[159 -: 8];
+               ip_hdr = ip_hdr << 8;
+
+               if(hdr_cntr == 5'd19) begin
+                  s_tx_axis_trdy_reg <= m_tx_axis_trdy;
+                  checksum_pckt_diff <= 16'hFFFF - ip_checksum_sum;
+                  pckt_cntr <= IPv4_HDR_BYTES + 1;                                    
+                  state_reg <= PAYLOAD;
+               end
                
                hdr_cntr <= hdr_cntr + 1'b1;
-            end
+            end        
 
          end
          PAYLOAD : begin
+            s_tx_axis_trdy_reg <= m_tx_axis_trdy;
             m_tx_axis_tvalid_reg <= 1'b1;
             m_eth_hdr_tvalid_reg <= (ETH_FRAME) ? 1'b0 : !hdr_latched;
 
@@ -371,10 +363,6 @@ always @(posedge i_clk) begin
                m_tx_axis_tdata_reg <= s_tx_axis_tdata;
                m_tx_axis_tlast_reg <= s_tx_axis_tlast;
 
-               if(pckt_cntr > checksum_pckt_diff) begin
-                  ip_checksum_sum <= ip_checksum_sum + 16'b1;
-               end
-
                //If we just sampled the final byte of data, return to the IDLE state on the next
                // clock edge
                if(s_tx_axis_tlast & m_tx_axis_tvalid_reg) begin
@@ -382,13 +370,14 @@ always @(posedge i_clk) begin
                   s_ip_hdr_rdy_reg <= 1'b1;
 
                   // Output the delayed header fields
-                  ip_hdr_checksum <= ~(ip_checksum_sum + pckt_cntr);
+                  ip_hdr_checksum <= ip_checksum_sum + pckt_cntr;
                   ip_hdr_total_length <= pckt_cntr;
                   m_ip_tx_hdr_tvalid_reg <= 1'b1;
 
                   state_reg <= IDLE;
                end
 
+               fold_checksum_carry <= (pckt_cntr > checksum_pckt_diff);
                pckt_cntr <= pckt_cntr + 1;
             end   
 
@@ -417,12 +406,12 @@ assign m_tx_axis_tlast = m_tx_axis_tlast_reg;
 // sending data while the down-stream module is not ready.
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-assign s_tx_axis_trdy = (state_reg == PAYLOAD) ? m_tx_axis_trdy_reg : 1'b0;
+assign s_tx_axis_trdy = s_tx_axis_trdy_reg;
 assign s_ip_tx_hdr_rdy = s_ip_hdr_rdy_reg;
 
 /* IP Header Outputs */
 assign m_ip_tx_hdr_tvalid = m_ip_tx_hdr_tvalid_reg;
 assign m_ip_tx_total_length = ip_hdr_total_length;
-assign m_ip_tx_checksum = ip_hdr_checksum;
+assign m_ip_tx_checksum = ~(ip_hdr_checksum + fold_checksum_carry);
 
 endmodule 

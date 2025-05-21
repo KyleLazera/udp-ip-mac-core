@@ -66,7 +66,6 @@ reg [AXI_DATA_WIDTH-1:0] s_axis_tdata_reg = {AXI_DATA_WIDTH{1'b0}};
 reg s_axis_tvalid_reg = 1'b0;
 reg s_axis_tlast_reg = 1'b0;
 reg s_axis_trdy_reg = 1'b0;
-reg m_axis_trdy_reg = 1'b0;
 
 reg udp_hdr_tvalid_reg = 1'b0;
 reg s_udp_hdr_trdy_reg = 1'b0; 
@@ -90,8 +89,6 @@ always @(posedge i_clk) begin
         s_axis_tlast_reg <= 1'b0;
         udp_hdr_tvalid_reg <= 1'b0;
         s_udp_hdr_trdy_reg <= 1'b0; 
-
-        m_axis_trdy_reg <= m_tx_axis_trdy;
 
         case(state)
             IDLE: begin
@@ -130,7 +127,7 @@ always @(posedge i_clk) begin
                         5'd6: s_axis_tdata_reg <= UDP_CHECKSUM_PLACEHOLDER[15:8];
                         5'd7: begin
                             s_axis_tdata_reg <= UDP_CHECKSUM_PLACEHOLDER[7:0];
-                            s_axis_trdy_reg <= 1'b1;
+                            s_axis_trdy_reg <= m_tx_axis_trdy;
 
                             state <= UDP_PAYLOAD;
                         end
@@ -139,7 +136,7 @@ always @(posedge i_clk) begin
             end 
             UDP_PAYLOAD: begin
                 s_axis_tvalid_reg <= 1'b1;
-                s_axis_trdy_reg <= 1'b1;
+                s_axis_trdy_reg <= m_tx_axis_trdy;
 
                 if(s_tx_axis_tvalid & m_tx_axis_trdy) begin
                     s_axis_tdata_reg <= s_tx_axis_tdata;
@@ -158,7 +155,7 @@ end
 /* Output Logic */
 
 assign s_udp_hdr_trdy = s_udp_hdr_trdy_reg;
-assign s_tx_axis_trdy = (state == UDP_PAYLOAD) ? m_axis_trdy_reg : s_axis_trdy_reg;
+assign s_tx_axis_trdy = s_axis_trdy_reg;
 
 // Master AXI-Stream Outputs
 assign m_tx_axis_tdata = s_axis_tdata_reg;

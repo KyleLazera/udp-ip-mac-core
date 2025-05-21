@@ -21,5 +21,5 @@ payload = Raw(load="This is a test IP packet!")
 packets = eth_packet / ip_packet / udp_packet / payload
 
 # Send the packet 
-sendpfast(packets, iface=iface, file_cache=True, loop=1000)
+sendpfast(packets, iface=iface, file_cache=True, loop=1)
 print("Complete Script")

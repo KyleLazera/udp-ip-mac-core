@@ -107,24 +107,28 @@ cdc_signal_sync#(
 );
 
 /* Full & Empty Flag */
-assign full = (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
-assign empty = (rd_ptr_grey == wr_ptr_grey_sync);
+//assign full = (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
+//assign empty = (rd_ptr_grey == wr_ptr_grey_sync);
 
-/*always @(posedge s_aclk) begin
+always @(posedge s_aclk) begin
     if(!s_sresetn | !m2s_reset_sync)
         full <= 1'b0;
     else
-        full <= (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
+        full <= (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]})) 
+                | (wr_ptr_grey_next == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
 end
 
 always @(posedge m_aclk) begin
     if(!m_sresetn | !s2m_reset_sync)
         empty <= 1'b1;
     else
-        empty <= (rd_ptr_grey == wr_ptr_grey_sync);
-end*/
+        empty <= (rd_ptr_grey == wr_ptr_grey_sync) | (rd_ptr_grey_next == wr_ptr_grey_sync);
+end
 
 /* Writing Logic */
+
+reg [FIFO_ADDR_WIDTH:0] wr_ptr_binary_precompute = {FIFO_ADDR_WIDTH{1'b0}};
+reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey_next = {FIFO_ADDR_WIDTH{1'b0}};
 
 always @(posedge s_aclk) begin
     if(!s_sresetn | !m2s_reset_sync) begin
@@ -134,11 +138,18 @@ always @(posedge s_aclk) begin
         wr_ptr_packet_commit_grey <= {FIFO_ADDR_WIDTH{1'b0}};
         wr_ptr_grey <= {FIFO_ADDR_WIDTH{1'b0}};
         s_frame_commit <= 1'b0;
-    end else begin
-        s_frame_commit <= 1'b0;
 
-        // AXI-Stream handshake signaling valid data/slave is ready 
-        if(s_axis_tvalid & s_axis_trdy & !full) begin
+        wr_ptr_binary_precompute <= {FIFO_ADDR_WIDTH{1'b0}};
+        wr_ptr_grey_next <= {FIFO_ADDR_WIDTH{1'b0}};
+
+    // AXI-Stream Handshake
+    end else if(s_axis_tvalid & s_axis_trdy) begin
+
+        wr_ptr_binary_precompute <= wr_ptr_binary + 3;
+        wr_ptr_grey_next <= (wr_ptr_binary_precompute >> 1) ^ wr_ptr_binary_precompute;
+        
+        // Increment the Binary Pointer if the FIFO is not full
+        if(!full) begin
             bram[wr_ptr_binary[FIFO_ADDR_WIDTH-1:0]] <= {s_axis_tdata, s_axis_tlast};
             
             // If the FIFO is not full, increment the write pointer
@@ -148,14 +159,16 @@ always @(posedge s_aclk) begin
         end
 
         //If it is the last packet and it is not a bad packet; udpate the commited pointer
-        if(s_axis_tvalid & s_axis_trdy & s_axis_tlast & !s_axis_tuser) begin
+        if(s_axis_tlast & !s_axis_tuser) begin
             wr_ptr_packet_commit <= wr_ptr_binary_next;
             s_frame_commit <= 1'b1;
         //If the frame was a bad frame, return the write pointer to the last previously commited frame address
         end else if(s_axis_tuser) begin
             wr_ptr_binary <= wr_ptr_packet_commit;
         end
-        
+    end else begin
+        s_frame_commit <= 1'b0;
+
         //Only update the grey pointer that is used in the read domain if we commit a new frame
         if(s_frame_commit) 
             wr_ptr_packet_commit_grey <= (wr_ptr_packet_commit >> 1) ^ wr_ptr_packet_commit;
@@ -174,12 +187,21 @@ integer i;
 
 /* Reading Logic */
 
+reg [FIFO_ADDR_WIDTH:0] rd_ptr_binary_precompute = {FIFO_ADDR_WIDTH{1'b0}};
+reg [FIFO_ADDR_WIDTH:0] rd_ptr_grey_next = {FIFO_ADDR_WIDTH{1'b0}};
+
 always @(posedge m_aclk) begin
     if(!m_sresetn | !s2m_reset_sync) begin
         rd_ptr_binary <= {FIFO_ADDR_WIDTH{1'b0}};
         rd_ptr_binary_next <= {{(FIFO_ADDR_WIDTH-1){1'b0}}, 1'b1};
-        rd_ptr_grey <= {FIFO_ADDR_WIDTH{1'b0}};        
+        rd_ptr_grey <= {FIFO_ADDR_WIDTH{1'b0}};   
+
+        rd_ptr_grey_next <= {FIFO_ADDR_WIDTH{1'b0}};  
+        rd_ptr_binary_precompute <= {FIFO_ADDR_WIDTH{1'b0}}; 
     end else begin
+
+        rd_ptr_binary_precompute <= rd_ptr_binary + 3;
+        rd_ptr_grey_next <= (rd_ptr_binary_precompute >> 1) ^ rd_ptr_binary_precompute;
 
         for(i = PIPELINE_STAGES; i > 0; i = i-1) begin
             //////////////////////////////////////////////////////////////////////////
@@ -208,7 +230,7 @@ always @(posedge m_aclk) begin
             //Update the read pointer if the FIFO is not empty
             rd_ptr_binary_next <= rd_ptr_binary_next + 1;
             rd_ptr_binary <= rd_ptr_binary_next;
-            rd_ptr_grey <= (rd_ptr_binary_next >> 1) ^ rd_ptr_binary_next;  
+            rd_ptr_grey <= (rd_ptr_binary_next >> 1) ^ rd_ptr_binary_next;   
         end
     end
 end

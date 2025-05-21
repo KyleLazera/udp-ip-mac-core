@@ -12,7 +12,7 @@ create_clock -period 10.000 -name i_clk [get_ports i_clk]
 create_generated_clock -name mmcm_clk_125 [get_pins clk_mmcm_inst/CLKOUT0]
 create_generated_clock -name mmcm_clk90_125 [get_pins clk_mmcm_inst/CLKOUT1]
 create_generated_clock -name mmcm_clk_200 [get_pins clk_mmcm_inst/CLKOUT2]
-create_generated_clock -name clk_200 -source [get_pins clk_mmcm_inst/CLKOUT2] -divide_by 1 [get_pins clk_200_bufg_inst/O]
+create_generated_clock -name clk_333 -source [get_pins clk_mmcm_inst/CLKOUT3] -divide_by 1 [get_pins clk_333_bufg_inst/O]
 create_generated_clock -name mmcm_clk_feedback [get_pins clk_mmcm_inst/CLKFBOUT]
 
 #Forwarded Clock

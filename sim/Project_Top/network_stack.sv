@@ -469,6 +469,12 @@ class ip_stack extends eth_mac;
                 11: begin
                     tx_pckt.ip_hdr.ip_hdr_checksum[7:0] = tx_byte;
                     rx_pckt.ip_hdr.ip_hdr_checksum[7:0] = rx_byte;
+
+                    assert(tx_pckt.ip_hdr.ip_hdr_checksum == rx_pckt.ip_hdr.ip_hdr_checksum) 
+                        else begin
+                            $display("IP tx checksum %0h != IP rx checksum %0h MISMATCH", tx_pckt.ip_hdr.ip_hdr_checksum, rx_pckt.ip_hdr.ip_hdr_checksum);
+                            $finish;
+                        end
                 end
                 12: begin
                     tx_pckt.ip_hdr.src_ip_addr[31:24] = tx_byte;
