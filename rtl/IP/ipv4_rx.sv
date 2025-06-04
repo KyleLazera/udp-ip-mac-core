@@ -69,28 +69,31 @@ module ipv4_rx
 localparam IPv4_VERSION = 4'd4; 
 
 /* State Encoding */
-localparam [2:0] IDLE = 3'b000;
-localparam [2:0] ETH_HDR = 3'b001;
-localparam [2:0] IP_HDR = 3'b010;
-localparam [2:0] PAYLOAD = 3'b011;
-localparam [2:0] WAIT = 3'b100;
+typedef enum logic [1:0] {
+    IDLE = 2'b00,
+    ETH_HDR = 2'b01,
+    IP_HDR = 2'b10,
+    PAYLOAD = 2'b11
+} ip_state_t;
 
 /* Data Path Registers */
-reg [2:0] state = IDLE;
+ip_state_t state = IDLE;
 reg [15:0] ip_checksum_fields;
 reg [16:0] int_checksum_sum = 17'b0;
 reg [15:0] checksum_carry_sum = 16'b0;
+reg bad_pckt_reg = 1'b0;
+
+reg [AXI_DATA_WIDTH-1:0] m_axis_tdata_pipe = {AXI_DATA_WIDTH{1'b0}};
+reg m_axis_tlast_pipe = 1'b0;
+reg m_axis_tvalid_pipe = 1'b0;
+
 reg [AXI_DATA_WIDTH-1:0] m_rx_axis_tdata_reg = {AXI_DATA_WIDTH-1{1'b0}};
 reg m_rx_axis_tvalid_reg = 1'b0;
 reg m_rx_axis_tlast_reg = 1'b0;
 reg s_rx_axis_trdy_reg = 1'b0;
-reg bad_pckt_reg = 1'b0;
 
 reg [4:0] hdr_cntr = 5'b0;
 reg latched_hdr = 1'b0;
-
-/* Checksum Calculation Logic */ 
-reg [15:0] checksum_sum = 16'b0;
 
 /* Ethernet Header Data Path Registers */
 reg eth_hdr_rdy_reg = 1'b0;
@@ -111,7 +114,32 @@ reg [7:0] ip_hdr_ttl;
 reg [7:0] ip_hdr_protocol;
 reg [15:0] ip_hdr_checksum;
 reg [31:0] ip_hdr_src_ip_addr;                                 
-reg [31:0] ip_hdr_dst_ip_addr;  
+reg [31:0] ip_hdr_dst_ip_addr; 
+
+reg [159:0] ip_hdr = 160'b0;
+reg [111:0] eth_hdr = 112'b0;
+
+always @(posedge i_clk) begin
+    // If the up-stream module & down-stream module have data/can recieve data
+    // we can latch the incoming data
+    if(m_rx_axis_trdy) begin
+
+        if(m_axis_tvalid_pipe) begin
+            m_rx_axis_tdata_reg <= m_axis_tdata_pipe;
+            m_rx_axis_tlast_reg <= m_axis_tlast_pipe; 
+            m_axis_tvalid_pipe <= 1'b0;                           
+        end else begin
+            m_rx_axis_tdata_reg <= s_rx_axis_tdata;
+            m_rx_axis_tlast_reg <= s_rx_axis_tlast;
+        end
+    end
+    
+    if(s_rx_axis_trdy & !m_rx_axis_trdy) begin
+        m_axis_tdata_pipe <= s_rx_axis_tdata;
+        m_axis_tlast_pipe <= s_rx_axis_tlast;
+        m_axis_tvalid_pipe <= 1'b1;
+    end     
+end
 
 /* De-encapsulation Logic */
 always @(posedge i_clk) begin
@@ -134,75 +162,37 @@ always @(posedge i_clk) begin
         m_rx_axis_tvalid_reg <= 1'b0;
         m_ip_hdr_tvalid_reg <= 1'b0;
 
-        case(state)
-            IDLE: begin
+        // Only allow the state machine to iterate if the down-stream module (ethernet MAC)
+        // has valid data.
+        if(s_rx_axis_tvalid)  begin
 
-                checksum_carry_sum <= 16'b0;
-                int_checksum_sum <= 17'b0;
-
-                ////////////////////////////////////////////////////////////////////////////////////////
-                // If ETH_FRAME is set, the AXI data recieved will be directly passed from the ethernet MAC
-                // therefore, it will be formatted with the src MAC, dst MAC and ethernet type in front 
-                // of the IP packet. In this case, the ethernet header data will not be passed in-parallel
-                // and the ethernet header data will be in-front of the IP packet.
-                ////////////////////////////////////////////////////////////////////////////////////////
-                if(ETH_FRAME) begin
+            case(state)
+                IDLE: begin
+                    checksum_carry_sum <= 16'b0;
+                    int_checksum_sum <= 17'b0;
                     eth_hdr_rdy_reg <= 1'b0;
-                    
-                    if(s_rx_axis_tvalid) begin
-                        s_rx_axis_trdy_reg <= 1'b1;
-                        hdr_cntr <= 5'b0;
-                        state <= ETH_HDR;
-                    end
-                end else begin
-                    eth_hdr_rdy_reg <= 1'b1;
-
-                    // If there is valid data and valid header, latch the ethernet header and shift
-                    // to the next state
-                    if(s_eth_hdr_valid & s_rx_axis_tvalid) begin
-                        eth_rx_src_mac_addr <= s_eth_rx_src_mac_addr;
-                        eth_rx_dst_mac_addr <= s_eth_rx_dst_mac_addr;
-                        eth_rx_type <= s_eth_rx_type;
-
-                        s_rx_axis_trdy_reg <= 1'b1;
-                        eth_hdr_rdy_reg <= 1'b0;
-                        hdr_cntr <= 5'b0;
-                        state <= IP_HDR;
-                    end
+                    s_rx_axis_trdy_reg <= 1'b1;
+                    hdr_cntr <= 5'b0;
+                    state <= ETH_HDR;
                 end
-            end
-            ETH_HDR: begin
-                s_rx_axis_trdy_reg <= 1'b1;
-
-                if(s_rx_axis_trdy_reg & s_rx_axis_tvalid) begin
+                ETH_HDR: begin
+                    s_rx_axis_trdy_reg <= 1'b1;
 
                     hdr_cntr <= hdr_cntr + 1;
 
-                    // Depending on the header counter, the input values will be associated with
-                    // specific values of the ethernet header
-                    if(hdr_cntr < 4'd6)
-                        eth_rx_dst_mac_addr <= {eth_rx_dst_mac_addr[39:0], s_rx_axis_tdata};
-                    else if(hdr_cntr < 4'd12)
-                        eth_rx_src_mac_addr <= {eth_rx_src_mac_addr[39:0], s_rx_axis_tdata};
-                    else if(hdr_cntr < 4'd14) begin
-                        eth_rx_type <= {eth_rx_type[7:0], s_rx_axis_tdata};
+                    eth_hdr <= {eth_hdr[104:0], s_rx_axis_tdata};
 
-                        if(hdr_cntr == 4'd13) begin
-                            hdr_cntr <= 5'b0;
-                            state <= IP_HDR;
-                        end
-                    end
-                            
+                    if(hdr_cntr == 4'd13) begin
+                        hdr_cntr <= 5'b0;
+                        state <= IP_HDR;
+                    end                    
+
                 end
-            end
-            IP_HDR: begin
-                s_rx_axis_trdy_reg <= 1'b1;
-
-                // AXI-Stream valid handshake
-                if(s_rx_axis_trdy_reg & s_rx_axis_tvalid) begin
+                IP_HDR: begin
+                    s_rx_axis_trdy_reg <= 1'b1;
 
                     hdr_cntr <= hdr_cntr + 1'b1;
-                    
+
                     // If the number of bytes recieved is even, stage the byte to form a 16-bit word
                     // and calculate the carry for any current intermediary sums.
                     if(hdr_cntr[0] == 1'b0) begin
@@ -211,117 +201,60 @@ always @(posedge i_clk) begin
                     end else 
                         int_checksum_sum <= checksum_carry_sum + {ip_checksum_fields[7:0], s_rx_axis_tdata};
 
-                    // Iterate through each byte of the IP header and store the values in the data registers
-                    case(hdr_cntr)
-                        5'd0: begin
-                            // Make sure the packet is an IPv4 packet
-                            if(s_rx_axis_tdata[7:4] == IPv4_VERSION) begin
-                                ip_hdr_length <= s_rx_axis_tdata[3:0];
-                                ip_hdr_version <= s_rx_axis_tdata[7:4];
-                            end else
-                                state <= WAIT;
-                        end
-                        5'd1: ip_hdr_type <= s_rx_axis_tdata;
-                        5'd2: ip_hdr_total_length[15:8] <= s_rx_axis_tdata;
-                        5'd3: ip_hdr_total_length[7:0] <= s_rx_axis_tdata;
-                        5'd4: ip_hdr_id[15:8] <= s_rx_axis_tdata;
-                        5'd5: ip_hdr_id[7:0] <= s_rx_axis_tdata;
-                        5'd6: begin
-                            ip_hdr_flags <= s_rx_axis_tdata[7:5];
-                            ip_hdr_frag_offset[12:8] <= s_rx_axis_tdata[4:0];
-                            // Subtract the total length register from the number of header bytes
-                            ip_hdr_total_length <= ip_hdr_total_length - (ip_hdr_length << 2); 
-                        end
-                        5'd7: ip_hdr_frag_offset[7:0] <= s_rx_axis_tdata;
-                        5'd8: ip_hdr_ttl <= s_rx_axis_tdata;
-                        5'd9: ip_hdr_protocol <= s_rx_axis_tdata;
-                        5'd10: ip_hdr_checksum[15:8] <= s_rx_axis_tdata;
-                        5'd11: ip_hdr_checksum[7:0] <= s_rx_axis_tdata;
-                        5'd12: ip_hdr_src_ip_addr[31:24] <= s_rx_axis_tdata;
-                        5'd13: ip_hdr_src_ip_addr[23:16] <= s_rx_axis_tdata;
-                        5'd14: ip_hdr_src_ip_addr[15:8] <= s_rx_axis_tdata;
-                        5'd15: ip_hdr_src_ip_addr[7:0] <= s_rx_axis_tdata;    
-                        5'd16: ip_hdr_dst_ip_addr[31:24] <= s_rx_axis_tdata;
-                        5'd17: ip_hdr_dst_ip_addr[23:16] <= s_rx_axis_tdata;
-                        5'd18: ip_hdr_dst_ip_addr[15:8] <= s_rx_axis_tdata;
-                        5'd19: ip_hdr_dst_ip_addr[7:0] <= s_rx_axis_tdata;   
-                        5'd20: begin
-                            s_rx_axis_trdy_reg <= m_rx_axis_trdy;
-                            m_ip_hdr_tvalid_reg <= 1'b1;
+                    ip_hdr <= {ip_hdr[151:0], s_rx_axis_tdata};
 
-                            //Store the first raw payload data
-                            m_rx_axis_tdata_reg <= s_rx_axis_tdata;
-                            m_rx_axis_tvalid_reg <= s_rx_axis_tvalid;
-                            m_rx_axis_tlast_reg <= s_rx_axis_tlast;  
-                                
-                            // Decrement the payload byte counter
-                            ip_hdr_total_length <= ip_hdr_total_length - 1'b1;  
+                    if(hdr_cntr == 5'd19) begin
+                        ip_hdr_total_length <= ip_hdr[143-:16] - (ip_hdr[159:156] << 2);
+                        s_rx_axis_trdy_reg <= m_rx_axis_trdy;
+                        state <= PAYLOAD; 
+                    end          
 
-                            // If the packet only contained IP/ethernet header info, return to IDLE
-                            if(s_rx_axis_tlast & s_rx_axis_tvalid)
-                                state <= IDLE; 
-                            else                    
-                                state <= PAYLOAD;         
-
-                        end                                    
-                    endcase            
                 end
-            end
-            PAYLOAD: begin
-                m_rx_axis_tvalid_reg <= 1'b1;
-                m_ip_hdr_tvalid_reg <= 1'b1;
+                PAYLOAD: begin
+                    m_rx_axis_tvalid_reg <= 1'b1;
+                    m_ip_hdr_tvalid_reg <= 1'b1;
+                    s_rx_axis_trdy_reg <= m_rx_axis_trdy;
 
-                // Verify Checksum
-                if(checksum_carry_sum != 16'hFFFF) begin
-                    bad_pckt_reg <= 1'b1;
-                    state <= WAIT;
-                end
+                    ip_hdr_src_ip_addr <= ip_hdr[63:32];
+                    ip_hdr_dst_ip_addr <= ip_hdr[31:0];
+                    eth_rx_dst_mac_addr <= eth_hdr[111:64];
+                    eth_rx_src_mac_addr <= eth_hdr[63:16];                    
+                    eth_rx_type <= eth_hdr[15:0];
 
-                // Once the downstream module has read the header data, we can lower the hdr_valid signal
-                if(latched_hdr || (m_ip_hdr_trdy & m_ip_hdr_tvalid)) begin
-                    m_ip_hdr_tvalid_reg <= 1'b0;
-                    latched_hdr <= 1'b1;
-                end 
+                    // Verify Checksum
+                    if(checksum_carry_sum != 16'hFFFF) begin
+                        bad_pckt_reg <= 1'b1;
+                    end
 
-                // If the up-stream module & down-stream module have data/can recieve data
-                // we can latch the incoming data
-                if(m_rx_axis_trdy & s_rx_axis_tvalid) begin
-                    m_rx_axis_tdata_reg <= s_rx_axis_tdata;
-                    m_rx_axis_tlast_reg <= s_rx_axis_tlast;
+                    // Once the downstream module has read the header data, we can lower the hdr_valid signal
+                    if(latched_hdr || (m_ip_hdr_trdy & m_ip_hdr_tvalid)) begin
+                        m_ip_hdr_tvalid_reg <= 1'b0;
+                        latched_hdr <= 1'b1;
+                    end            
 
                     // Count the number of bytes recieved
-                    ip_hdr_total_length <= ip_hdr_total_length - 1'b1;
+                    if(m_rx_axis_trdy)
+                        ip_hdr_total_length <= ip_hdr_total_length - 1'b1;
 
-                    if(s_rx_axis_tlast & s_rx_axis_tvalid) begin
+                    if(s_rx_axis_tlast) begin
                         latched_hdr <= 1'b0;
-
                         // Total bytes in the payload did not match the bytes specified in the IP Header
                         if(ip_hdr_total_length != 16'b1)begin
                             bad_pckt_reg <= 1'b1;
-                            state <= WAIT;
                         end
-
                         state <= IDLE;
                     end
-                end
 
-            end
-            WAIT: begin
-                s_rx_axis_trdy_reg <= 1'b1;
-                // Wait until the remainder of the packet has been recieved
-                if(s_rx_axis_tlast & s_rx_axis_tvalid) begin
-                    s_rx_axis_trdy_reg <= 1'b0;
-                    latched_hdr <= 1'b0;
-                    state <= IDLE;
                 end
-            end
-        endcase
+            endcase
+
+        end
     end
 end
 
 /* Output Modules */
 assign s_eth_hdr_rdy = eth_hdr_rdy_reg;
-assign s_rx_axis_trdy = (state == PAYLOAD) ? m_rx_axis_trdy : s_rx_axis_trdy_reg;
+assign s_rx_axis_trdy = s_rx_axis_trdy_reg;
 
 assign m_rx_axis_tvalid = m_rx_axis_tvalid_reg;
 assign m_rx_axis_tdata = m_rx_axis_tdata_reg;

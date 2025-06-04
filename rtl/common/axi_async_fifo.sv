@@ -50,8 +50,6 @@ reg [FIFO_ADDR_WIDTH:0] wr_ptr_grey_sync;
 /* Data-Path Registers */
 reg s_frame_commit = 1'b0;
 reg s_axis_trdy_out = 1'b0;
-reg full;
-reg empty;
 
 /* Reset Logic */
 reg [2:0] s_reset_sync = 3'b0;
@@ -107,22 +105,40 @@ cdc_signal_sync#(
 );
 
 /* Full & Empty Flag */
-//assign full = (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
-//assign empty = (rd_ptr_grey == wr_ptr_grey_sync);
+
+reg full_now_msb = 1'b0;
+reg full_now_lsb = 1'b0;
+reg full_next = 1'b0;
+reg empty_now = 1'b1;
+reg empty_next = 1'b1;
+wire full;
+wire empty;
+
+assign full = (full_now_msb & full_now_lsb) | full_next;
 
 always @(posedge s_aclk) begin
-    if(!s_sresetn | !m2s_reset_sync)
-        full <= 1'b0;
-    else
-        full <= (wr_ptr_grey == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]})) 
-                | (wr_ptr_grey_next == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
+    if(!s_sresetn | !m2s_reset_sync) begin
+        full_now_msb <= 1'b0;
+        full_now_lsb <= 1'b0;
+        full_next <= 1'b0;
+    end else begin
+        full_now_msb <= (wr_ptr_grey[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1] == ~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1]);
+        full_now_lsb <= (wr_ptr_grey[FIFO_ADDR_WIDTH-2:0] == rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]);
+        full_next <= (wr_ptr_grey_next == ({~rd_ptr_grey_sync[FIFO_ADDR_WIDTH:FIFO_ADDR_WIDTH-1], rd_ptr_grey_sync[FIFO_ADDR_WIDTH-2:0]}));
+    end
 end
 
+assign empty = empty_now | empty_next;
+
 always @(posedge m_aclk) begin
-    if(!m_sresetn | !s2m_reset_sync)
-        empty <= 1'b1;
-    else
-        empty <= (rd_ptr_grey == wr_ptr_grey_sync) | (rd_ptr_grey_next == wr_ptr_grey_sync);
+    if(!m_sresetn | !s2m_reset_sync) begin
+        empty_now <= 1'b1;
+        empty_next <= 1'b1;
+    end else begin
+        empty_now <= (rd_ptr_grey == wr_ptr_grey_sync); 
+        empty_next <= (rd_ptr_grey_next == wr_ptr_grey_sync);
+
+    end
 end
 
 /* Writing Logic */
@@ -212,7 +228,7 @@ always @(posedge m_aclk) begin
             // not ready for a transaction yet. The pipe also needs to empty its contents
             // completely for each frame.
             //////////////////////////////////////////////////////////////////////////
-            if((~empty | ~pipe_empty) & !pipe_wait) begin
+            if(~pipe_empty & !pipe_wait) begin
                 //Pass data down the pipeline
                 m_axis_tvalid_pipe[i] <= m_axis_tvalid_pipe[i-1];
                 m_axis_tdata_pipe[i] <= m_axis_tdata_pipe[i-1];

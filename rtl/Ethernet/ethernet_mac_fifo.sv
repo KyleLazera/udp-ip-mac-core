@@ -120,7 +120,7 @@ RX FIFO Instantiation
 axi_async_fifo #(
     .AXI_DATA_WIDTH(8),
     .PIPELINE_STAGES(2),
-    .FIFO_ADDR_WIDTH(13) 
+    .FIFO_ADDR_WIDTH(12) 
 ) rx_fifo (
     /* AXI Master - Output Signals / Read Side */
     .m_aclk(i_clk),

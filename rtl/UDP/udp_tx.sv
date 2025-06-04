@@ -69,80 +69,75 @@ reg s_axis_trdy_reg = 1'b0;
 
 reg udp_hdr_tvalid_reg = 1'b0;
 reg s_udp_hdr_trdy_reg = 1'b0; 
-reg [15:0] udp_hdr_src_port_reg = 16'b0;
-reg [15:0] udp_hdr_dst_port_reg = 16'b0;
+reg [AXI_DATA_WIDTH-1:0] udp_header_bytes [0:6];
 
+/* Data Path Pipeline Logic */
+always @(posedge i_clk) begin
+    s_axis_tvalid_reg <= s_tx_axis_tvalid;
+    s_axis_tlast_reg <= s_tx_axis_tlast;
+    udp_hdr_tvalid_reg <= s_udp_hdr_tvalid; 
+end
+
+/* FSM Control Path Logic */
 always @(posedge i_clk) begin
     if(!i_reset_n) begin
         state <= IDLE;
         hdr_cntr <= 4'b0;
-
-        s_axis_trdy_reg <= 1'b0;
-        s_axis_tvalid_reg <= 1'b0;
-        s_axis_tlast_reg <= 1'b0;
-        udp_hdr_tvalid_reg <= 1'b0;
-        s_udp_hdr_trdy_reg <= 1'b0; 
-
     end else begin
-        s_axis_trdy_reg <= 1'b0;
-        s_axis_tvalid_reg <= 1'b0;
-        s_axis_tlast_reg <= 1'b0;
-        udp_hdr_tvalid_reg <= 1'b0;
-        s_udp_hdr_trdy_reg <= 1'b0; 
+        s_axis_trdy_reg <= 1'b0;        
+        s_udp_hdr_trdy_reg <= 1'b0;        
+        hdr_cntr <= 4'b0;
 
         case(state)
-            IDLE: begin
-                hdr_cntr <= 4'b0;
+            IDLE: begin                
                 s_udp_hdr_trdy_reg <= 1'b1;
+                // Set the first byte to transmit as the source port
+                s_axis_tdata_reg <= s_udp_src_port[15:8];
 
-                if(s_udp_hdr_tvalid & s_udp_hdr_trdy_reg) begin
+                if(udp_hdr_tvalid_reg) begin
                     // Latch the UDP Input Header Data
-                    udp_hdr_src_port_reg <= s_udp_src_port;
-                    udp_hdr_dst_port_reg <= s_udp_dst_port;
-                    s_udp_hdr_trdy_reg <= 1'b0;
+                    udp_header_bytes[0] <= s_udp_src_port[7:0];
+                    udp_header_bytes[1] <= s_udp_dst_port[15:8];
+                    udp_header_bytes[2] <= s_udp_dst_port[7:0];   
+                    udp_header_bytes[3] <= UDP_LENGTH_PLACHOLDER[15:8];
+                    udp_header_bytes[4] <= UDP_LENGTH_PLACHOLDER[7:0];
+                    udp_header_bytes[5] <= UDP_CHECKSUM_PLACEHOLDER[15:8];
+                    udp_header_bytes[6] <= UDP_CHECKSUM_PLACEHOLDER[7:0];                                     
                     
-                    // Set the first byte to transmit as the source port
-                    s_axis_tdata_reg <= s_udp_src_port[15:8];
-                    s_axis_tvalid_reg <= 1'b1;
+                    s_udp_hdr_trdy_reg <= 1'b0;
 
-                    // Shift states & increment the header counter
-                    hdr_cntr <= hdr_cntr + 1;
+                    // Shift states
                     state <= UDP_HDR;
                 end
             end 
             UDP_HDR: begin
-                s_axis_tvalid_reg <= 1'b1;
-                // Before sending more data, make sure the downstream module is ready
-                if(m_tx_axis_trdy & m_tx_axis_tvalid) begin
+                // Before sending the initial UDP header, make sure the downstream module is ready
+                // to recieve data 
+                if(m_tx_axis_trdy) begin
 
                     hdr_cntr <= hdr_cntr + 1;
 
-                    // Iterate through the header counter to determine which part of teh header to transmit
-                    case(hdr_cntr)
-                        5'd1: s_axis_tdata_reg <= udp_hdr_src_port_reg[7:0];
-                        5'd2: s_axis_tdata_reg <= udp_hdr_dst_port_reg[15:8];
-                        5'd3: s_axis_tdata_reg <= udp_hdr_dst_port_reg[7:0];
-                        5'd4: s_axis_tdata_reg <= UDP_LENGTH_PLACHOLDER[15:8];
-                        5'd5: s_axis_tdata_reg <= UDP_LENGTH_PLACHOLDER[7:0];
-                        5'd6: s_axis_tdata_reg <= UDP_CHECKSUM_PLACEHOLDER[15:8];
-                        5'd7: begin
-                            s_axis_tdata_reg <= UDP_CHECKSUM_PLACEHOLDER[7:0];
-                            s_axis_trdy_reg <= m_tx_axis_trdy;
+                    // Iterate and transmit each byte of teh UDP header
+                    s_axis_tdata_reg <= udp_header_bytes[hdr_cntr];
 
-                            state <= UDP_PAYLOAD;
-                        end
-                    endcase
+                    if(hdr_cntr == 5'd6) begin
+                        s_axis_trdy_reg <= m_tx_axis_trdy;
+                        state <= UDP_PAYLOAD;                        
+                    end
                 end
             end 
             UDP_PAYLOAD: begin
-                s_axis_tvalid_reg <= 1'b1;
                 s_axis_trdy_reg <= m_tx_axis_trdy;
 
-                if(s_tx_axis_tvalid & m_tx_axis_trdy) begin
+                // AXI-Stream Handhsaking is valid before transmitting data tot eh donw-stream
+                // module
+                if(m_tx_axis_trdy) begin
                     s_axis_tdata_reg <= s_tx_axis_tdata;
-                    s_axis_tlast_reg <= s_tx_axis_tlast;
 
-                    if(s_tx_axis_tlast & s_axis_tvalid_reg) begin
+                    // If the tlast signal is asserted, this indicates we have recieved the last beat
+                    // of teh transaction and we should therefore lower the rdy flag & return to the 
+                    // IDLE state
+                    if(s_tx_axis_tlast) begin
                         s_axis_trdy_reg <= 1'b0;
                         state <= IDLE;
                     end

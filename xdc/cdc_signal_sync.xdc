@@ -14,3 +14,4 @@ set_max_delay -from [get_pins -filter {REF_PIN_NAME == C} -of [get_cells -hierar
 set_max_delay -from [all_inputs] -to [get_pins -filter {REF_PIN_NAME == D} -of [get_cells -hierarchical -filter {NAME =~ *cdc_signal_sync_reg_reg[0]*}]] 10.000
 
 
+
