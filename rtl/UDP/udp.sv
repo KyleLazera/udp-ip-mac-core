@@ -94,6 +94,7 @@ udp_state_t state = HEADER_SUM_COMBINE;
 reg [PCKT_CNTR_WIDTH-1:0] pckt_cntr = {PCKT_CNTR_WIDTH{1'b0}};
 reg hdr_latched = 1'b0;
 reg s_tx_udp_trdy;
+reg odd_last_byte = 1'b0;
 
 // Checksum Signals 
 reg [AXI_DATA_WIDTH-1:0] udp_checksum_value = 8'b0;
@@ -101,7 +102,6 @@ reg [16:0] int_checksum_sum = 17'b0;
 reg [16:0] odd_byte_checksum = 17'b0;
 reg [15:0] checksum_sum_carry = 16'b0;
 reg [15:0] odd_checksum_sum_carry = 16'b0;
-reg odd_last_byte = 1'b0;
 
 reg [16:0] src_ip_checksum_precompute = 17'b0;
 reg [16:0] dst_ip_checksum_precompute = 17'b0;

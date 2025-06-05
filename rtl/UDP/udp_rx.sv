@@ -74,7 +74,6 @@ reg [15:0] udp_hdr_src_port_reg = 16'b0;
 reg [15:0] udp_hdr_dst_port_reg = 16'b0;
 reg [15:0] udp_hdr_checksum_reg = 16'b0;
 reg [15:0] udp_hdr_length;
-
 reg [63:0] udp_hdr = 64'b0; 
 
 /* AXI-Stream Data Path */

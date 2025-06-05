@@ -103,19 +103,9 @@ reg [15:0] eth_rx_type = 16'd0;
 
 /* IP Header Data Path Registers */
 reg m_ip_hdr_tvalid_reg = 1'b0;
-reg [3:0] ip_hdr_version;
-reg [3:0] ip_hdr_length;
-reg [7:0] ip_hdr_type;
 reg [15:0] ip_hdr_total_length;
-reg [15:0] ip_hdr_id;
-reg [2:0] ip_hdr_flags;
-reg [12:0] ip_hdr_frag_offset;
-reg [7:0] ip_hdr_ttl;
-reg [7:0] ip_hdr_protocol;
-reg [15:0] ip_hdr_checksum;
 reg [31:0] ip_hdr_src_ip_addr;                                 
 reg [31:0] ip_hdr_dst_ip_addr; 
-
 reg [159:0] ip_hdr = 160'b0;
 reg [111:0] eth_hdr = 112'b0;
 

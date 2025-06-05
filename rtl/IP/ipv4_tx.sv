@@ -255,7 +255,6 @@ always @(posedge i_clk) begin
 
       m_tx_axis_tlast_reg <= s_tx_axis_tlast;  
       m_tx_axis_trdy_reg <= m_tx_axis_trdy;
-      fold_checksum_carry <= (pckt_cntr > checksum_pckt_diff);
 
       // FSM
       case(state)
@@ -276,6 +275,7 @@ always @(posedge i_clk) begin
                ip_hdr_src_ip_addr <= s_ip_tx_src_ip_addr;
                ip_hdr_dst_ip_addr <= s_ip_tx_dst_ip_addr;
 
+               // Latch IP Header 
                ip_hdr_bytes[0] <= {ip_hdr_version, ip_hdr_length};
                ip_hdr_bytes[1] <= s_ip_tx_hdr_type; 
                ip_hdr_bytes[2] <= 8'hDE;
@@ -297,6 +297,7 @@ always @(posedge i_clk) begin
                ip_hdr_bytes[18] <= s_ip_tx_dst_ip_addr[15:8]; 
                ip_hdr_bytes[19] <= s_ip_tx_dst_ip_addr[7:0];                
 
+               // Latch Ethernet
                eth_hdr_bytes[0] <= s_eth_tx_dst_mac_addr[47:40];
                eth_hdr_bytes[1] <= s_eth_tx_dst_mac_addr[39:32];
                eth_hdr_bytes[2] <= s_eth_tx_dst_mac_addr[31:24];
@@ -366,6 +367,7 @@ always @(posedge i_clk) begin
             s_tx_axis_trdy_reg <= m_tx_axis_trdy;
             m_eth_hdr_tvalid_reg <= (ETH_FRAME) ? 1'b0 : !hdr_latched;
             m_tx_axis_tdata_reg <= s_tx_axis_tdata;
+            fold_checksum_carry <= (pckt_cntr > checksum_pckt_diff);
 
             // Make sure AXI Handshake is active - Due to the AXI-Stream specification,
             // once the master drives the tvalid flag, it cannot lower it until all data

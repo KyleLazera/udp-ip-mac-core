@@ -53,13 +53,15 @@ localparam logic [15:0] UDP_LENGTH_PLACHOLDER = 16'hBEEF;
 
 /* State Declarations */
 
-localparam IDLE = 2'b00;
-localparam UDP_HDR = 2'b01;
-localparam UDP_PAYLOAD = 2'b10;
+typedef enum logic [1:0] {
+    IDLE = 2'b00,
+    UDP_HDR = 2'b01,
+    UDP_PAYLOAD = 2'b10
+} udp_state_t;
 
 /* Register Declarations */
 
-reg [1:0] state = IDLE;
+udp_state_t state = IDLE;
 reg [3:0] hdr_cntr = 4'b0;
 
 reg [AXI_DATA_WIDTH-1:0] s_axis_tdata_reg = {AXI_DATA_WIDTH{1'b0}};
