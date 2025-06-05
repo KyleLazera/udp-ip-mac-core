@@ -20,11 +20,11 @@ Supported Features
   - Custom Auto-Negotiation Logic – Determines link speed dynamically.
   - Hardware CRC Calculation – Computes and appends CRC checksums on outgoing packets.
   - AXI-Stream Interface – Provides a high-speed, standardized interface to external modules.
-  - FIFO Buffering – Implements internal FIFO queues to buffer incoming and outgoing packets, reducing latency.
+  - UDP/IP header injection - Allows for the injection of delayed UDP and IP header fields (UDP length/checksum etc.)
 
 ### Limitations And Future Improvements
+  - Reduce total latency on RX side.
   - No MDIO Module – Does not currently implement MDIO (Management Data Input/Output) for PHY configuration.
-  - No Pause Frame/Flow Control Support
   - No Jumbo Frame Support – Limited to standard Ethernet frame sizes (≤1518 bytes).
   - Mid-Transaction Link speed changes are not permitted.
 ## Top Level Design
