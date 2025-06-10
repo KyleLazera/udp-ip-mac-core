@@ -22,8 +22,9 @@ This project is a low-latency network stack implemented on an FPGA, specifically
   - Prepends and removes UDP headers  
   - Computes the UDP checksum
 
-### Future Improvements
-This project is still a work in progress and has several areas where enhancements are planned. As development continues, the following improvements are targeted to enhance overall functionality and performance:
+### Extras
+
+Although the main goal of the project has been achieved, there are still several improvements and additions that could enhance its overall functionality:
 
 1. **Add ARP support** to enable MAC address resolution for IP communication.  
 2. **Reduce RX Ethernet latency** to further minimize end-to-end transmission delays.  
