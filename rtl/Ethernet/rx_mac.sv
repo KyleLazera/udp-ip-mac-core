@@ -290,7 +290,6 @@ always @(posedge clk) begin
                     axis_data_reg <= rgmii_rdx[4];
 
                     //If the RX FIFO is full or there was a data error/data not valid, do not store the packet in the FIFO
-                    //todo: For flow control, we would also need to inspect the opcode and eth_type
                     if((s_rx_axis_trdy == 1'b0) || !rgmii_dv[4] && rgmii_er[4]) begin 
                         axis_user_reg <= 1'b1;
                         state_reg <= BAD_PCKT;
